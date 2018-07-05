@@ -1,0 +1,3 @@
+[submodule "binutils-ulp"]
+	path = binutils-ulp
+	url = gitlab@gitlab.suse.de:jmoreira/binutils-ulp.git
