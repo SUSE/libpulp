@@ -1,0 +1,3 @@
+/tmp/patch1.so
+@/usr/lib64/libdummy.so
+bar:new_bar

@@ -1,0 +1,71 @@
+/*
+ *  libpulp - User-space Livepatching Library
+ *
+ *  Copyright (C) 2017-2018 SUSE Linux GmbH
+ *
+ *  This file is part of libpulp.
+ *
+ *  libpulp is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  libpulp is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *  Author: Joao Moreira <jmoreira@suse.de>
+ */
+
+#include <link.h>
+#include <bfd.h>
+
+struct ulp_process
+{
+    int pid;
+
+    Elf64_Addr load_bias;
+
+    struct ulp_thread *threads;
+    struct ulp_dynobj *dynobjs;
+};
+
+struct ulp_thread
+{
+    int tid;
+    struct user_regs_struct context;
+    int consistent;
+    struct ulp_thread *next;
+};
+
+struct ulp_dynobj
+{
+    char *filename;
+    int main;
+    struct link_map link_map;
+    asymbol **symtab;
+    int symtab_len;
+
+    Elf64_Addr loop;
+    Elf64_Addr trigger;
+    Elf64_Addr consistency;
+    Elf64_Addr path_buffer;
+
+    struct ulp_dynobj *next;
+};
+
+struct ulp_addresses
+{
+    Elf64_Addr loop;
+    Elf64_Addr trigger;
+    Elf64_Addr path_buffer;
+};
+
+typedef struct ulp_process ulp_process;
+typedef struct ulp_thread ulp_threads;
+typedef struct ulp_dynobj ulp_dynobj;
+typedef struct ulp_addresses ulp_addresses;
