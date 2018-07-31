@@ -29,6 +29,7 @@ Source0:	%{name}-%{version}.tar.bz2
 %define _specdir %(echo $PWD)
 %define _srcrpmdir %{topdir}/rpms
 
+BuildRequires:  libelf-devel
 # Custom binutils is also built with libpulp, thus inherit its BuildRequires
 BuildRequires:  bison
 #BuildRequires:  dejagnu
