@@ -9,7 +9,7 @@ set -e
 # TODO: fix this.
 echo "** building modified binutils (bfd/ld)"
 cd ../binutils-ulp/
-./configure --prefix=$BFD_DIR
+./configure --prefix=$BFD_DIR --disable-gdb
 make clean
 make -j${NUMCORES}
 make install
