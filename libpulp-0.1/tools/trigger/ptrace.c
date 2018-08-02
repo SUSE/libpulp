@@ -85,7 +85,6 @@ int read_byte(char *byte, int pid, Elf64_Addr addr)
     value = ptrace(PTRACE_PEEKDATA, pid, addr, 0);
     if (errno)
     {
-	WARN("Unable to read byte.\n");
 	return 1;
     }
     *byte = value & 0xff;
@@ -127,30 +126,25 @@ int read_string(char **buffer, int pid, Elf64_Addr addr)
     if (attach(pid))
     {
 	WARN("Unable to attach to %d.\n", pid);
+        return 1;
     };
 
-    do {
-	if (read_byte(&byte, pid, addr + len))
-	{
-	    WARN("read_string error.\n");
-	    return 2;
-	}
-	len++;
-    } while (byte);
+    while (!read_byte(&byte, pid, addr + len) && byte) len++;
 
-    *buffer = malloc(len + 3);
+    *buffer = malloc(len + 1);
     if (!buffer)
     {
 	WARN("read string malloc error.\n");
-	return 3;
+	return 2;
     }
 
-    for (i = 0; i < len + 3; i++) {
+    for (i = 0; i < len; i++) {
 	if (read_byte((*buffer + i), pid, addr + i)) {
 	    WARN("read string error.\n");
-	    return 4;
+	    return 3;
 	}
     }
+    *(*buffer + i) = '\0';
 
     if (detach(pid))
     {

@@ -515,7 +515,7 @@ int check_thread_consistency(char *path)
 
     if (d == NULL)
     {
-	WARN("to be patched object not loaded.\n");
+	WARN("to be patched object (%s) not loaded.\n", obj->name);
 	return 3;
     }
 
@@ -885,7 +885,7 @@ int check_patch_sanity()
 
     if (!d)
     {
-	WARN("to be patched object not loaded.");
+	WARN("to be patched object (%s) not loaded.", obj->name);
 	return 3;
     }
 
