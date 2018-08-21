@@ -64,7 +64,7 @@ __ulp_get_flag:
     nop
     nop
     xor	    %rax, %rax
-    mov	    __ulp_flag@gottpoff(%rip), %r10
+    mov	    __ulp_ret@gottpoff(%rip), %r10
     mov	    %fs:(%r10), %rax
     int3
 
@@ -76,9 +76,3 @@ __ulp_get_flag:
 .global __ulp_ret
 __ulp_ret:
 .word   0x0
-
-.type   __ulp_flag, @object
-.size   __ulp_flag, 8
-.global __ulp_flag
-__ulp_flag:
-.word 0x0
