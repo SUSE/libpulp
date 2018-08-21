@@ -27,7 +27,10 @@
 __ulp_trigger:
     nop
     nop
+    push    %rsp
+    and     $0xfffffffffffffff0, %rsp
     call    __ulp_apply_patch@PLT
+    pop     %rsp
     int3
 
 /* this can be optimized to return the address directly */
@@ -35,7 +38,10 @@ __ulp_trigger:
 __ulp_get_path_buffer:
     nop
     nop
+    push    %rsp
+    and     $0xfffffffffffffff0, %rsp
     call    __ulp_get_path_buffer_addr@PLT
+    pop     %rsp
     int3
 
 .align 8
