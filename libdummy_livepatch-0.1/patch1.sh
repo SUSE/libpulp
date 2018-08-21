@@ -1,6 +1,6 @@
 #!/bin/sh
 
-LIBNAME="libdummy"
+LIBNAME="libdummy.so"
 
 function schedule_retry
 {
