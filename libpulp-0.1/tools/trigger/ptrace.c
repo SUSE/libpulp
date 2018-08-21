@@ -168,6 +168,8 @@ int restart(int pid)
 /* attach/detach and run functions */
 int attach(int pid)
 {
+    int status;
+
     if (ptrace(PTRACE_ATTACH, pid, NULL, NULL))
     {
 	WARN("PTRACE_ATTACH error.\n");
@@ -175,8 +177,8 @@ int attach(int pid)
     }
 
     usleep(1000);
-    if (waitpid(pid, 0, WSTOPPED) == -1) {
-	WARN("waitpid error.\n");
+    if (waitpid(-1, &status, __WALL) == -1) {
+	WARN("waitpid error (pid %d).\n", pid);
 	return 2;
     }
 
@@ -236,13 +238,13 @@ int run_and_redirect(int pid, struct user_regs_struct *regs, Elf64_Addr addr)
     }
 
     usleep(1000);
-    if (wait(&status) == -1)
+    if (waitpid(-1, &status, __WALL) == -1)
     {
-	WARN("wait() error (pid %d).\n", pid);
+	WARN("waitpid error (pid %d).\n", pid);
 	return 4;
     }
 
-    if (WIFEXITED(status))
+    if (WIFEXITED(status) || WCOREDUMP(status))
     {
 	WARN("%d failed %s.\n", pid, strsignal(WEXITSTATUS(status)));
 	return 5;
