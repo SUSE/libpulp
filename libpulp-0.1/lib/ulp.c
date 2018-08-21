@@ -448,7 +448,7 @@ int is_object_consistent(struct ulp_object *obj)
 {
     char *flag;
 
-    flag = load_so_symbol("__ulp_flag", obj->dl_handler);
+    flag = load_so_symbol("__ulp_ret", obj->dl_handler);
 
     if (*flag) return 0;
     return 1;
