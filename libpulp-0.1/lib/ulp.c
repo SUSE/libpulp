@@ -67,6 +67,16 @@ void * __ulp_get_path_buffer_addr()
     return &__ulp_path_buffer;
 }
 
+int __ulp_check_applied_patch()
+{
+    struct ulp_applied_patch *patch;
+
+    __ulp_path_buffer[33] = '\0';
+    patch = ulp_get_applied_patch(__ulp_path_buffer);
+    if (patch) return 1;
+    else return 0;
+}
+
 /* libpulp functions */
 void free_metadata(struct ulp_metadata *ulp)
 {

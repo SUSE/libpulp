@@ -57,18 +57,18 @@ int check_args(int argc, char *argv[])
     return 0;
 }
 
-int apply_patch(char *path)
+int patch_applied()
 {
     struct ulp_thread *t;
     struct user_regs_struct context;
     int patched;
 
     t = target.threads;
-    if (set_path_buffer(path, t)) return 2;
+    if (set_id_buffer(ulp.patch_id, t)) return 2;
 
     /* redirect control-flow to trigger */
     context = t->context;
-    context.rip = addr.trigger + 2;
+    context.rip = addr.check + 2;
 
     if (run_and_redirect(t->tid, &context, addr.loop))
     {
@@ -78,15 +78,16 @@ int apply_patch(char *path)
 
     /* capture trigger return */
     patched = context.rax;
-    context = t->context;
+    //context = t->context;
 
+    /*
     if (attach(t->tid))
     {
 	WARN("apply patch error (attach).");
 	return 2;
     }
 
-    /* put thread back into loop */
+    / put thread back into loop /
     if (set_regs(t->tid, &context))
     {
 	WARN("apply patch error (set_regs).");
@@ -97,16 +98,19 @@ int apply_patch(char *path)
     {
 	WARN("apply patch error (detach).");
 	return 4;
-    }
+    }*/
 
-    if (!patched)
+    /*if (!patched)
     {
 	WARN("apply patch error: patch not applied.");
 	return 5;
-    }
+    }*/
 
-    return 0;
+    return patched;
 }
+
+
+
 
 int main(int argc, char **argv)
 {
@@ -114,7 +118,7 @@ int main(int argc, char **argv)
     int var;
     int consistent;
     char *livepatch;
-    int patched = 0;
+    int patched = -1;
 
     if (check_args(argc, argv)) return 2;
     pid = atoi(argv[1]);
@@ -130,13 +134,13 @@ int main(int argc, char **argv)
 
     if (restart(pid)) return 7;
 
-    if (!check_consistency(livepatch))
+    if (patch_applied(livepatch))
     {
-	if (apply_patch(livepatch)) WARN("apply patch failed.");
-	else WARN("Patching succesful.");
+        WARN("Process %d was already patched.", pid);
+        patched = 1;
     } else {
-	WARN("Patch could not be applied, try again.");
-	patched = 1;
+        WARN("Process %d not patched.", pid);
+        patched = 0;
     }
 
     if (stop(pid)) return 8;
@@ -145,6 +149,5 @@ int main(int argc, char **argv)
 
     if (restart(pid)) return 10;
 
-    WARN("Patching attempt finished.");
     return patched;
 }

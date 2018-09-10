@@ -72,6 +72,7 @@ mv rpm/build/libdummy.so %{buildroot}%_libdir/libdummy.so
 mv rpm/build/trigger %{buildroot}%_bindir/ulp_trigger
 mv rpm/build/packer %{buildroot}%_bindir/ulp_packer
 mv rpm/build/dynsym_gate %{buildroot}%_bindir/ulp_dynsym_gate
+mv rpm/build/checker %{buildroot}%_bindir/ulp_check
 
 %files -n libpulp
 %defattr(-,root,root)
@@ -79,6 +80,7 @@ mv rpm/build/dynsym_gate %{buildroot}%_bindir/ulp_dynsym_gate
 %{_bindir}/ulp_trigger
 %{_bindir}/ulp_packer
 %{_bindir}/ulp_dynsym_gate
+%{_bindir}/ulp_check
 
 %files -n dummyapp
 %defattr(-,root,root)

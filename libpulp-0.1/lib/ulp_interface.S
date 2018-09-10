@@ -45,6 +45,16 @@ __ulp_get_path_buffer:
     int3
 
 .align 8
+__ulp_check_patched:
+    nop
+    nop
+    push   %rsp
+    and    $0xfffffffffffffff0, %rsp
+    call   __ulp_check_applied_patch@PLT
+    pop    %rsp
+    int3
+
+.align 8
 __ulp_loop:
     nop
     nop
