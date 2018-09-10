@@ -28,8 +28,10 @@
 #include <sys/ptrace.h>
 #include <sys/wait.h>
 #include <sys/user.h>
-#include "trigger.h"
+#include <unistd.h>
 #include "../../include/ulp_common.h"
+#include "introspection.h"
+#include "ptrace.h"
 
 extern ulp_process target;
 

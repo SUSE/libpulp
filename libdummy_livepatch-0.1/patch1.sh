@@ -22,6 +22,18 @@ function patch_me
     fi
 }
 
+function check_me
+{
+    echo "** LIVEPATCH CHECKER: CHECKING PID $1"
+    /usr/bin/ulp_check $1 /tmp/metadata1.ulp
+    if [ $? = 0 ];
+    then
+        echo "- NOT PATCHED!"
+    else
+        echo "- PATCHED!"
+    fi
+}
+
 function patch_targets
 {
     rm -f /tmp/patching.ulp
@@ -47,7 +59,11 @@ function apply_patch
 {
     cat /tmp/patching.ulp | while read pid
     do
+        check_me ${pid}
+        sleep 1
         patch_me ${pid}
+        sleep 1
+        check_me ${pid}
     done
 }
 

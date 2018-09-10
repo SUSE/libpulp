@@ -29,7 +29,10 @@ ${CC} -c ../lib/trm.S -o ./build/trm.o -fPIC --shared
 ${CC} ../tools/packer/packer.c -o ./build/packer -lelf -Wall
 ${CC} ../tools/dynsym_gate/dynsym_gate.c -o ./build/dynsym_gate -lelf -Wall
 ${CC} ../tools/trigger/trigger.c -c -o ./build/trigger.o
+${CC} ../tools/trigger/check.c -c -o ./build/check.o
+${CC} ../tools/trigger/introspection.c -c -o ./build/introspection.o
 ${CC} ../tools/trigger/ptrace.c -c -o ./build/ptrace.o
-${CC} ./build/trigger.o ./build/ptrace.o -o ./build/trigger -lelf -lbfd -lz -liberty -ldl -lpthread
+${CC} ./build/trigger.o ./build/ptrace.o ./build/introspection.o -o ./build/trigger -lelf -lbfd -lz -liberty -ldl -lpthread
+${CC} ./build/ptrace.o ./build/introspection.o ./build/check.o -o ./build/checker -lelf -lbfd -lz -liberty -ldl -lpthread
 
 echo $'\n** DONE'
