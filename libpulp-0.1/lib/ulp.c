@@ -52,8 +52,6 @@ int __ulp_apply_patch()
 	return 0;
     }
 
-    fprintf(stderr, "load patch successful\n");
-
     return 1;
 }
 
