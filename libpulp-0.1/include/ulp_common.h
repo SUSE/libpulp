@@ -28,8 +28,6 @@
 
 #define WARN(format, ...) \
 	fprintf(stderr, "ulp: " format "\n", ##__VA_ARGS__)
-#define OUT_PATCH_NAME "metadata.ulp"	// TODO: these may no longer be needed
-#define ULP_PATH "/tmp/ulp/"
 
 #define ULP_PATH_LEN 256
 
