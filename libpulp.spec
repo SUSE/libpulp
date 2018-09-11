@@ -35,6 +35,7 @@ BuildRequires:  bison
 #BuildRequires:  dejagnu
 BuildRequires:  flex
 BuildRequires:  gcc-c++
+BuildRequires:	binutils-devel
 # for the testsuite
 %if 0%{suse_version} >= 1210
 #BuildRequires:  glibc-devel-static
