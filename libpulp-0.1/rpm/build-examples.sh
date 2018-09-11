@@ -5,15 +5,11 @@ BFD_DIR="./binutils/"
 ULP_LD="${BFD_DIR}bin/ld"
 LINKER="/lib64/ld-linux-x86-64.so.2"
 LIB="/usr/lib64/"
-ULP_DIR="/tmp/ulp/"
 LD="ld"
 
 set -e
 
 echo $'*** LIBPULP:'
-echo $'** Setting up environment'
-export LD_LIBRARY_PATH="${ULP_DIR}:$LD_LIBRARY_PATH"
-
 echo $'** Cleaning up build dir'
 cd build
 rm -f *.o
