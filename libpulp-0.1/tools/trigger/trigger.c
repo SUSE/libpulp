@@ -78,31 +78,10 @@ int apply_patch(char *path)
 
     /* capture trigger return */
     patched = context.rax;
-    context = t->context;
-
-    if (attach(t->tid))
-    {
-	WARN("apply patch error (attach).");
-	return 2;
-    }
-
-    /* put thread back into loop */
-    if (set_regs(t->tid, &context))
-    {
-	WARN("apply patch error (set_regs).");
-	return 3;
-    };
-
-    if (detach(t->tid))
-    {
-	WARN("apply patch error (detach).");
-	return 4;
-    }
-
     if (!patched)
     {
 	WARN("apply patch error: patch not applied.");
-	return 5;
+	return 2;
     }
 
     return 0;
@@ -121,10 +100,16 @@ int main(int argc, char **argv)
     livepatch = argv[2];
 
     if (stop(pid)) return 3;
-    if (initialize_data_structures(pid, livepatch)) return 4;
+    if (initialize_data_structures(pid, livepatch)) {
+      restart(pid);
+      return 4;
+    }
 
     /* verify if to-be-patched libs support libpulp */
-    if (check_patch_sanity(livepatch)) return 5;
+    if (check_patch_sanity(livepatch)) {
+      restart(pid);
+      return 5;
+    }
 
     if (hijack_threads()) return 6;
 
