@@ -63,7 +63,7 @@ cd rpm
 %install
 mkdir -p %{buildroot}%_bindir
 mkdir -p %{buildroot}%_libdir
-mkdir -p %{buildroot}/tmp/
+mkdir -p %{buildroot}/var/ulp/
 mv rpm/build/ex1 %{buildroot}%_bindir/dummyapp1
 mv rpm/build/ex2 %{buildroot}%_bindir/dummyapp2
 mv rpm/build/ex3 %{buildroot}%_bindir/dummyapp3
@@ -73,6 +73,7 @@ mv rpm/build/trigger %{buildroot}%_bindir/ulp_trigger
 mv rpm/build/packer %{buildroot}%_bindir/ulp_packer
 mv rpm/build/dynsym_gate %{buildroot}%_bindir/ulp_dynsym_gate
 mv rpm/build/checker %{buildroot}%_bindir/ulp_check
+mv tools/dispatcher/dispatcher.lua %{buildroot}%_bindir/ulp_dispatcher
 
 %files -n libpulp
 %defattr(-,root,root)
@@ -81,6 +82,7 @@ mv rpm/build/checker %{buildroot}%_bindir/ulp_check
 %{_bindir}/ulp_packer
 %{_bindir}/ulp_dynsym_gate
 %{_bindir}/ulp_check
+%{_bindir}/ulp_dispatcher
 
 %files -n dummyapp
 %defattr(-,root,root)

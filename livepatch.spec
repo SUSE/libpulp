@@ -28,12 +28,14 @@ Source0:	%{name}-%{version}.tar.bz2
 %define _sourcedir %(echo $PWD)
 %define _specdir %(echo $PWD)
 %define _srcrpmdir %{topdir}/rpms
+%define patchdir /var/ulp/%{name}-%{version}
 
 # tricky part: we need to build using libdummy 0.1 binaries, but before
 # installing, we need to make sure that these binaries are up to date
 BuildRequires:	dummyapp = 0.1
 BuildRequires:	libpulp
 Requires:	libpulp
+Requires:	lua53
 
 %description
 This package provides a livepatch for libdummy.
@@ -45,18 +47,16 @@ This package provides a livepatch for libdummy.
 ./build-livepatch.sh
 
 %install
-mkdir -p %{buildroot}/tmp/
-mv ./build/patch1.so %{buildroot}/tmp/patch1.so
-mv ./build/metadata1.ulp %{buildroot}/tmp/metadata1.ulp
-mv ./patch1.sh %{buildroot}/tmp/patch1.sh
+mkdir -p %{buildroot}%{patchdir}
+mv ./build/patch1.so %{buildroot}%{patchdir}/patch1.so
+mv ./build/metadata1.ulp %{buildroot}%{patchdir}/metadata1.ulp
 
 %post -n libdummy_livepatch
-/tmp/patch1.sh
+lua %{_bindir}/ulp_dispatcher patch %{patchdir}/metadata1.ulp
 
 %postun
 
 %files -n libdummy_livepatch
 %defattr(-,root,root)
-/tmp/patch1.so
-/tmp/metadata1.ulp
-/tmp/patch1.sh
+%{patchdir}/patch1.so
+%{patchdir}/metadata1.ulp
