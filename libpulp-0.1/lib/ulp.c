@@ -603,6 +603,10 @@ int check_patch_sanity(struct ulp_metadata *ulp)
 {
     if (!check_build_id(ulp)) return 0;
     if (!check_patch_dependencies(ulp)) return 0;
+    if (ulp_get_applied_patch(ulp->patch_id)) {
+      WARN("Patch was already applied\n");
+      return 0;
+    }
 
     return 1;
 }

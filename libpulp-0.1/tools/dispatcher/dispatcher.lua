@@ -82,7 +82,7 @@ function get_target_list(metadata)
   return targets
 end
 
-function check_processes(metadata_file)
+function check_all(metadata_file)
   local ulp_check = "/usr/bin/ulp_check "
   local metadata = parse_metadata(metadata_file)
   if not metadata then return nil end
@@ -98,6 +98,13 @@ function check_processes(metadata_file)
   end
 end
 
+function check_single(metadata, metadata_file, pid)
+  local ulp_check = "/usr/bin/ulp_check "
+  local check = os.execute(ulp_check .. pid .. " " .. metadata_file)
+  if check == 1 then return 0 end
+  return 1
+end
+
 function patch_all(metadata_file)
   local ulp_patch = "/usr/bin/ulp_trigger "
   local metadata = parse_metadata(metadata_file)
@@ -106,10 +113,14 @@ function patch_all(metadata_file)
   local targets = get_target_list(metadata)
   local i = 1
   while i < #targets+1 do
-    local check = os.execute(ulp_patch .. targets[i] .. " " .. metadata_file)
-    if not check then
-      print("Unable to patch process " .. targets[i] .. " - please try again:")
-      print("ulp_dispatcher patch " .. metadata_file .. " " .. targets[i])
+    if check_single(metadata, metadata_file, targets[i]) then
+      local check = os.execute(ulp_patch .. targets[i] .. " " .. metadata_file)
+      if not check then
+        print("Unable to patch process " .. targets[i] .. " - please try again:")
+        print(" ulp_dispatcher patch " .. metadata_file .. " " .. targets[i])
+      end
+    else
+      print(targets[i] .. " is already patched. Not patching again\n")
     end
     i = i + 1
   end
@@ -132,7 +143,7 @@ if ( #arg < 2 or #arg > 3 ) then
 end
 
 if (arg[1] == "check") then
-  check_processes(arg[2])
+  check_all(arg[2])
   os.exit()
 end
 
