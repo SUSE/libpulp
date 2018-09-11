@@ -32,6 +32,7 @@ Source0:	%{name}-%{version}.tar.bz2
 BuildRequires: gcc
 BuildRequires: binutils_ulp
 BuildRequires: libelf-devel
+BuildRequires: binutils-devel
 
 %description
 This package provides libpulp. Also, example applications.
