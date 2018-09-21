@@ -26,6 +26,8 @@
 #ifndef _ULP_LIB_COMMON_
 #define _ULP_LIB_COMMON_
 
+#define OUT_PATCH_NAME "metadata.ulp"
+
 #define WARN(format, ...) \
 	fprintf(stderr, "ulp: " format "\n", ##__VA_ARGS__)
 
