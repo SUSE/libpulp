@@ -16,8 +16,6 @@ sleep 1
 LD_PRELOAD=/usr/lib64/libpulp.so /usr/bin/dummyapp3 &
 sudo rpm -ivh rpmbuild/rpms/x86_64/libdummy_livepatch-0.1-0.x86_64.rpm
 sleep 5
-lua /usr/bin/dispatcher /var/ulp/libdummy_livepatch-0.1/metadata.ulp
-sleep 4
 killall dummyapp1
 killall dummyapp3
 sleep 2
