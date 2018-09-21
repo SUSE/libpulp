@@ -117,8 +117,8 @@ int main(int argc, char **argv)
 
     if (!check_consistency(livepatch))
     {
-	if (apply_patch(livepatch)) WARN("apply patch failed.");
-	else WARN("Patching succesful.");
+	if (apply_patch(livepatch)) WARN("Apply patch to %d failed.", pid);
+	else WARN("Patching %d succesful.", pid);
     } else {
 	WARN("Patch could not be applied, try again.");
 	patched = 1;
@@ -130,6 +130,6 @@ int main(int argc, char **argv)
 
     if (restart(pid)) return 10;
 
-    WARN("Patching attempt finished.");
+    //WARN("Patching attempt finished.");
     return patched;
 }
