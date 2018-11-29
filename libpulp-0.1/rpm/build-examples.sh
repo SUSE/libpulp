@@ -6,6 +6,7 @@ ULP_LD="${BFD_DIR}bin/ld"
 LINKER="/lib64/ld-linux-x86-64.so.2"
 LIB="/usr/lib64/"
 LD="ld"
+NOP_LENGTH="8,6"
 
 set -e
 
@@ -22,9 +23,9 @@ echo $'** Building libpulp'
 
 echo $'** Building libdummy'
 pwd
-${CC} -c ../src/libdummy/libdummy.c -o ./build/libdummy.o -Wall -fPIC
+${CC} -c ../src/libdummy/libdummy.c -o ./build/libdummy.o -Wall -fPIC -fpatchable-function-entry=${NOP_LENGTH}
 # weak is built just to show that modified binutils support weak symbols
-${CC} -c ../src/libdummy/weak.c -o ./build/weak.o -Wall -fPIC
+${CC} -c ../src/libdummy/weak.c -o ./build/weak.o -Wall -fPIC -fpatchable-function-entry=${NOP_LENGTH}
 ${ULP_LD} -shared -o build/libdummy.so build/libdummy.o build/weak.o build/trm.o -lc --build-id
 
 echo $'\n** Adjusting .dynsym and .ulp'
