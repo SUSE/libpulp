@@ -32,6 +32,7 @@
 #include <err.h>
 
 #define TRM_LEN 16
+#define ENTRY_LEN 8
 
 typedef struct
 {
@@ -49,6 +50,11 @@ static const char trm_entry_layout[TRM_LEN] =
     0x90, 0x90, 0x90, 0x90, 0x90, 0x88
 };
 
+static const char func_entry_layout[ENTRY_LEN] =
+{
+    0x90, 0x90, 0x90, 0x90, 0x90, 0x90, /* before function entry */
+    0x66, 0x90
+};
 
 Elf *gelf;
 
@@ -97,6 +103,13 @@ void write_trm_entry(elf_section stub, int32_t offset, int32_t branch,
     memcpy(ptr + 6, &branch, 4);
 }
 
+void write_padding_nops(elf_section text, uint64_t fct_offset)
+{
+    void *ptr = text.data->d_buf;
+    ptr = ptr + fct_offset;
+    memcpy(ptr, func_entry_layout, 8);
+}
+
 int main(int argc, char **argv) {
     elf_version(EV_CURRENT);
 
@@ -109,7 +122,7 @@ int main(int argc, char **argv) {
     int bind, type;
     void * trm_offset;
     int32_t ulp_offset, fct_offset, count = 0;
-    elf_section dynsym, symtab, stubs;
+    elf_section dynsym, symtab, stubs, text, patchable;
 
     fd = 0;
     gelf = load_elf(argv[1], &fd);
@@ -149,6 +162,23 @@ int main(int argc, char **argv) {
 	    stubs.offset = (void *) sh.sh_offset;
 	    stubs.data = elf_getdata(stubs.sec, NULL);
 	}
+        if (strcmp(str, ".text")==0) {
+            text.sec = s;
+            text.shdr = elf64_getshdr(s);
+            text.offset = (void *) sh.sh_offset;
+            text.data = elf_getdata(text.sec, NULL);
+        }
+	if (strcmp(str, "__patchable_function_entries")==0) {
+            patchable.sec = s;
+            patchable.shdr = elf64_getshdr(s);
+            patchable.offset = (void *) sh.sh_offset;
+            patchable.data = elf_getdata(patchable.sec, NULL);
+            patchable.len = (int) sh.sh_size / sizeof(void *);
+            // the __patchable_function_entries section keeps relocation
+            // information of patchable entries. by subtracting these from the
+            // .text section offset, we get the position of the patchable entry
+            // in the .text data buffer.
+        }
     }
 
     for (i = 0; i < symtab.len; i++) {
@@ -177,9 +207,15 @@ int main(int argc, char **argv) {
 	}
     }
 
+    for (i = 0; i < patchable.len; i++) {
+      uint64_t offset = * (uint64_t *) (patchable.data->d_buf + (i * 8));
+      write_padding_nops(text, offset - (uint64_t) text.offset);
+    }
+
     if (count > 0) {
 	elf_flagehdr(gelf, ELF_C_SET, ELF_F_DIRTY | ELF_F_LAYOUT);
 	elf_flagscn(dynsym.sec, ELF_C_SET, ELF_F_DIRTY | ELF_F_LAYOUT);
+	elf_flagscn(text.sec, ELF_C_SET, ELF_F_DIRTY | ELF_F_LAYOUT);
 	elf_flagelf(gelf, ELF_C_SET, ELF_F_DIRTY | ELF_F_LAYOUT);
 	if (elf_update(gelf, ELF_C_WRITE) < 0)
 	    errx(EXIT_FAILURE , "elf_update(): %s", elf_errmsg( -1));
