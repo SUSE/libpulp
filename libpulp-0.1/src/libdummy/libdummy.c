@@ -7,6 +7,7 @@ void foo(int n) {
 
 int bar() {
     fprintf(stderr, "example: locked behind bars...\n");
+    foo(3);
     return 1;
 }
 

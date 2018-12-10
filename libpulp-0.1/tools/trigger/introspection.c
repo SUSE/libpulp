@@ -354,6 +354,7 @@ struct link_map *parse_lib_dynobj(struct link_map *link_map_addr)
     obj->consistency = get_loaded_symbol_addr(obj, "__ulp_get_flag");
     obj->path_buffer = get_loaded_symbol_addr(obj, "__ulp_get_path_buffer");
     obj->check = get_loaded_symbol_addr(obj, "__ulp_check_patched");
+    obj->set_pending = get_loaded_symbol_addr(obj, "__ulp_set_pending");
 
     return link_map;
 }
@@ -408,18 +409,34 @@ int initialize_data_structures(int pid, char *livepatch)
 	if (o->trigger) addr.trigger = o->trigger;
 	if (o->path_buffer) addr.path_buffer = o->path_buffer;
         if (o->check) addr.check = o->check;
+	if (o->set_pending) addr.set_pending = o->set_pending;
     }
 
-    if (!(addr.loop && addr.trigger && addr.path_buffer))
-    {
-	WARN("error: ulp addresses not found.\n");
-	return 5;
+    if (!(addr.loop)) {
+	WARN("ulp loop address not found.");
+        return 5;
+    }
+    if (!(addr.trigger)) {
+        WARN("ulp trigger address not found.");
+        return 6;
+    }
+    if (!(addr.path_buffer)) {
+        WARN("ulp path_buffer address not found.");
+        return 7;
+    }
+    if (!(addr.check)) {
+        WARN("ulp check address not found.");
+        return 8;
+    }
+    if (!(addr.set_pending)) {
+        WARN("ulp set_pending address not found.");
+        return 9;
     }
 
     return 0;
 }
 
-int hijack_threads()
+int hijack_threads(int set_pending)
 {
     struct ulp_thread *t;
     struct user_regs_struct context;
@@ -445,7 +462,8 @@ int hijack_threads()
 	};
 
 	context = t->context;
-	context.rip = addr.loop + 2;
+	if (set_pending) context.rip = addr.set_pending +2;
+	else context.rip = addr.loop + 2;
 
 	if (set_regs(t->tid, &context))
 	{
@@ -475,7 +493,7 @@ int set_id_buffer(char *patch_id, struct ulp_thread *t)
 
     if (run_and_redirect(t->tid, &context, addr.loop))
     {
-	WARN("set_path_buffer error 1.");
+	WARN("set_id_buffer error 1.");
 	return 1;
     };
 
@@ -565,7 +583,9 @@ int check_thread_consistency(char *path)
 	    WARN("unable to check consistency.");
 	    return 4;
 	}
-	if (context.rax == 0) t->consistent = 1;
+        fprintf(stderr, "CONTEXT.RAX %d %lx\n", t->tid, context.rax);
+	if (!context.rax) t->consistent = 1;
+	fprintf(stderr, "CONSISTENT: %x\n", t->consistent);
     }
 
     /* write path buffer */
@@ -616,7 +636,7 @@ int check_consistency(char *path)
     {
 	if (!t->consistent)
 	{
-	    WARN("Threads are not consistent.");
+	    WARN("Threads are not consistent. (%d %d)", t->tid, t->consistent);
 	    return 2;
 	}
     }

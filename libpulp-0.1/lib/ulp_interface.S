@@ -34,7 +34,6 @@ __ulp_trigger:
     int3
 
 /* this can be optimized to return the address directly */
-.align 8
 __ulp_get_path_buffer:
     nop
     nop
@@ -44,7 +43,6 @@ __ulp_get_path_buffer:
     pop     %rsp
     int3
 
-.align 8
 __ulp_check_patched:
     nop
     nop
@@ -54,7 +52,17 @@ __ulp_check_patched:
     pop    %rsp
     int3
 
-.align 8
+__ulp_set_pending:
+    nop
+    nop
+    pushq   %rdi
+    pushq   %rax
+    leaq    __ulp_pending@tlsld(%rip), %rdi
+    call    __tls_get_addr@PLT
+    movq    $0x1, __ulp_pending@dtpoff(%rax)
+    popq    %rax
+    popq    %rdi
+
 __ulp_loop:
     nop
     nop

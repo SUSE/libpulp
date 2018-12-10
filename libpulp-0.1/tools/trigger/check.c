@@ -105,7 +105,7 @@ int main(int argc, char **argv)
       return 5;
     }
 
-    if (hijack_threads()) return 6;
+    if (hijack_threads(0)) return 6;
 
     if (restart(pid)) return 7;
 

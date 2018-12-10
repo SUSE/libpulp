@@ -48,6 +48,10 @@ struct ulp_applied_unit {
     struct ulp_applied_unit *next;
 };
 
+/* libpulp TLS variables */
+
+__thread int __ulp_pending = 0;
+
 /* libpulp livepatching interfaces */
 int __ulp_apply_patch();
 
@@ -60,7 +64,7 @@ void free_metadata(struct ulp_metadata *ulp);
 
 int unload_handlers(struct ulp_metadata *ulp);
 
-void *load_so_symbol(char *fname, void *handle);
+void *load_so_symbol(char *fname, void *handle, int trm);
 
 int load_so_handlers(struct ulp_metadata *ulp);
 
@@ -71,6 +75,8 @@ struct ulp_metadata *load_metadata();
 int parse_metadata(struct ulp_metadata *ulp);
 
 void *load_so(char *obj);
+
+extern void *__ulp_get_pending();
 
 int load_patch();
 

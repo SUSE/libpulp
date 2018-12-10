@@ -39,6 +39,23 @@ struct ulp_patching_state __ulp_state;
 char __ulp_path_buffer[256] = "";
 struct ulp_metadata *__ulp_metadata_ref = NULL;
 
+// movabs 	&__ulp_get_pending, %r11
+// call 	*%r11
+// cmp		$0x0, %r11
+// jne		<foo+2>
+// jmpq		0x0(%rip) # first byte after instruction
+// <data>	# address of new foo
+char ulp_prologue[35] = {0x49, 0xbb,
+			 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			 0x41, 0xff, 0xd3,
+			 0x49, 0x83, 0xfb, 0x00,
+			 0x75, 0x10,
+			 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			 0xeb, - (PRE_NOPS_LEN + 2)};
+
+char ulp_absolute_jmp[6] = {0xff, 0x25, 0x00, 0x00, 0x00, 0x00};
+
 __attribute__ ((constructor)) void begin(void)
 {
     fprintf(stderr, "libpulp loaded...\n");
@@ -51,7 +68,6 @@ int __ulp_apply_patch()
 	WARN("Patch not applied");
 	return 0;
     }
-
     return 1;
 }
 
@@ -119,9 +135,20 @@ int unload_handlers(struct ulp_metadata *ulp)
     return status;
 }
 
-void *load_so_symbol(char *fname, void *handle)
+void *get_fentry_from_ulp(void *func)
 {
-    void (*func)(void);
+    void *address;
+    int offset = 0;
+    memcpy(&offset, func + 3, 8);
+    address = func + offset + 7;
+    memcpy(&offset, address, sizeof(offset));
+    return address;
+}
+
+// trm: should be set to take real function address out of .ulp section
+void *load_so_symbol(char *fname, void *handle, int trm)
+{
+    void *func;
     char *error;
 
     func = dlsym(handle, fname);
@@ -130,6 +157,8 @@ void *load_so_symbol(char *fname, void *handle)
 	WARN("Unable to load function %s: %s.", fname, error);
 	return NULL;
     }
+
+    if (trm) func = get_fentry_from_ulp(func);
 
     return func;
 }
@@ -167,7 +196,6 @@ struct ulp_metadata *load_metadata()
     struct ulp_metadata *ulp;
     if (__ulp_metadata_ref)
     {
-	fprintf(stderr, "entered meta\n");
 	return __ulp_metadata_ref;
     }
 
@@ -410,8 +438,6 @@ int load_patch()
     }
     patch = 0;
 
-    fprintf(stderr, "AAAAHHHHHHHH\n");
-
 load_patch_success:
     unload_metadata(ulp);
     return patch;
@@ -456,7 +482,7 @@ int is_object_consistent(struct ulp_object *obj)
 {
     char *flag;
 
-    flag = load_so_symbol("__ulp_ret", obj->dl_handler);
+    flag = load_so_symbol("__ulp_ret", obj->dl_handler, 0);
 
     if (*flag) return 0;
     return 1;
@@ -470,10 +496,10 @@ int ulp_apply_all_units(struct ulp_object *obj, void *patch_so)
     /* only shared objs have units, this loop never runs for main obj */
     unit = obj->units;
     while (unit) {
-	old_fun = load_so_symbol(unit->old_fname, obj->dl_handler);
+	old_fun = load_so_symbol(unit->old_fname, obj->dl_handler, 1);
 	if (!old_fun) return 0;
 
-	new_fun = load_so_symbol(unit->new_fname, patch_so);
+	new_fun = load_so_symbol(unit->new_fname, patch_so, 0);
 	if (!new_fun) return 0;
 
 	if (!ulp_patch_addr(old_fun, new_fun))  return 0;
@@ -523,11 +549,11 @@ struct ulp_applied_patch *ulp_state_update(struct ulp_metadata *ulp)
 	}
 
 	a_unit->patched_addr = load_so_symbol(unit->old_fname,
-		obj->dl_handler);
+		obj->dl_handler, 1);
 	if (!a_unit->patched_addr) return 0;
 
 	a_unit->target_addr = load_so_symbol(unit->new_fname,
-		ulp->so_handler);
+		ulp->so_handler, 0);
 	if (!a_unit->target_addr) return 0;
 
 	memcpy(a_unit->overwritten_bytes, a_unit->patched_addr, 14);
@@ -546,6 +572,7 @@ struct ulp_applied_patch *ulp_state_update(struct ulp_metadata *ulp)
     prev_patch = __ulp_state.patches;
     __ulp_state.patches = a_patch;
     a_patch->next = prev_patch;
+
     return a_patch;
 }
 
@@ -722,35 +749,36 @@ int check_build_id(struct ulp_metadata *ulp)
     return 1;
 }
 
-void ulp_patch_addr_relative(void *old_faddr, ptrdiff_t rel_tgt)
+void ulp_patch_prologue_layout(void *old_fentry, void *pending)
 {
-    /* -5 because jump is relative to next instr address */
-
-    rel_tgt = rel_tgt - 5;
-    memset(old_faddr, 0xe9, 1);
-    memcpy(old_faddr+1, &rel_tgt, 4);
+    memcpy(old_fentry, ulp_prologue, sizeof(ulp_prologue));
+    memcpy(old_fentry + 2, &pending, 8); // TODO: fix the size here
 }
 
-void ulp_patch_addr_absolute(void *old_faddr, void *new_faddr)
+void *ulp_get_pending()
 {
-    char opcode[6] = {0xff, 0x25, 0x00, 0x00, 0x00, 0x00};
-    memcpy(old_faddr, &opcode, 6);
-    memcpy(old_faddr+6, &new_faddr, sizeof(new_faddr));
+	return &__ulp_get_pending;
+}
+
+void ulp_patch_addr_absolute(void *old_fentry, void *new_faddr)
+{
+   // absolute jump patching
+    memcpy(old_fentry + 19, ulp_absolute_jmp, sizeof(ulp_absolute_jmp));
+    memcpy(old_fentry + 19 + sizeof(ulp_absolute_jmp), &new_faddr, sizeof(void *));
 }
 
 int ulp_patch_addr(void *old_faddr, void *new_faddr)
 {
-    ptrdiff_t distance;
-    distance = new_faddr - old_faddr;
+    void *old_fentry = old_faddr - PRE_NOPS_LEN;
+    void *pending;
+    pending = ulp_get_pending();
+    //__ulp_pending = 1;
 
     if (!set_write_tgt(old_faddr))
 	return 0;
 
-    if (distance > INT32_MAX || distance < INT32_MIN) {
-	ulp_patch_addr_absolute(old_faddr, new_faddr);
-    } else {
-	ulp_patch_addr_relative(old_faddr, distance);
-    }
+    ulp_patch_prologue_layout(old_fentry, pending);
+    ulp_patch_addr_absolute(old_fentry, new_faddr);
 
     if (!set_exec_tgt(old_faddr))
 	return 0;

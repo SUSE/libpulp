@@ -22,44 +22,112 @@
  */
 
 .section .ulp.track,"ax",@progbits
-.local	__ulp_trm
-.type	__ulp_trm,@function
+.local	__ulp_entry
+.type	__ulp_entry,@function
+
 
 .align 8
-__ulp_trm:
-    // check if lib was already entered
-    mov	    __ulp_ret@gottpoff(%rip), %r11
-    cmp	    $0x0, %fs:(%r11)
-    jnz	    __ulp_trm_epilogue
+.ifdef LOCAL_EXEC
+__ulp_entry:
+    // check if this is library entrance
+    movq    __ulp_ret@gottpoff(%rip), %r11
+    cmp     $0x0, %fs:(%r11)
+    jnz     __ulp_entry_bypass
 
-    push    %r10
+    // migrate to new universe if there is a pending patch
+    // TODO: verify if comparing then setting to zero if pending performs
+    // better then simply always setting to zero
+    push %r10
+    movq    __ulp_pending@gottpoff(%rip), %r10
+    //movq    %fs:(%r10), %rax
+    cmp     $0x1, %fs:(%r10)
+    jne     __ulp_call_function
+    movq    $0x0, %fs:(%r10)
 
-    // load and save original return address
-    mov	    0x10(%rsp), %r10
-    mov	    %r10, %fs:(%r11)
-
-    // modify return address
-    leaq    __ulp_trm_return(%rip), %r10
-    movq    %r10, 0x10(%rsp)
-    pop	    %r10
-
-__ulp_trm_epilogue:
+   // call original function
+__ulp_call_function:
+    pop     %r10
+    push    8(%rsp)
+    pop     %fs:(%r11)
+    pop     %r11
+    addq    $0x8, %rsp
+    call    *%r11
+    mov     __ulp_ret@gottpoff(%rip), %r11
+    push    %fs:(%r11)
+    movq    $0x0, %fs:(%r11)
     ret
 
-.align  8
-.local  __ulp_trm_return
-.type   __ulp_trm_return,@function
+__ulp_entry_bypass:
+    pop     %r11
+    jmp     *%r11
 
-__ulp_trm_return:
-    mov	    __ulp_ret@gottpoff(%rip), %r10
-    mov	    %fs:(%r10), %r11
-    movl    $0x0, %fs:(%r10)
-    jmp	    *%r11
+.else
+
+__ulp_entry:
+    // check if this is library entrance
+    pushq   %rdi
+    pushq   %rax
+    leaq    __ulp_ret@tlsld(%rip), %rdi
+    call    __tls_get_addr@PLT
+    cmp     $0x0, __ulp_ret@dtpoff(%rax)
+    jnz     __ulp_entry_bypass
+
+    movq    %rax, %r11
+
+    // migrate to new universe
+    // we are always setting to zero, irrespectively of what was there before.
+    // TODO: check if cmp 1 + set to 0 is better then simply always set to 0
+
+    leaq    __ulp_pending@tlsld(%rip), %rdi
+    call    __tls_get_addr@PLT
+    movq    $0x0, __ulp_pending@dtpoff(%rax)
+
+   // call original function
+__ulp_call_function:
+    popq    %rax
+    popq    %rdi
+    push    8(%rsp)
+    pop     __ulp_ret@dtpoff(%r11)
+    pop     %r11
+    addq    $0x8, %rsp
+    call    *%r11
+
+    pushq   %rdi
+    pushq   %rax
+    leaq    __ulp_ret@tlsld(%rip), %rdi
+    call    __tls_get_addr@PLT
+    movq     __ulp_ret@dtpoff(%rax), %r11
+    movq    $0x0, __ulp_ret@dtpoff(%rax)
+    popq    %rax
+    popq    %rdi
+    pushq   %r11
+    retq
+
+__ulp_entry_bypass:
+    pop     %rax
+    pop     %rdi
+    pop     %r11
+    jmp     *%r11
+
+.endif
 
 .align  8
+.global __ulp_get_pending
+.type   __ulp_get_pending,@function
+__ulp_get_pending:
+    pushq   %rdi
+    pushq   %rax
+    leaq    __ulp_pending@tlsld(%rip), %rdi
+    call    __tls_get_addr@PLT
+    movq    __ulp_pending@dtpoff(%rax), %r11
+    popq   %rax
+    popq   %rdi
+    retq
+
 .local	__ulp_get_flag
 .type	__ulp_get_flag,@function
 
+   // TODO: is this function still needed? I don't think so, check it.
 __ulp_get_flag:
     nop
     nop
@@ -68,11 +136,17 @@ __ulp_get_flag:
     mov	    %fs:(%r10), %rax
     int3
 
-.section .tdata,"awT",@progbits
-.align  16
+.section .tbss,"awT",@nobits
+.align  8
 
 .type   __ulp_ret, @object
 .size   __ulp_ret, 8
 .global __ulp_ret
 __ulp_ret:
-.word   0x0
+.zero   0x8
+
+.type   __ulp_pending, @object
+.size   __ulp_pending, 8
+.global __ulp_pending
+__ulp_pending:
+.zero	0x8

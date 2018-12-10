@@ -32,6 +32,9 @@
 	fprintf(stderr, "ulp: " format "\n", ##__VA_ARGS__)
 
 #define ULP_PATH_LEN 256
+#define PRE_NOPS_LEN 33
+
+extern __thread int __ulp_pending;
 
 struct ulp_metadata {
   unsigned char patch_id[32];

@@ -30,6 +30,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <err.h>
+#include "../../include/ulp_common.h"
 
 #define TRM_LEN 16
 #define ENTRY_LEN 8
@@ -50,10 +51,12 @@ static const char trm_entry_layout[TRM_LEN] =
     0x90, 0x90, 0x90, 0x90, 0x90, 0x88
 };
 
-static const char func_entry_layout[ENTRY_LEN] =
+static const char trm_cet_entry_layout[TRM_LEN] =
 {
-    0x90, 0x90, 0x90, 0x90, 0x90, 0x90, /* before function entry */
-    0x66, 0x90
+    0x4c, 0x8d, 0x1d, 0, 0, 0, 0,
+    0x41, 0x53,
+    0xe9, 0, 0, 0, 0, 0x90, 0x90
+
 };
 
 Elf *gelf;
@@ -93,6 +96,17 @@ int32_t compute_branch(void *org, void *dst, int entry, int instr_offset)
     return (int32_t) offset;
 }
 
+void write_trm_cet_entry(elf_section stub, int32_t branch, void *target,
+	uint32_t count)
+{
+	void *ptr = stub.data->d_buf;
+	ptr = ptr + (count * TRM_LEN);
+	memcpy(ptr, trm_cet_entry_layout, TRM_LEN);
+	memcpy(ptr + 3, &target, 4);
+	memcpy(ptr + 10, &branch, 4);
+	fprintf(stderr, "BRANCH: %d\n", branch);
+}
+
 void write_trm_entry(elf_section stub, int32_t offset, int32_t branch,
 	uint32_t count)
 {
@@ -107,7 +121,14 @@ void write_padding_nops(elf_section text, uint64_t fct_offset)
 {
     void *ptr = text.data->d_buf;
     ptr = ptr + fct_offset;
-    memcpy(ptr, func_entry_layout, 8);
+    memset(ptr, 0x90, PRE_NOPS_LEN + 2);
+    memset(ptr + PRE_NOPS_LEN, 0x66, 1);
+}
+
+int whitelisted(char *sym_name)
+{
+	if (strcmp(sym_name, "__ulp_get_pending")==0) return 1;
+	return 0;
 }
 
 int main(int argc, char **argv) {
@@ -120,7 +141,7 @@ int main(int argc, char **argv) {
     Elf64_Sym *sym;
     char *sym_name, *str;
     int bind, type;
-    void * trm_offset;
+    void * trm_offset = NULL;
     int32_t ulp_offset, fct_offset, count = 0;
     elf_section dynsym, symtab, stubs, text, patchable;
 
@@ -186,7 +207,7 @@ int main(int argc, char **argv) {
 	sym_name = elf_strptr(gelf, symtab.shdr->sh_link, sym->st_name);
 	bind = ELF64_ST_BIND(sym->st_info);
 	type = ELF64_ST_TYPE(sym->st_info);
-	if (strcmp(sym_name, "__ulp_trm")==0) {
+	if (strcmp(sym_name, "__ulp_entry")==0) {
 	    trm_offset = (void *) sym->st_value;
 	}
     }
@@ -195,13 +216,15 @@ int main(int argc, char **argv) {
     for (i = 0; i < dynsym.len; i++) {
 	sym = (Elf64_Sym *) (dynsym.data->d_buf + i * sizeof(Elf64_Sym));
 	sym_name = elf_strptr(gelf, dynsym.shdr->sh_link, sym->st_name);
+	if (whitelisted(sym_name)) continue;
 	bind = ELF64_ST_BIND(sym->st_info);
 	type = ELF64_ST_TYPE(sym->st_info);
 	if (type == 2 && bind == 1 && sym->st_shndx != 0) {
-	    ulp_offset = -(compute_branch(stubs.offset, trm_offset, count, 5));
+	    ulp_offset = -(compute_branch(stubs.offset, trm_offset, count, 14));
+            fprintf(stderr, "STUBS_OFFSET TRM_OFFSET %d %d\n", stubs.offset, trm_offset);
 	    fct_offset = compute_branch(stubs.offset, (void *) sym->st_value,
-		    count, 10);
-	    write_trm_entry(stubs, ulp_offset, fct_offset, count);
+		    count, 7);
+            write_trm_cet_entry(stubs, ulp_offset, fct_offset, count);
 	    sym->st_value = (Elf64_Addr) stubs.offset + (count * 16);
 	    count++;
 	}
