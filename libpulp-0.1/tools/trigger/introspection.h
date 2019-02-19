@@ -52,10 +52,10 @@ struct ulp_dynobj
 
     Elf64_Addr loop;
     Elf64_Addr trigger;
-    Elf64_Addr consistency;
     Elf64_Addr check;
     Elf64_Addr path_buffer;
     Elf64_Addr set_pending;
+    Elf64_Addr get_pending;
 
     struct ulp_dynobj *next;
 };
@@ -67,6 +67,7 @@ struct ulp_addresses
     Elf64_Addr path_buffer;
     Elf64_Addr check;
     Elf64_Addr set_pending;
+    Elf64_Addr get_pending;
 };
 
 typedef struct ulp_process ulp_process;
@@ -104,11 +105,7 @@ int set_id_buffer(char *patch_id, struct ulp_thread *t);
 
 int set_path_buffer(char *path, struct ulp_thread *t);
 
-int check_thread_consistency(char *path);
-
 int restore_threads();
-
-int check_consistency(char *path);
 
 int load_patch_info(char *livepatch);
 

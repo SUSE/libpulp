@@ -51,19 +51,3 @@ __ulp_check_patched:
     call   __ulp_check_applied_patch@PLT
     pop    %rsp
     int3
-
-__ulp_set_pending:
-    nop
-    nop
-    pushq   %rdi
-    pushq   %rax
-    leaq    __ulp_pending@tlsld(%rip), %rdi
-    call    __tls_get_addr@PLT
-    movq    $0x1, __ulp_pending@dtpoff(%rax)
-    popq    %rax
-    popq    %rdi
-
-__ulp_loop:
-    nop
-    nop
-    jmp	    __ulp_loop

@@ -4,19 +4,19 @@
 
 void *f1(void *arg) {
     fprintf(stderr, "ex2: Thread 1: entering bar from f1()\n");
-    while (bar(1)) { sleep(rand() % 3); }
+    while (sleeping_bar(1)) { sleep(rand() % 3); }
     fprintf(stderr, "ex2: Thread 1: left bar from f1()\n");
 }
 
 void *f2(void *arg) {
     fprintf(stderr, "ex2: Thread 2: entering bar from f2()\n");
-    while (bar(2)) { sleep(rand() % 3); }
+    loop_bar(20);
     fprintf(stderr, "ex2: Thread 2: left bar from f2()\n");
 }
 
 void *f3(void *arg) {
     fprintf(stderr, "ex2: Thread 3: entering bar from f3()\n");
-    while (bar(3)) { sleep(rand() % 3); }
+    while (sleeping_bar(10)) { sleep(rand() % 3); }
     fprintf(stderr, "ex2: Thread 3: left bar from f3()\n");
 }
 

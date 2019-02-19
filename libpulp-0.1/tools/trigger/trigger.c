@@ -111,20 +111,12 @@ int main(int argc, char **argv)
       return 5;
     }
 
-    if (hijack_threads(0)) return 6;
-
-    // TODO: SET PENDING IN ALL THREADS
+    if (hijack_threads(1)) return 6;
 
     if (restart(pid)) return 7;
 
-    if (!check_consistency(livepatch))
-    {
-	if (apply_patch(livepatch)) WARN("Apply patch to %d failed.", pid);
-	else WARN("Patching %d succesful.", pid);
-    } else {
-	WARN("Patch could not be applied, try again.");
-	patched = 1;
-    }
+    if (apply_patch(livepatch)) WARN("Apply patch to %d failed.", pid);
+    else WARN("Patching %d succesful.", pid);
 
     if (stop(pid)) return 8;
 

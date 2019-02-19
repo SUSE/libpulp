@@ -585,14 +585,14 @@ int set_write_tgt(void *tgt_addr)
     page_offset = (unsigned long) tgt_addr % page_size;
     page_start = tgt_addr - page_offset;
 
-    if (mprotect(page_start, page_size, PROT_WRITE)) {
+    if (mprotect(page_start, page_size, PROT_WRITE | PROT_EXEC)) {
 	WARN("Memory protection set +w error");
 	return 0;
     }
 
     if (page_offset - page_size < 5) {
 	page_start = page_start + page_size;
-	if (mprotect(page_start, page_size, PROT_WRITE)) {
+	if (mprotect(page_start, page_size, PROT_WRITE | PROT_EXEC)) {
 	    WARN("Memory protection set +w error (second page)");
 	    return 0;
 	}

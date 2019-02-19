@@ -293,6 +293,8 @@ int parse_main_dynobj(char *objname)
     obj->loop = get_loaded_symbol_addr(obj, "__ulp_loop");
     obj->path_buffer = get_loaded_symbol_addr(obj, "__ulp_get_path_buffer");
     obj->check = get_loaded_symbol_addr(obj, "__ulp_check_patched");
+    obj->set_pending = get_loaded_symbol_addr(obj, "__ulp_set_pending");
+    obj->get_pending = get_loaded_symbol_addr(obj, "__ulp_get_pending");
 
     target.dynobjs = obj;
 
@@ -351,10 +353,10 @@ struct link_map *parse_lib_dynobj(struct link_map *link_map_addr)
     obj->link_map = *link_map;
     obj->trigger = get_loaded_symbol_addr(obj, "__ulp_trigger");
     obj->loop = get_loaded_symbol_addr(obj, "__ulp_loop");
-    obj->consistency = get_loaded_symbol_addr(obj, "__ulp_get_flag");
     obj->path_buffer = get_loaded_symbol_addr(obj, "__ulp_get_path_buffer");
     obj->check = get_loaded_symbol_addr(obj, "__ulp_check_patched");
     obj->set_pending = get_loaded_symbol_addr(obj, "__ulp_set_pending");
+    obj->get_pending = get_loaded_symbol_addr(obj, "__ulp_get_pending");
 
     return link_map;
 }
@@ -405,15 +407,16 @@ int initialize_data_structures(int pid, char *livepatch)
 
     for (o = target.dynobjs; o != NULL; o = o->next)
     {
-	if (o->loop) addr.loop = o->loop;
-	if (o->trigger) addr.trigger = o->trigger;
-	if (o->path_buffer) addr.path_buffer = o->path_buffer;
+        if (o->loop) addr.loop = o->loop;
+        if (o->trigger) addr.trigger = o->trigger;
+        if (o->path_buffer) addr.path_buffer = o->path_buffer;
         if (o->check) addr.check = o->check;
-	if (o->set_pending) addr.set_pending = o->set_pending;
+        if (o->set_pending) addr.set_pending = o->set_pending;
+        if (o->get_pending) addr.get_pending = o->get_pending;
     }
 
     if (!(addr.loop)) {
-	WARN("ulp loop address not found.");
+        WARN("ulp loop address not found.");
         return 5;
     }
     if (!(addr.trigger)) {
@@ -431,6 +434,10 @@ int initialize_data_structures(int pid, char *livepatch)
     if (!(addr.set_pending)) {
         WARN("ulp set_pending address not found.");
         return 9;
+    }
+    if (!(addr.get_pending)) {
+        WARN("ulp get_pending address not found.");
+        return 10;
     }
 
     return 0;
@@ -462,7 +469,7 @@ int hijack_threads(int set_pending)
 	};
 
 	context = t->context;
-	if (set_pending) context.rip = addr.set_pending +2;
+	if (set_pending) context.rip = addr.set_pending + 2;
 	else context.rip = addr.loop + 2;
 
 	if (set_regs(t->tid, &context))
@@ -539,62 +546,6 @@ int set_path_buffer(char *path, struct ulp_thread *t)
     return 0;
 }
 
-int check_thread_consistency(char *path)
-{
-    struct user_regs_struct context;
-    struct ulp_thread *t;
-    struct ulp_object *obj;
-    struct ulp_dynobj *d;
-    int consistency;
-    int aux;
-    int path_buffer_set = 0;
-    int test;
-
-    if (!addr.loop) {
-	WARN("error: consistency or loop not found.");
-	return 1;
-    }
-
-    obj = ulp.objs;
-    if (!obj->name)
-    {
-	WARN("object has no name\n");
-	return 2;
-    };
-
-    for (d = target.dynobjs; d != NULL; d = d->next)
-    {
-	if (strcmp(d->filename, obj->name)==0) break;
-    }
-
-    if (d == NULL)
-    {
-	WARN("to be patched object (%s) not loaded.\n", obj->name);
-	return 3;
-    }
-
-    for (t = target.threads; t != NULL; t = t->next)
-    {
-	context = t->context;
-	context.rip = d->consistency + 2;
-
-	if (run_and_redirect(t->tid, &context, addr.loop))
-	{
-	    WARN("unable to check consistency.");
-	    return 4;
-	}
-        fprintf(stderr, "CONTEXT.RAX %d %lx\n", t->tid, context.rax);
-	if (!context.rax) t->consistent = 1;
-	fprintf(stderr, "CONSISTENT: %x\n", t->consistent);
-    }
-
-    /* write path buffer */
-    t = target.threads;
-    if (set_path_buffer(path, t)) return 5;
-
-    return 0;
-}
-
 int restore_threads()
 {
     struct ulp_thread *t;
@@ -619,27 +570,6 @@ int restore_threads()
 	};
     }
 
-    return 0;
-}
-
-int check_consistency(char *path)
-{
-    struct ulp_thread *t;
-
-    if (check_thread_consistency(path))
-    {
-	WARN("Unable to verify thread consistency.");
-	return 1;
-    };
-
-    for (t = target.threads; t != NULL; t = t->next)
-    {
-	if (!t->consistent)
-	{
-	    WARN("Threads are not consistent. (%d %d)", t->tid, t->consistent);
-	    return 2;
-	}
-    }
     return 0;
 }
 
@@ -851,7 +781,7 @@ int check_patch_sanity()
     struct ulp_dynobj *d;
 
     /* check if ulp functions exist in main */
-    if (!(addr.loop && addr.trigger && addr.path_buffer))
+    if (!(addr.loop && addr.trigger && addr.path_buffer && addr.set_pending))
     {
 	WARN("ulp functions not found in main object.");
 	return 1;
@@ -877,9 +807,9 @@ int check_patch_sanity()
     }
 
     /* check if to-be-patched objects support ulp */
-    if (!d->consistency)
+    if (!d->get_pending)
     {
-	WARN("to be patched object does not support ulp.");
+	WARN("to be patched object does not support ulp. BREAK");
 	return 4;
     }
 

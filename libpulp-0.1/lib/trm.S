@@ -111,6 +111,7 @@ __ulp_entry_bypass:
 
 .endif
 
+// TODO: check if visibility of these symbols below are ok
 .align  8
 .global __ulp_get_pending
 .type   __ulp_get_pending,@function
@@ -124,17 +125,25 @@ __ulp_get_pending:
     popq   %rdi
     retq
 
-.local	__ulp_get_flag
-.type	__ulp_get_flag,@function
+.global __ulp_set_pending
+.type   __ulp_set_pending,@function
+__ulp_set_pending:
+    nop
+    nop
+    pushq   %rdi
+    pushq   %rax
+    leaq    __ulp_pending@tlsld(%rip), %rdi
+    call    __tls_get_addr@PLT
+    movq    $0x1, __ulp_pending@dtpoff(%rax)
+    popq    %rax
+    popq    %rdi
 
-   // TODO: is this function still needed? I don't think so, check it.
-__ulp_get_flag:
+.global __ulp_loop
+.type   __ulp_loop,@function
+__ulp_loop:
     nop
     nop
-    xor	    %rax, %rax
-    mov	    __ulp_ret@gottpoff(%rip), %r10
-    mov	    %fs:(%r10), %rax
-    int3
+    jmp	    __ulp_loop
 
 .section .tbss,"awT",@nobits
 .align  8
