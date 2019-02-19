@@ -96,7 +96,7 @@ int32_t compute_branch(void *org, void *dst, int entry, int instr_offset)
     return (int32_t) offset;
 }
 
-void write_trm_cet_entry(elf_section stub, int32_t branch, void *target,
+void write_trm_cet_entry(elf_section stub, int32_t branch, uint32_t target,
 	uint32_t count)
 {
 	void *ptr = stub.data->d_buf;
@@ -104,7 +104,6 @@ void write_trm_cet_entry(elf_section stub, int32_t branch, void *target,
 	memcpy(ptr, trm_cet_entry_layout, TRM_LEN);
 	memcpy(ptr + 3, &target, 4);
 	memcpy(ptr + 10, &branch, 4);
-	fprintf(stderr, "BRANCH: %d\n", branch);
 }
 
 void write_trm_entry(elf_section stub, int32_t offset, int32_t branch,
@@ -221,7 +220,6 @@ int main(int argc, char **argv) {
 	type = ELF64_ST_TYPE(sym->st_info);
 	if (type == 2 && bind == 1 && sym->st_shndx != 0) {
 	    ulp_offset = -(compute_branch(stubs.offset, trm_offset, count, 14));
-            fprintf(stderr, "STUBS_OFFSET TRM_OFFSET %d %d\n", stubs.offset, trm_offset);
 	    fct_offset = compute_branch(stubs.offset, (void *) sym->st_value,
 		    count, 7);
             write_trm_cet_entry(stubs, ulp_offset, fct_offset, count);
