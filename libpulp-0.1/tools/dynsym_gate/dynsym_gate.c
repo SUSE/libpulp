@@ -39,9 +39,11 @@ typedef struct
 {
     Elf_Scn *sec;
     Elf64_Shdr *shdr;
-    int len;
-    void *offset;
+    unsigned int len;
+    uint64_t offset;
     Elf_Data *data;
+    unsigned int size;
+    int update;
 } elf_section;
 
 static const char trm_entry_layout[TRM_LEN] =
@@ -84,7 +86,7 @@ void unload_elf(Elf **elf, int *fd)
     *elf = NULL;
 }
 
-int32_t compute_branch(void *org, void *dst, int entry, int instr_offset)
+int32_t compute_branch(uint64_t org, uint64_t dst, int entry, int instr_offset)
 {
     ptrdiff_t offset = (org + (entry * TRM_LEN)) - dst + instr_offset;
     if (org > dst) offset = -offset;
@@ -96,29 +98,29 @@ int32_t compute_branch(void *org, void *dst, int entry, int instr_offset)
     return (int32_t) offset;
 }
 
-void write_trm_cet_entry(elf_section stub, int32_t branch, uint32_t target,
+void write_trm_cet_entry(elf_section *stub, int32_t branch, uint32_t target,
 	uint32_t count)
 {
-	void *ptr = stub.data->d_buf;
-	ptr = ptr + (count * TRM_LEN);
-	memcpy(ptr, trm_cet_entry_layout, TRM_LEN);
-	memcpy(ptr + 3, &target, 4);
-	memcpy(ptr + 10, &branch, 4);
+    void *ptr = stub->data->d_buf;
+    ptr = ptr + (count * TRM_LEN);
+    memcpy(ptr, trm_cet_entry_layout, TRM_LEN);
+    memcpy(ptr + 3, &target, 4);
+    memcpy(ptr + 10, &branch, 4);
 }
 
-void write_trm_entry(elf_section stub, int32_t offset, int32_t branch,
+void write_trm_entry(elf_section *stub, int32_t offset, int32_t branch,
 	uint32_t count)
 {
-    void *ptr = stub.data->d_buf;
+    void *ptr = stub->data->d_buf;
     ptr = ptr + (count * TRM_LEN);
     memcpy(ptr, trm_entry_layout, TRM_LEN);
     memcpy(ptr + 1, &offset, 4);
     memcpy(ptr + 6, &branch, 4);
 }
 
-void write_padding_nops(elf_section text, uint64_t fct_offset)
+void write_padding_nops(elf_section *text, uint64_t fct_offset)
 {
-    void *ptr = text.data->d_buf;
+    void *ptr = text->data->d_buf;
     ptr = ptr + fct_offset;
     memset(ptr, 0x90, PRE_NOPS_LEN + 2);
     memset(ptr + PRE_NOPS_LEN, 0x66, 1);
@@ -136,13 +138,18 @@ int main(int argc, char **argv) {
     Elf_Scn *s = NULL;
     GElf_Shdr sh;
     size_t shstrndx, nr;
-    int i, fd;
+    int i, j, fd;
     Elf64_Sym *sym;
     char *sym_name, *str;
     int bind, type;
-    void * trm_offset = NULL;
+    uint64_t trm_offset = 0;
+    void ** sections = NULL;
     int32_t ulp_offset, fct_offset, count = 0;
-    elf_section dynsym, symtab, stubs, text, patchable;
+    elf_section *dynsym = NULL;
+    elf_section *symtab = NULL;
+    elf_section *stubs = NULL;
+    elf_section *patchable = NULL;
+    elf_section *sec = NULL;
 
     fd = 0;
     gelf = load_elf(argv[1], &fd);
@@ -150,10 +157,14 @@ int main(int argc, char **argv) {
     if (elf_getshdrnum(gelf, &nr))
 	errx(EXIT_FAILURE, "elf_getshdrnum: %s", elf_errmsg(-1));
 
+    sections = malloc(sizeof(void *) * nr);
+    if (!sections)
+        errx(EXIT_FAILURE, "section malloc failed.");
+
     if (elf_getshdrstrndx(gelf, &shstrndx))
 	errx(EXIT_FAILURE, "elf_getshdrstrndx: %s", elf_errmsg(-1));
 
-    // TODO: add section type checks besides name comparison below
+    // step 1: parse sections from elf
     for (i = 0; i < nr; i++) {
 	s = elf_getscn(gelf, i);
 	if (!s)	errx(EXIT_FAILURE, "elf_getscn: %s", elf_errmsg(-1));
@@ -161,82 +172,99 @@ int main(int argc, char **argv) {
 	if (!gelf_getshdr(s, &sh))
 	    errx(EXIT_FAILURE, "elf_getshdr: %s", elf_errmsg(-1));
 
+        sec = malloc(sizeof(elf_section));
+        if (!sec)
+            errx(EXIT_FAILURE, "section malloc failed.");
+
+        sections[i] = sec;
+
+        sec->sec = s;
+        sec->shdr = elf64_getshdr(s);
+        sec->size = sh.sh_size;
+        sec->offset = sh.sh_offset;
+        sec->data = elf_getdata(sec->sec, NULL);
+        sec->update = 0;
+
 	str = elf_strptr(gelf, shstrndx, sh.sh_name);
 	if (strcmp(str, ".dynsym")==0) {
-	    dynsym.sec = s;
-	    dynsym.shdr = elf64_getshdr(s);
-	    dynsym.len = (int) sh.sh_size / sizeof(Elf64_Sym);
-	    dynsym.offset = (void *) sh.sh_offset;
-	    dynsym.data = elf_getdata(dynsym.sec, NULL);
+	    sec->len = (int) sh.sh_size / sizeof(Elf64_Sym);
+            sec->update = 1;
+            dynsym = sec;
 	}
+
 	if (strcmp(str, ".symtab")==0) {
-	    symtab.sec = s;
-	    symtab.shdr = elf64_getshdr(s);
-	    symtab.len = (int) sh.sh_size / sizeof(Elf64_Sym);
-	    symtab.offset = (void *) sh.sh_offset;
-	    symtab.data = elf_getdata(symtab.sec, NULL);
+	    sec->len = (int) sh.sh_size / sizeof(Elf64_Sym);
+            symtab = sec;
 	}
-	if (strcmp(str, ".ulp")==0) {
-	    stubs.sec = s;
-	    stubs.shdr = elf64_getshdr(s);
-	    stubs.offset = (void *) sh.sh_offset;
-	    stubs.data = elf_getdata(stubs.sec, NULL);
-	}
-        if (strcmp(str, ".text")==0) {
-            text.sec = s;
-            text.shdr = elf64_getshdr(s);
-            text.offset = (void *) sh.sh_offset;
-            text.data = elf_getdata(text.sec, NULL);
-        }
+
 	if (strcmp(str, "__patchable_function_entries")==0) {
-            patchable.sec = s;
-            patchable.shdr = elf64_getshdr(s);
-            patchable.offset = (void *) sh.sh_offset;
-            patchable.data = elf_getdata(patchable.sec, NULL);
-            patchable.len = (int) sh.sh_size / sizeof(void *);
-            // the __patchable_function_entries section keeps relocation
-            // information of patchable entries. by subtracting these from the
-            // .text section offset, we get the position of the patchable entry
-            // in the .text data buffer.
+            sec->len = (int) sh.sh_size / sizeof(void *);
+            patchable = sec;
+            // this section keeps relocation info on patchable entries. By
+            // subtracting these from the respective section offset, we get the
+            // position of the patchable entry in the section data buffer.
         }
+
+	if (strcmp(str, ".ulp")==0) {
+            stubs = sec;
+	}
     }
 
-    for (i = 0; i < symtab.len; i++) {
-	sym = (Elf64_Sym *)(symtab.data->d_buf + (i * sizeof(Elf64_Sym)));
-	sym_name = elf_strptr(gelf, symtab.shdr->sh_link, sym->st_name);
+    if (!stubs) {
+       fprintf(stderr, "stubs section not found!\n");
+       exit(1);
+    }
+
+    // step 2: find __ulp_entry offset in symtab
+    for (i = 0; i < symtab->len; i++) {
+	sym = (Elf64_Sym *)(symtab->data->d_buf + (i * sizeof(Elf64_Sym)));
+	sym_name = elf_strptr(gelf, symtab->shdr->sh_link, sym->st_name);
 	bind = ELF64_ST_BIND(sym->st_info);
 	type = ELF64_ST_TYPE(sym->st_info);
 	if (strcmp(sym_name, "__ulp_entry")==0) {
-	    trm_offset = (void *) sym->st_value;
+	    trm_offset = sym->st_value;
 	}
     }
     if (!trm_offset) errx(EXIT_FAILURE, "Elf has not __ulp_trm function\n");
 
-    for (i = 0; i < dynsym.len; i++) {
-	sym = (Elf64_Sym *) (dynsym.data->d_buf + i * sizeof(Elf64_Sym));
-	sym_name = elf_strptr(gelf, dynsym.shdr->sh_link, sym->st_name);
+    // step 3: emit the ulp trampoline entries
+    // step 4: redirect symbol entry value in .dynsym to the ulp entry
+    for (i = 0; i < dynsym->len; i++) {
+	sym = (Elf64_Sym *) (dynsym->data->d_buf + i * sizeof(Elf64_Sym));
+	sym_name = elf_strptr(gelf, dynsym->shdr->sh_link, sym->st_name);
 	if (whitelisted(sym_name)) continue;
 	bind = ELF64_ST_BIND(sym->st_info);
 	type = ELF64_ST_TYPE(sym->st_info);
 	if (type == 2 && bind == 1 && sym->st_shndx != 0) {
-	    ulp_offset = -(compute_branch(stubs.offset, trm_offset, count, 14));
-	    fct_offset = compute_branch(stubs.offset, (void *) sym->st_value,
-		    count, 7);
+	    ulp_offset = -(compute_branch(stubs->offset, trm_offset, count, 14));
+	    fct_offset = compute_branch(stubs->offset, sym->st_value, count, 7);
             write_trm_cet_entry(stubs, ulp_offset, fct_offset, count);
-	    sym->st_value = (Elf64_Addr) stubs.offset + (count * 16);
+	    sym->st_value = (Elf64_Addr) stubs->offset + (count * 16);
 	    count++;
 	}
     }
 
-    for (i = 0; i < patchable.len; i++) {
-      uint64_t offset = * (uint64_t *) (patchable.data->d_buf + (i * 8));
-      write_padding_nops(text, offset - (uint64_t) text.offset);
+    // step 5: fix single-byte nops in function entries to two-byte nops
+    for (i = 0; i < patchable->len; i++) {
+        uint64_t offset = * (uint64_t *) (patchable->data->d_buf + (i * 8));
+        for (j = 0; j < nr; j++) {
+            sec = sections[j];
+            if (offset < sec->offset + sec->size && offset >= sec->offset) {
+                sec->update = 1;
+                write_padding_nops(sec, offset - sec->offset);
+                break;
+            }
+        }
     }
 
+    // step 6: update the elf
     if (count > 0) {
 	elf_flagehdr(gelf, ELF_C_SET, ELF_F_DIRTY | ELF_F_LAYOUT);
-	elf_flagscn(dynsym.sec, ELF_C_SET, ELF_F_DIRTY | ELF_F_LAYOUT);
-	elf_flagscn(text.sec, ELF_C_SET, ELF_F_DIRTY | ELF_F_LAYOUT);
+        for (i = 0; i < nr; i++) {
+            sec = sections[j];
+            if (sec->update)
+                elf_flagscn(sec->sec, ELF_C_SET, ELF_F_DIRTY | ELF_F_LAYOUT);
+        }
 	elf_flagelf(gelf, ELF_C_SET, ELF_F_DIRTY | ELF_F_LAYOUT);
 	if (elf_update(gelf, ELF_C_WRITE) < 0)
 	    errx(EXIT_FAILURE , "elf_update(): %s", elf_errmsg( -1));
