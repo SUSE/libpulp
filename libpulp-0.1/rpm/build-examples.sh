@@ -6,7 +6,7 @@ ULP_LD="${BFD_DIR}bin/ld"
 LINKER="/lib64/ld-linux-x86-64.so.2"
 LIB="/usr/lib64/"
 LD="ld"
-NOP_LENGTH="39,37"
+NOP_LENGTH="35,33"
 
 set -e
 
