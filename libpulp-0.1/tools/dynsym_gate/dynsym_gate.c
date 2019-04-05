@@ -233,9 +233,10 @@ int main(int argc, char **argv) {
 	sym = (Elf64_Sym *) (dynsym->data->d_buf + i * sizeof(Elf64_Sym));
 	sym_name = elf_strptr(gelf, dynsym->shdr->sh_link, sym->st_name);
 	if (whitelisted(sym_name)) continue;
+        // bind must be 1 for GLOBAL or 2 for WEAK
 	bind = ELF64_ST_BIND(sym->st_info);
 	type = ELF64_ST_TYPE(sym->st_info);
-	if (type == 2 && bind == 1 && sym->st_shndx != 0) {
+	if (type == 2 && (bind == 1 || bind == 2) && sym->st_shndx != 0) {
 	    ulp_offset = -(compute_branch(stubs->offset, trm_offset, count, 14));
 	    fct_offset = compute_branch(stubs->offset, sym->st_value, count, 7);
             write_trm_cet_entry(stubs, ulp_offset, fct_offset, count);
