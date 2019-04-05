@@ -29,6 +29,24 @@ function read_uint8(file)
   return b1
 end
 
+function resolve_link(object)
+
+  local link = io.popen("file " .. object)
+  local line = link:read("*line")
+
+  if not line then
+    print("DISPATCHER ERROR: Unable to check link: " .. object)
+    return nil
+  end
+
+  path, target = string.match(line, "(.*)/.*: symbolic link to (.*)")
+  if path then
+    object = path .. "/" .. target
+  end
+
+  return object
+end
+
 function parse_metadata(metadata_file)
   local metadata = {}
 
@@ -46,6 +64,9 @@ function parse_metadata(metadata_file)
   metadata["build_id"] = file:read(metadata["build_id_len"])
   metadata["target_object_name_len"] = read_uint32(file)
   metadata["target_object"] = file:read(metadata["target_object_name_len"])
+
+  -- check if target object is symbolic link and resolve it
+  metadata["target_object"] = resolve_link(metadata["target_object"])
 
   file:close()
   return metadata
