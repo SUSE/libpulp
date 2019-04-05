@@ -69,7 +69,8 @@ mv rpm/build/ex1 %{buildroot}%_bindir/dummyapp1
 mv rpm/build/ex2 %{buildroot}%_bindir/dummyapp2
 mv rpm/build/ex3 %{buildroot}%_bindir/dummyapp3
 mv rpm/build/libpulp.so %{buildroot}%_libdir/libpulp.so
-mv rpm/build/libdummy.so %{buildroot}%_libdir/libdummy.so
+cp -R rpm/lib %{buildroot}%_libdir/ulp_glibc
+mv rpm/build/libdummy.so %{buildroot}%_libdir/ulp_glibc/lib/libdummy.so
 mv rpm/build/trigger %{buildroot}%_bindir/ulp_trigger
 mv rpm/build/packer %{buildroot}%_bindir/ulp_packer
 mv rpm/build/dynsym_gate %{buildroot}%_bindir/ulp_dynsym_gate
@@ -90,4 +91,6 @@ mv tools/dispatcher/dispatcher.lua %{buildroot}%_bindir/ulp_dispatcher
 %{_bindir}/dummyapp1
 %{_bindir}/dummyapp2
 %{_bindir}/dummyapp3
-%{_libdir}/libdummy.so
+
+%files -n libdummy
+%{_libdir}/ulp_glibc/lib/libdummy.so
