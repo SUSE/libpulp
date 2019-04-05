@@ -65,6 +65,8 @@ __ulp_entry_bypass:
 
 __ulp_entry:
     // check if this is library entrance
+    pushq   %rdx
+    pushq   %rcx
     pushq   %rdi
     pushq   %rax
     leaq    __ulp_ret@tlsld(%rip), %rdi
@@ -86,12 +88,16 @@ __ulp_entry:
 __ulp_call_function:
     popq    %rax
     popq    %rdi
+    popq    %rcx
+    popq    %rdx
     push    8(%rsp)
     pop     __ulp_ret@dtpoff(%r11)
     pop     %r11
     addq    $0x8, %rsp
     call    *%r11
 
+    pushq   %rdx
+    pushq   %rcx
     pushq   %rdi
     pushq   %rax
     leaq    __ulp_ret@tlsld(%rip), %rdi
@@ -100,12 +106,16 @@ __ulp_call_function:
     movq    $0x0, __ulp_ret@dtpoff(%rax)
     popq    %rax
     popq    %rdi
+    popq    %rcx
+    popq    %rdx
     pushq   %r11
     retq
 
 __ulp_entry_bypass:
     pop     %rax
     pop     %rdi
+    pop     %rcx
+    pop     %rdx
     pop     %r11
     jmp     *%r11
 
