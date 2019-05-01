@@ -15,11 +15,13 @@
 # Please submit bugfixes or comments via http://bugs.opensuse.org/
 #
 
-Name:           libpulp
+Name:           libdummy
 Version:	0.1
 Release:	0
 License:	SUSE-GPL-2.0
-Summary:	User-space Livepatching Library
+Summary:	Dummy library example for user space live patching
+Group:		System/Libraries
+Provides:	libdummy = %{version}
 Source0:	%{name}-%{version}.tar.bz2
 
 %define topdir %(echo $PWD)/rpmbuild
@@ -29,37 +31,40 @@ Source0:	%{name}-%{version}.tar.bz2
 %define _specdir %(echo $PWD)
 %define _srcrpmdir %{topdir}/rpms
 
-BuildRequires: gcc
-BuildRequires: binutils_ulp
-BuildRequires: libelf-devel
-BuildRequires: binutils-devel
+BuildRequires:	gcc_ulp
+BuildRequires:	binutils_ulp
+BuildRequires:	libpulp
 
 %description
-This package provides libpulp. Also, example applications.
+This package brings the libpulp dummy example
+
+%package -n dummyapp
+Summary:	Application that uses libdummy and will be patched
+Group:		Development/Tools/Other
+Provides:	dummyapp
+
+%description -n dummyapp
+Application to be patched in libpulp examples.
 
 %prep
-%setup -q -n libpulp-%{version}
+%setup -q -n libdummy-%{version}
 
 %build
-cd rpm
-./build-lib.sh
+./build-libdummy.sh
 
 %install
-mkdir -p %{buildroot}%_bindir
-mkdir -p %{buildroot}%_libdir
-mkdir -p %{buildroot}/var/ulp/
-mv rpm/build/libpulp.so %{buildroot}%_libdir/libpulp.so
-mv rpm/build/trigger %{buildroot}%_bindir/ulp_trigger
-mv rpm/build/packer %{buildroot}%_bindir/ulp_packer
-mv rpm/build/dynsym_gate %{buildroot}%_bindir/ulp_dynsym_gate
-mv rpm/build/checker %{buildroot}%_bindir/ulp_check
-mv tools/dispatcher/dispatcher.lua %{buildroot}%_bindir/ulp_dispatcher
+mkdir -p %{buildroot}%_bindir/
+mkdir -p %{buildroot}%_libdir/
+mv build/ex1 %{buildroot}%_bindir/dummyapp1
+mv build/ex2 %{buildroot}%_bindir/dummyapp2
+mv build/ex3 %{buildroot}%_bindir/dummyapp3
+mv build/libdummy.so %{buildroot}%_libdir/libdummy.so
 
-%files -n libpulp
+%files -n dummyapp
 %defattr(-,root,root)
-%{_libdir}/libpulp.so
-%{_bindir}/ulp_trigger
-%{_bindir}/ulp_packer
-%{_bindir}/ulp_dynsym_gate
-%{_bindir}/ulp_check
-%{_bindir}/ulp_dispatcher
+%{_bindir}/dummyapp1
+%{_bindir}/dummyapp2
+%{_bindir}/dummyapp3
+
+%files -n libdummy
+%{_libdir}/libdummy.so

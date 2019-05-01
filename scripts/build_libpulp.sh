@@ -15,6 +15,9 @@ then
 	exit
 fi
 
-./build-libpulp.sh
-./build-libdummy.sh
-./build-lp_libdummy.sh
+# uninstal rpms, for when retrying
+sudo rpm -e libpulp-0.1-0.x86_64
+
+# build and install libpulp and the dummy example
+rpmbuild -bb libpulp.spec
+sudo rpm -ivh rpmbuild/rpms/x86_64/libpulp-0.1-0.x86_64.rpm

@@ -18,5 +18,11 @@ fi
 # remove old tar.bz2 files and recreate them
 rm -f libdummy_livepatch-0.1.tar.bz2
 rm -f libpulp-0.1.tar.bz2
+rm -f libdummy-0.1.tar.bz2
+
+# ensure that trm.S is up to date
+cp libpulp-0.1/lib/trm.S libdummy-0.1/libdummy/trm.S
+
 tar cjvf libpulp-0.1.tar.bz2 libpulp-0.1
+tar cjvf libdummy-0.1.tar.bz2 libdummy-0.1
 tar cjvf libdummy_livepatch-0.1.tar.bz2 libdummy_livepatch-0.1

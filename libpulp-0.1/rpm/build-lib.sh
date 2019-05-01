@@ -1,10 +1,6 @@
 #!/bin/sh
 
 CC="gcc"
-BFD_DIR="/usr/ulp/binutils/"
-LD="${BFD_DIR}bin/ld"
-LINKER="/lib64/ld-linux-x86-64.so.2"
-LIB="/usr/lib64/"
 
 set -e
 
