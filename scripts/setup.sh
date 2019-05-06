@@ -15,6 +15,12 @@ then
 	exit
 fi
 
-./build-libpulp.sh
-./build-libdummy.sh
-./build-lp_libdummy.sh
+# remove all packages
+sudo rpm -e libdummy_livepatch-0.1-0.x86_64
+sudo rpm -e libpulp-0.1-0.x86_64
+sudo rpm -e dummyapp-0.1-0.x86_64
+sudo rpm -e libdummy-0.1-0.x86_64
+
+./scripts/build_libpulp.sh
+./scripts/build_libdummy.sh
+./scripts/build_lp_libdummy.sh
