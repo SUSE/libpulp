@@ -52,17 +52,19 @@ void free_metadata(struct ulp_metadata *ulp)
     struct ulp_unit *unit, *next_unit;
     if (!ulp) return;
     obj = ulp->objs;
-    unit = obj->units;
-    while (unit) {
-	next_unit = unit->next;
-	free(unit->old_fname);
-	free(unit->new_fname);
-	free(unit);
-	unit = next_unit;
+    if (obj) {
+	unit = obj->units;
+	while (unit) {
+	    next_unit = unit->next;
+	    free(unit->old_fname);
+	    free(unit->new_fname);
+	    free(unit);
+	    unit = next_unit;
+	}
+	free(obj->name);
+	free(obj->build_id);
+	free(obj);
     }
-    free(obj->name);
-    free(obj->build_id);
-    free(obj);
 }
 
 void unload_elf(Elf **elf, int *fd)
@@ -379,6 +381,11 @@ int parse_description(char *filename, struct ulp_metadata *ulp)
 	    ulp->objs->nunits = 0;
 	    last_unit = NULL;
 	} else {
+	    if (!ulp->objs) {
+		WARN("Patch description does not define shared object for patching.");
+		return 0;
+	    }
+
 	    /* else, this is new function to-be-patched in last found object */
 	    if (first[n-1] == '\n') first[n-1] = '\0';
 
@@ -510,8 +517,10 @@ int generate_random_patch_id(struct ulp_metadata *ulp)
 int main(int argc, char **argv)
 {
     struct ulp_metadata ulp;
-    Elf *target_elf;
+    Elf *target_elf = NULL;
     int fd;
+
+    memset(&ulp, 0, sizeof(ulp));
 
     if (argc < 3) {
 	usage(argv[0]);
