@@ -21,6 +21,7 @@
  *  Author: Joao Moreira <jmoreira@suse.de>
  */
 
+#include <err.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <gelf.h>
@@ -78,13 +79,13 @@ Elf *load_elf(char *obj, int *fd)
 
     *fd = open(obj, O_RDONLY);
     if (*fd == -1) {
-	perror("open");
+	err(0, "Error opening %s", obj);
 	return NULL;
     }
 
     elf = elf_begin(*fd, ELF_C_READ, NULL);
     if (!elf) {
-	perror("elf_begin");
+	err(0, "Error invoking elf_begin()");
 	close(*fd);
 	return NULL;
     }
@@ -98,14 +99,14 @@ Elf_Scn *get_symtab(Elf *elf) {
     GElf_Shdr sh;
 
     if (elf_getshdrnum(elf, &nsecs)) {
-	perror("elf_getshdrnum");
+	err(0, "Error invoking elf_getshdrnum()");
 	return NULL;
     }
 
     for (i = 0; i < nsecs; i++) {
 	s = elf_getscn(elf, i);
 	if (!s) {
-	    perror("elf_getscn");
+	    err(0, "Error invoking elf_getscn()");
 	    return NULL;
 	}
 	gelf_getshdr(s, &sh);
@@ -125,15 +126,13 @@ Elf_Scn *get_build_id_note(Elf *elf) {
     char *sec_name;
 
     if (elf_getshdrnum(elf, &nsecs)) {
-	perror("elf_getshdrnum");
-	exit(-1);
+	err(1, "Error invoking elf_getshdrnum()");
     }
 
     for (i = 0; i < nsecs; i++) {
 	s = elf_getscn(elf, i);
 	if (!s) {
-	    perror("elf_getscn");
-	    exit(-1);
+	    err(1, "Error invoking elf_getscn()");
 	}
 	gelf_getshdr(s, &sh);
 
@@ -516,13 +515,13 @@ int main(int argc, char **argv)
 
     if (argc < 3) {
 	usage(argv[0]);
-	exit(-1);
+	return 1;
     }
 
     elf_version(EV_CURRENT);
 
     if (!parse_description(argv[1], &ulp)) {
-	WARN("Unable to parse patch description.");
+	WARN("Unable to parse patch description from %s.", argv[1]);
 	goto main_error;
     }
 
@@ -545,5 +544,5 @@ int main(int argc, char **argv)
 main_error:
     unload_elf(&target_elf, &fd);
     free_metadata(&ulp);
-    return -1;
+    return 1;
 }
