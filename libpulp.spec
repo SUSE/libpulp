@@ -46,9 +46,9 @@ cd rpm
 
 %install
 mkdir -p %{buildroot}%_bindir
-mkdir -p %{buildroot}%_libdir
+mkdir -p %{buildroot}/usr/ulp/libpulp
 mkdir -p %{buildroot}/var/ulp/
-mv rpm/build/libpulp.so %{buildroot}%_libdir/libpulp.so
+mv rpm/build/libpulp.so %{buildroot}/usr/ulp/libpulp/libpulp.so
 mv rpm/build/trigger %{buildroot}%_bindir/ulp_trigger
 mv rpm/build/packer %{buildroot}%_bindir/ulp_packer
 mv rpm/build/dynsym_gate %{buildroot}%_bindir/ulp_dynsym_gate
@@ -57,7 +57,7 @@ mv tools/dispatcher/dispatcher.lua %{buildroot}%_bindir/ulp_dispatcher
 
 %files -n libpulp
 %defattr(-,root,root)
-%{_libdir}/libpulp.so
+/usr/ulp/libpulp/libpulp.so
 %{_bindir}/ulp_trigger
 %{_bindir}/ulp_packer
 %{_bindir}/ulp_dynsym_gate

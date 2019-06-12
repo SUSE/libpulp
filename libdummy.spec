@@ -54,11 +54,11 @@ Application to be patched in libpulp examples.
 
 %install
 mkdir -p %{buildroot}%_bindir/
-mkdir -p %{buildroot}%_libdir/
+mkdir -p %{buildroot}/usr/ulp/libdummy/
 mv build/ex1 %{buildroot}%_bindir/dummyapp1
 mv build/ex2 %{buildroot}%_bindir/dummyapp2
 mv build/ex3 %{buildroot}%_bindir/dummyapp3
-mv build/libdummy.so %{buildroot}%_libdir/libdummy.so
+mv build/libdummy.so %{buildroot}/usr/ulp/libdummy/libdummy.so
 
 %files -n dummyapp
 %defattr(-,root,root)
@@ -67,4 +67,4 @@ mv build/libdummy.so %{buildroot}%_libdir/libdummy.so
 %{_bindir}/dummyapp3
 
 %files -n libdummy
-%{_libdir}/libdummy.so
+/usr/ulp/libdummy/*
