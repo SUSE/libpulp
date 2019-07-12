@@ -16,7 +16,9 @@ then
 fi
 
 # uninstal rpms, for when retrying
-sudo rpm -e libdummy_livepatch.sh
+sudo rpm -e libdummy_livepatch_1-0.1-0.x86_64
+sudo rpm -e libdummy_livepatch_2-0.1-0.x86_64
 
 # build and install libpulp and the dummy example
-rpmbuild -bb libdummy_livepatch.spec
+rpmbuild -bb libdummy_livepatch_1.spec
+rpmbuild -bb libdummy_livepatch_2.spec

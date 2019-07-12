@@ -15,9 +15,11 @@ mkdir ./build
 echo $'\n** Building libpulp, packer, plt_swap, trigger and dump'
 ${CC} ../lib/ulp.c -c -o ./build/ulp.o -fPIC
 ${CC} ../lib/ulp_interface.S -c -o ./build/ulp_interface.o -fPIC
-${CC} ./build/ulp.o ./build/ulp_interface.o -shared -o ./build/libpulp.so -fPIC -ldl -Wall
+${CC} ../lib/ulp_prologue.S -c -o ./build/ulp_prologue.o -fPIC
+${CC} ./build/ulp.o ./build/ulp_prologue.o ./build/ulp_interface.o -shared -o ./build/libpulp.so -fPIC -ldl -Wall
 ${CC} -c ../lib/trm.S -o ./build/trm.o -fPIC --shared
 ${CC} ../tools/packer/packer.c -o ./build/packer -lelf -Wall
+${CC} ../tools/packer/revert.c -o ./build/reverse -Wall
 ${CC} ../tools/dynsym_gate/dynsym_gate.c -o ./build/dynsym_gate -lelf -Wall
 ${CC} ../tools/trigger/trigger.c -c -o ./build/trigger.o
 ${CC} ../tools/trigger/check.c -c -o ./build/check.o

@@ -22,49 +22,18 @@
  */
 
 .section .ulp.track,"ax",@progbits
+
+.weak   __ulp_global_universe
 .local	__ulp_entry
 .type	__ulp_entry,@function
-
-
 .align 8
-.ifdef LOCAL_EXEC
-__ulp_entry:
-    // check if this is library entrance
-    movq    __ulp_ret@gottpoff(%rip), %r11
-    cmp     $0x0, %fs:(%r11)
-    jnz     __ulp_entry_bypass
-
-    // migrate to new universe if there is a pending patch
-    // TODO: verify if comparing then setting to zero if pending performs
-    // better then simply always setting to zero
-    push %r10
-    movq    __ulp_pending@gottpoff(%rip), %r10
-    //movq    %fs:(%r10), %rax
-    cmp     $0x1, %fs:(%r10)
-    jne     __ulp_call_function
-    movq    $0x0, %fs:(%r10)
-
-   // call original function
-__ulp_call_function:
-    pop     %r10
-    push    8(%rsp)
-    pop     %fs:(%r11)
-    pop     %r11
-    addq    $0x8, %rsp
-    call    *%r11
-    mov     __ulp_ret@gottpoff(%rip), %r11
-    push    %fs:(%r11)
-    movq    $0x0, %fs:(%r11)
-    ret
-
-__ulp_entry_bypass:
-    pop     %r11
-    jmp     *%r11
-
-.else
 
 __ulp_entry:
     // check if this is library entrance
+    pushq   %r10
+    pushq   %r9
+    pushq   %r8
+    pushq   %rsi
     pushq   %rdx
     pushq   %rcx
     pushq   %rdi
@@ -76,13 +45,19 @@ __ulp_entry:
 
     movq    %rax, %r11
 
-    // migrate to new universe
-    // we are always setting to zero, irrespectively of what was there before.
-    // TODO: check if cmp 1 + set to 0 is better then simply always set to 0
+    // Migrate to new universe:
+    // - always set __ulp_thread_universe = __ulp_global_universe.
+    // - comparing __ulp_thread_universe with __ulp_global_universe pior to
+    // setting it, would require loading the __ulp_thread_universe value, then
+    // cmp, then jne. Instead of that, we always update the value and end with
+    // one movq instruction in place of the load, cmp, jne, movq sequence.
+    // - the above should be properly benchmarked.
 
-    leaq    __ulp_pending@tlsld(%rip), %rdi
+    leaq    __ulp_thread_universe@tlsld(%rip), %rdi
     call    __tls_get_addr@PLT
-    movq    $0x0, __ulp_pending@dtpoff(%rax)
+    movq    __ulp_global_universe@GOTPCREL(%rip), %rdi
+    movq    (%rdi), %rdi
+    movq    %rdi, __ulp_thread_universe@dtpoff(%rax)
 
    // call original function
 __ulp_call_function:
@@ -90,12 +65,20 @@ __ulp_call_function:
     popq    %rdi
     popq    %rcx
     popq    %rdx
+    popq    %rsi
+    popq    %r8
+    popq    %r9
+    popq    %r10
     push    8(%rsp)
     pop     __ulp_ret@dtpoff(%r11)
     pop     %r11
     addq    $0x8, %rsp
     call    *%r11
 
+    pushq   %r10
+    pushq   %r9
+    pushq   %r8
+    pushq   %rsi
     pushq   %rdx
     pushq   %rcx
     pushq   %rdi
@@ -108,45 +91,41 @@ __ulp_call_function:
     popq    %rdi
     popq    %rcx
     popq    %rdx
+    popq    %rsi
+    popq    %r8
+    popq    %r9
+    popq    %r10
     pushq   %r11
     retq
 
 __ulp_entry_bypass:
-    pop     %rax
-    pop     %rdi
-    pop     %rcx
-    pop     %rdx
+    popq    %rax
+    popq    %rdi
+    popq    %rcx
+    popq    %rdx
+    popq    %rsi
+    popq    %r8
+    popq    %r9
+    popq    %r10
     pop     %r11
     jmp     *%r11
 
-.endif
-
-// TODO: check if visibility of these symbols below are ok
-.align  8
-.global __ulp_get_pending
-.type   __ulp_get_pending,@function
-__ulp_get_pending:
-    pushq   %rdi
-    pushq   %rax
-    leaq    __ulp_pending@tlsld(%rip), %rdi
-    call    __tls_get_addr@PLT
-    movq    __ulp_pending@dtpoff(%rax), %r11
-    popq   %rax
-    popq   %rdi
-    retq
-
-.global __ulp_set_pending
-.type   __ulp_set_pending,@function
-__ulp_set_pending:
-    nop
-    nop
-    pushq   %rdi
-    pushq   %rax
-    leaq    __ulp_pending@tlsld(%rip), %rdi
-    call    __tls_get_addr@PLT
-    movq    $0x1, __ulp_pending@dtpoff(%rax)
-    popq    %rax
-    popq    %rdi
+//.global __ulp_get_universe
+//.type   __ulp_get_universe,@function
+//__ulp_get_universe:
+//    pushq   %rdx
+//    pushq   %rcx
+//    pushq   %rdi
+//    pushq   %rax
+//    leaq    __ulp_ret@tlsld(%rip), %rdi
+//    call    __tls_get_addr@PLT
+//    movq    __ulp_ret@dtpoff(%rax), %r11
+//    cmp     $0x0, __ulp_ret@dtpoff(%rax)
+//    popq    %rax
+//    popq    %rdi
+//    popq    %rcx
+//    popq    %rdx
+//    retq
 
 .global __ulp_loop
 .type   __ulp_loop,@function
@@ -154,6 +133,13 @@ __ulp_loop:
     nop
     nop
     jmp	    __ulp_loop
+
+.section .data
+.align 8
+.type __ulp_global_universe, @object
+.size __ulp_global_universe, 8
+__ulp_global_universe:
+.zero 0x8
 
 .section .tbss,"awT",@nobits
 .align  8
@@ -164,8 +150,8 @@ __ulp_loop:
 __ulp_ret:
 .zero   0x8
 
-.type   __ulp_pending, @object
-.size   __ulp_pending, 8
-.global __ulp_pending
-__ulp_pending:
+.global __ulp_thread_universe
+.type   __ulp_thread_universe, @object
+.size   __ulp_thread_universe, 8
+__ulp_thread_universe:
 .zero	0x8

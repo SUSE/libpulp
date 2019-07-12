@@ -128,7 +128,7 @@ void write_padding_nops(elf_section *text, uint64_t fct_offset)
 
 int whitelisted(char *sym_name)
 {
-	if (strcmp(sym_name, "__ulp_get_pending")==0) return 1;
+	if (strcmp(sym_name, "__ulp_loop")==0) return 1;
 	return 0;
 }
 

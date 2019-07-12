@@ -15,13 +15,11 @@
 # Please submit bugfixes or comments via http://bugs.opensuse.org/
 #
 
-Name:           libdummy
+Name:           libdummy_livepatch_1
 Version:	0.1
 Release:	0
 License:	SUSE-GPL-2.0
-Summary:	Dummy library example for user space live patching
-Group:		System/Libraries
-Provides:	libdummy = %{version}
+Summary:	Livepatch for libdummy
 Source0:	%{name}-%{version}.tar.bz2
 
 %define topdir %(echo $PWD)/rpmbuild
@@ -30,43 +28,38 @@ Source0:	%{name}-%{version}.tar.bz2
 %define _sourcedir %(echo $PWD)
 %define _specdir %(echo $PWD)
 %define _srcrpmdir %{topdir}/rpms
+%define patchdir /var/ulp/%{name}-%{version}
 
-BuildRequires:	gcc_ulp
-BuildRequires:	binutils_ulp
+# tricky part: we need to build using libdummy 0.1 binaries, but before
+# installing, we need to make sure that these binaries are up to date
+BuildRequires:	dummyapp = 0.1
 BuildRequires:	libpulp
+Requires:	libpulp
+Requires:	lua53
 
 %description
-This package brings the libpulp dummy example
-
-%package -n dummyapp
-Summary:	Application that uses libdummy and will be patched
-Group:		Development/Tools/Other
-Provides:	dummyapp
-
-%description -n dummyapp
-Application to be patched in libpulp examples.
+This package provides a livepatch for libdummy.
 
 %prep
-%setup -q -n libdummy-%{version}
+%setup -q -n libdummy_livepatch_1-%{version}
 
 %build
-./build-libdummy.sh
+./build-livepatch.sh
 
 %install
-mkdir -p %{buildroot}%_bindir/
-mkdir -p %{buildroot}/usr/ulp/libdummy/
-mv build/ex1 %{buildroot}%_bindir/dummyapp1
-mv build/ex2 %{buildroot}%_bindir/dummyapp2
-mv build/ex3 %{buildroot}%_bindir/dummyapp3
-mv build/ex4 %{buildroot}%_bindir/dummyapp4
-mv build/libdummy.so %{buildroot}/usr/ulp/libdummy/libdummy.so
+mkdir -p %{buildroot}%{patchdir}
+mv ./build/patch1.so %{buildroot}%{patchdir}/patch1.so
+mv ./build/metadata1.ulp %{buildroot}%{patchdir}/metadata1.ulp
+mv ./build/reverse1.ulp %{buildroot}%{patchdir}/reverse1.ulp
 
-%files -n dummyapp
+%post -n libdummy_livepatch_1
+lua %{_bindir}/ulp_dispatcher patch %{patchdir}/metadata1.ulp
+
+%preun
+lua %{_bindir}/ulp_dispatcher patch %{patchdir}/reverse1.ulp
+
+%files -n libdummy_livepatch_1
 %defattr(-,root,root)
-%{_bindir}/dummyapp1
-%{_bindir}/dummyapp2
-%{_bindir}/dummyapp3
-%{_bindir}/dummyapp4
-
-%files -n libdummy
-/usr/ulp/libdummy/*
+%{patchdir}/patch1.so
+%{patchdir}/metadata1.ulp
+%{patchdir}/reverse1.ulp

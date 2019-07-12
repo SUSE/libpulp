@@ -54,8 +54,6 @@ struct ulp_dynobj
     Elf64_Addr trigger;
     Elf64_Addr check;
     Elf64_Addr path_buffer;
-    Elf64_Addr set_pending;
-    Elf64_Addr get_pending;
 
     struct ulp_dynobj *next;
 };
@@ -66,8 +64,6 @@ struct ulp_addresses
     Elf64_Addr trigger;
     Elf64_Addr path_buffer;
     Elf64_Addr check;
-    Elf64_Addr set_pending;
-    Elf64_Addr get_pending;
 };
 
 typedef struct ulp_process ulp_process;
@@ -75,7 +71,7 @@ typedef struct ulp_thread ulp_threads;
 typedef struct ulp_dynobj ulp_dynobj;
 typedef struct ulp_addresses ulp_addresses;
 
-int parse_file_symtab(ulp_dynobj *obj);
+int parse_file_symtab(ulp_dynobj *obj, char needed);
 
 asymbol **get_main_symtab();
 
@@ -99,7 +95,7 @@ struct link_map get_link_map(char *name);
 
 int initialize_data_structures(int pid, char *livepatch);
 
-int hijack_threads(int set_pending);
+int hijack_threads();
 
 int set_id_buffer(char *patch_id, struct ulp_thread *t);
 

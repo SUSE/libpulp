@@ -1,0 +1,4 @@
+/var/ulp/libdummy_livepatch_2-0.1/patch2.so
+@/usr/ulp/libdummy/libdummy.so
+bar:new_bar
+sleeping_bar:new_sleeping_bar

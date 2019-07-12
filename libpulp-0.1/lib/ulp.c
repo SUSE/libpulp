@@ -38,23 +38,30 @@
 struct ulp_patching_state __ulp_state;
 char __ulp_path_buffer[256] = "";
 struct ulp_metadata *__ulp_metadata_ref = NULL;
+struct ulp_detour_root *__ulp_root = NULL;
 
-// movabs 	&__ulp_get_pending, %r11
-// call 	*%r11
-// cmp		$0x0, %r11
-// jne		<foo+2>
-// jmpq		0x0(%rip) # first byte after instruction
-// <data>	# address of new foo
-char ulp_prologue[35] = {0x49, 0xbb,
-			 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			 0x41, 0xff, 0xd3,
-			 0x49, 0x83, 0xfb, 0x00,
-			 0x75, 0x10,
-			 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			 0xeb, - (PRE_NOPS_LEN + 2)};
+// push		function_index
+// jmpq		0x0(%rip)
+// <data>	&__ulp_manage_addresses
+//char ulp_prologue[21] = {0x68, 0x00, 0x00, 0x00, 0x00,
+//                         0xff, 0x25, 0x00, 0x00, 0x00, 0x00,
+//                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//                         0xeb, - (PRE_NOPS_LEN + 2)};
 
-char ulp_absolute_jmp[6] = {0xff, 0x25, 0x00, 0x00, 0x00, 0x00};
+// push		%rdi
+// movq		$0xindex, %rdi
+// jmp1		0x0(%rip)
+// <data>	&__ulp_prologue
+char ulp_prologue[24] = {0x57,
+                         0x48, 0xc7, 0xc7, 0x00, 0x00, 0x00, 0x00,
+                         0xff, 0x25, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                         0xeb, - (PRE_NOPS_LEN + 2)};
+
+unsigned int __ulp_root_index_counter = 0;
+unsigned long __ulp_global_universe = 0;
+
+extern void __ulp_prologue();
 
 __attribute__ ((constructor)) void begin(void)
 {
@@ -99,22 +106,23 @@ void free_metadata(struct ulp_metadata *ulp)
 
     if (ulp) {
 	obj = ulp->objs;
-	unit = ulp->objs->units;
-	while (unit) {
-	    next_unit = unit->next;
-	    free(unit->old_fname);
-	    free(unit->new_fname);
-	    free(unit);
-	    unit = next_unit;
-	}
-	free(obj->build_id);
-	if (obj->dl_handler && dlclose(obj->dl_handler)) {
-	    WARN("Error closing handler for %s.", obj->name);
-	}
-	free(obj->name);
-	free(obj);
+        if (obj) {
+  	    unit = ulp->objs->units;
+	    while (unit) {
+                next_unit = unit->next;
+                free(unit->old_fname);
+                free(unit->new_fname);
+                free(unit);
+                unit = next_unit;
+	    }
+            free(obj->build_id);
+            if (obj->dl_handler && dlclose(obj->dl_handler)) {
+	        WARN("Error closing handler for %s.", obj->name);
+            }
+            free(obj->name);
+            free(obj);
+        }
     }
-
     free(ulp);
 }
 
@@ -379,6 +387,7 @@ int parse_metadata(struct ulp_metadata *ulp)
 	prev_dep = dep;
     }
 
+    fclose(file);
     if(!check_patch_sanity(ulp)) return 0;
     if(!load_so_handlers(ulp)) return 0;
 
@@ -414,11 +423,9 @@ int load_patch()
 	    if (!patch_entry)
 		break;
 
-	    if (!ulp_apply_all_units(ulp->objs, ulp->so_handler)) {
-		WARN("PATCH NOT APPLIED, reverting!");
-		if (!ulp_revert_patch(patch_entry->patch_id))
-		    WARN("Unable to revert patch -- Inconsistent state!");
-		break;
+	    if (!ulp_apply_all_units(ulp)) {
+                WARN("FATAL ERROR while applying patch units\n");
+                exit(-1);
 	    }
 
 	    goto load_patch_success;
@@ -430,6 +437,7 @@ int load_patch()
 		WARN("Unable to revert patch.");
 		break;
 	    }
+
 	    goto load_patch_success;
 
 	default:  /* load patch metadata error */
@@ -472,26 +480,61 @@ int ulp_can_revert_patch(struct ulp_metadata *ulp)
 	}
     }
 
-    if (!is_object_consistent(ulp->objs)) return 1;
-
-    return 0;
-}
-
-// TODO: check if this is still needed
-int is_object_consistent(struct ulp_object *obj)
-{
-    char *flag;
-
-    flag = load_so_symbol("__ulp_ret", obj->dl_handler, 0);
-
-    if (*flag) return 0;
     return 1;
 }
 
-int ulp_apply_all_units(struct ulp_object *obj, void *patch_so)
+struct ulp_detour_root *get_detour_root_by_index(unsigned int idx)
+{
+    struct ulp_detour_root *r;
+    r = __ulp_root;
+
+    if (r == NULL) return NULL;
+    for (r = __ulp_root; r != NULL && r->index != idx; r = r->next) {};
+
+    return r;
+}
+
+struct ulp_detour_root *get_detour_root_by_address(void *addr)
+{
+    struct ulp_detour_root *r;
+    r = __ulp_root;
+
+    if (r == NULL) return NULL;
+    for (r = __ulp_root; r != NULL && r->patched_addr != addr; r = r->next) {};
+
+    return r;
+}
+
+struct ulp_detour_root *push_new_root()
+{
+    struct ulp_detour_root *root, *root_aux;
+
+    root = calloc(1, sizeof(struct ulp_detour_root));
+    if (!root) {
+	WARN("unable to allocate memory for ulp detour root");
+	return NULL;
+    }
+
+    // since above we use calloc, the if/else below shouldn't be needed
+    if (!__ulp_root) root_aux = NULL;
+    else root_aux = __ulp_root;
+    __ulp_root = root;
+    root->next = root_aux;
+
+    return root;
+}
+
+int ulp_apply_all_units(struct ulp_metadata *ulp)
 {
     void *old_fun, *new_fun;
+    void *patch_so = ulp->so_handler;
+    struct ulp_object *obj = ulp->objs;
     struct ulp_unit *unit;
+    struct ulp_detour_root *root;
+    unsigned long universe;
+    unsigned int index;
+
+    __ulp_global_universe++;
 
     /* only shared objs have units, this loop never runs for main obj */
     unit = obj->units;
@@ -502,7 +545,28 @@ int ulp_apply_all_units(struct ulp_object *obj, void *patch_so)
 	new_fun = load_so_symbol(unit->new_fname, patch_so, 0);
 	if (!new_fun) return 0;
 
-	if (!ulp_patch_addr(old_fun, new_fun))  return 0;
+        root = get_detour_root_by_address(old_fun);
+        if (!root) {
+            root = push_new_root();
+            if (!root) return 0;
+
+            root->index = get_next_function_index();
+            root->patched_addr = old_fun;
+            root->handler = obj->dl_handler;
+        }
+
+        if (!(push_new_detour(__ulp_global_universe, ulp->patch_id,
+                              root, new_fun)))
+        {
+            WARN("error setting ulp data structure\n");
+            return 0;
+        }
+
+        if (!(ulp_patch_addr(old_fun, new_fun, root->index)))
+        {
+            WARN("error patching address %p", old_fun);
+            return 0;
+        }
 
 	unit = unit->next;
     }
@@ -749,39 +813,96 @@ int check_build_id(struct ulp_metadata *ulp)
     return 1;
 }
 
-void ulp_patch_prologue_layout(void *old_fentry, void *pending)
+void ulp_patch_prologue_layout(void *old_fentry, unsigned int function_index)
 {
     memcpy(old_fentry, ulp_prologue, sizeof(ulp_prologue));
-    memcpy(old_fentry + 2, &pending, 8); // TODO: fix the size here
+    memcpy(old_fentry + 4, &function_index, 4);
 }
 
-void *ulp_get_pending()
+void __ulp_manage_universes(unsigned long idx)
 {
-	return &__ulp_get_pending;
+    unsigned long universe;
+    struct ulp_detour_root *root;
+    struct ulp_detour *d;
+    void *target;
+    void *aux_ptr;
+
+    root = get_detour_root_by_index((unsigned int) idx);
+    if (!root) {
+        WARN("FATAL ERROR While Live Patching.");
+        exit(-1);
+    }
+
+    // load the thread-local universe. if we can't, assume it zero.
+    aux_ptr = dlsym(root->handler, "__ulp_thread_universe");
+    if (aux_ptr) universe = * (unsigned long *) aux_ptr;
+    else universe = 0;
+
+    target = NULL;
+
+    if (universe != 0) {
+        // since universes are kept in order, this is a top-down search
+        for (d = root->detours; d != NULL; d = d->next) {
+            if (d->universe == universe ||
+               (d->universe < universe && d->active)) {
+                target = d->target_addr;
+                break;
+            }
+        }
+    }
+    if (!target) target = root->patched_addr + 2;
+
+    asm ("movq %0, %%r11;"
+		    :
+		    : "r" (target)
+		    : );
 }
 
-void ulp_patch_addr_absolute(void *old_fentry, void *new_faddr)
+unsigned int get_next_function_index()
 {
-   // absolute jump patching
-    memcpy(old_fentry + 19, ulp_absolute_jmp, sizeof(ulp_absolute_jmp));
-    memcpy(old_fentry + 19 + sizeof(ulp_absolute_jmp), &new_faddr, sizeof(void *));
+    return __ulp_root_index_counter++;
 }
 
-int ulp_patch_addr(void *old_faddr, void *new_faddr)
+unsigned int push_new_detour(unsigned long universe, char *patch_id,
+                             struct ulp_detour_root *root, void *new_faddr)
+{
+    struct ulp_detour *detour, *detour_aux;
+
+    detour = calloc(1, sizeof(struct ulp_detour));
+    if (!detour) {
+        WARN("Unable to acllocate memory for ulp detour");
+        return 0;
+    }
+
+    detour_aux = root->detours;
+    root->detours = detour;
+    detour->next = detour_aux;
+    detour->target_addr = new_faddr;
+    detour->universe = universe;
+    detour->active = 1;
+    strncpy(detour->patch_id, patch_id, 32);
+
+    return 1;
+}
+
+void ulp_patch_addr_absolute(void *old_fentry, void *manager)
+{
+    memcpy(old_fentry + 14, &manager, sizeof(void *));
+}
+
+int ulp_patch_addr(void *old_faddr, void *new_faddr, unsigned int index)
 {
     void *old_fentry = old_faddr - PRE_NOPS_LEN;
-    void *pending;
-    pending = ulp_get_pending();
-    //__ulp_pending = 1;
+    void *manage;
 
-    if (!set_write_tgt(old_faddr))
-	return 0;
+    manage = &__ulp_prologue;
 
-    ulp_patch_prologue_layout(old_fentry, pending);
-    ulp_patch_addr_absolute(old_fentry, new_faddr);
+    if (!set_write_tgt(old_faddr)) return 0;
 
-    if (!set_exec_tgt(old_faddr))
-	return 0;
+    ulp_patch_prologue_layout(old_fentry, index);
+    ulp_patch_addr_absolute(old_fentry, manage);
+
+    if (!set_exec_tgt(old_faddr)) return 0;
 
     return 1;
 }
@@ -800,14 +921,16 @@ int ulp_revert_patch(unsigned char *id)
 {
     struct ulp_applied_patch *patch;
 
+    __ulp_global_universe++;
     patch = ulp_get_applied_patch(id);
 
-    if (ulp_revert_all_units(patch)) {
+    if (ulp_revert_all_units(id)) {
 	if (!ulp_state_remove(patch)) {
 	    WARN("Problem updating state. Program may be inconsistent.");
 	    return 0;
 	}
     }
+
 
     return 1;
 }
@@ -853,36 +976,16 @@ int ulp_state_remove(struct ulp_applied_patch *rm_patch)
     return 1;
 }
 
-int ulp_revert_all_units(struct ulp_applied_patch *patch)
+int ulp_revert_all_units(char *patch_id)
 {
-    struct ulp_applied_unit *unit;
+    struct ulp_detour_root *r;
+    struct ulp_detour *d;
+    int i;
 
-    int consistent = 1;
-
-    for (unit = patch->units; unit != NULL; unit = unit->next) {
-	if (!ulp_unpatch_addr(unit->patched_addr, unit->overwritten_bytes)) {
-	    WARN("Unable to revert patch.");
-	    if (!consistent) {
-		WARN("Fatal error reverting patch. Program is inconsistent.");
-		exit(-1);
-	    } else {
-		WARN("Error reverting patch unit.");
-		return 0;
-	    }
-	} else {
-	    consistent = 0;
-	}
-    }
-    return 1;
-}
-
-int ulp_unpatch_addr(void *addr, char *previous)
-{
-    if (!set_write_tgt(addr)) return 0;
-
-    memcpy(addr, previous, 14);
-
-    if (!set_exec_tgt(addr)) return 0;
+    for (r = __ulp_root; r != NULL; r = r->next)
+        for (d = r->detours; d != NULL; d = d->next)
+            if (strncmp(d->patch_id, patch_id,32)==0)
+                d->active = 0;
 
     return 1;
 }
@@ -917,4 +1020,33 @@ void dump_ulp_patching_state(void)
 		    a_unit->target_addr);
     }
     fprintf(stderr, "----- End of dump ------\n");
+}
+
+void dump_ulp_detours(void)
+{
+    struct ulp_detour_root *r;
+    struct ulp_detour *d;
+    int i;
+    fprintf(stderr, "====== ULP Roots ======\n");
+    for (r = __ulp_root; r != NULL; r = r->next)
+    {
+        fprintf(stderr, "* ROOT:\n");
+        fprintf(stderr, "* Index: %d\n", r->index);
+        fprintf(stderr, "* Patched addr: %p\n", r->patched_addr);
+        fprintf(stderr, "----- ULP DETOURS -----\n");
+        for (d = r->detours; d != NULL; d = d->next)
+        {
+            fprintf(stderr, "  * DETOUR:\n");
+            fprintf(stderr, "  * Universe: %d\n", d->universe);
+            fprintf(stderr, "  * Target addr: %p\n", d->target_addr);
+            fprintf(stderr, "  * Active: ");
+            if (d->active) fprintf(stderr, "yep\n");
+            else fprintf(stderr, "nop\n");
+            fprintf(stderr, "  * Patch ID: ");
+            for (i = 0; i < 16; i++)  fprintf(stderr, "%x.", d->patch_id[i]);
+            fprintf(stderr, "\n              ");
+            for (i = 16; i < 32; i++)  fprintf(stderr, "%x.", d->patch_id[i]);
+	    fprintf(stderr, "\n========================\n");
+        }
+    }
 }

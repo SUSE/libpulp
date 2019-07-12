@@ -15,7 +15,7 @@
 # Please submit bugfixes or comments via http://bugs.opensuse.org/
 #
 
-Name:           libdummy_livepatch
+Name:           libdummy_livepatch_2
 Version:	0.1
 Release:	0
 License:	SUSE-GPL-2.0
@@ -41,22 +41,25 @@ Requires:	lua53
 This package provides a livepatch for libdummy.
 
 %prep
-%setup -q -n libdummy_livepatch-%{version}
+%setup -q -n libdummy_livepatch_2-%{version}
 
 %build
 ./build-livepatch.sh
 
 %install
 mkdir -p %{buildroot}%{patchdir}
-mv ./build/patch1.so %{buildroot}%{patchdir}/patch1.so
-mv ./build/metadata1.ulp %{buildroot}%{patchdir}/metadata1.ulp
+mv ./build/patch2.so %{buildroot}%{patchdir}/patch2.so
+mv ./build/metadata2.ulp %{buildroot}%{patchdir}/metadata2.ulp
+mv ./build/reverse2.ulp %{buildroot}%{patchdir}/reverse2.ulp
 
-%post -n libdummy_livepatch
-lua %{_bindir}/ulp_dispatcher patch %{patchdir}/metadata1.ulp
+%post -n libdummy_livepatch_2
+lua %{_bindir}/ulp_dispatcher patch %{patchdir}/metadata2.ulp
 
-%postun
+%preun
+lua %{_bindir}/ulp_dispatcher patch %{patchdir}/reverse2.ulp
 
-%files -n libdummy_livepatch
+%files -n libdummy_livepatch_2
 %defattr(-,root,root)
-%{patchdir}/patch1.so
-%{patchdir}/metadata1.ulp
+%{patchdir}/patch2.so
+%{patchdir}/metadata2.ulp
+%{patchdir}/reverse2.ulp

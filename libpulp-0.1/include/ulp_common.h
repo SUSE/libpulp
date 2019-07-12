@@ -27,12 +27,13 @@
 #define _ULP_LIB_COMMON_
 
 #define OUT_PATCH_NAME "metadata.ulp"
+#define OUT_REVERSE_NAME "reverse.ulp"
 
 #define WARN(format, ...) \
 	fprintf(stderr, "ulp: " format "\n", ##__VA_ARGS__)
 
 #define ULP_PATH_LEN 256
-#define PRE_NOPS_LEN 33
+#define PRE_NOPS_LEN 22
 
 extern __thread int __ulp_pending;
 

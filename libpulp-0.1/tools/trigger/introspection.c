@@ -41,7 +41,7 @@ ulp_process target;
 ulp_addresses addr;
 struct ulp_metadata ulp;
 
-int parse_file_symtab(ulp_dynobj *obj)
+int parse_file_symtab(ulp_dynobj *obj, char needed)
 {
     bfd *file;
     int symtab_len;
@@ -49,8 +49,11 @@ int parse_file_symtab(ulp_dynobj *obj)
     file = bfd_openr(obj->filename, NULL);
     if (!file)
     {
-	WARN("bfd_openr error.");
-	return 1;
+        if (needed) {
+            WARN("bfd_openr error: %s.", obj->filename);
+            return 1;
+        }
+        else return 0;
     }
     bfd_check_format(file, bfd_object);
 
@@ -285,7 +288,7 @@ int parse_main_dynobj(char *objname)
     }
     obj->filename = objname;
 
-    if (parse_file_symtab(obj)) return 2;
+    if (parse_file_symtab(obj, 1)) return 2;
     obj->main = 1;
     obj->next = target.dynobjs;
 
@@ -293,8 +296,6 @@ int parse_main_dynobj(char *objname)
     obj->loop = get_loaded_symbol_addr(obj, "__ulp_loop");
     obj->path_buffer = get_loaded_symbol_addr(obj, "__ulp_get_path_buffer");
     obj->check = get_loaded_symbol_addr(obj, "__ulp_check_patched");
-    obj->set_pending = get_loaded_symbol_addr(obj, "__ulp_set_pending");
-    obj->get_pending = get_loaded_symbol_addr(obj, "__ulp_get_pending");
 
     target.dynobjs = obj;
 
@@ -320,8 +321,9 @@ struct link_map *parse_lib_dynobj(struct link_map *link_map_addr)
 {
     struct ulp_dynobj *obj;
     struct link_map *link_map;
-
+    char needed = 0;
     char *libname;
+
     /* calloc initializes all to zero */
     obj = calloc(sizeof(struct ulp_dynobj), 1);
     link_map = calloc(sizeof(struct link_map), 1);
@@ -348,15 +350,22 @@ struct link_map *parse_lib_dynobj(struct link_map *link_map_addr)
     /* ensure that PIE was verified */
     if (!is_main_object_parsed()) return NULL;
 
-    if (parse_file_symtab(obj)) return NULL;
+    // We always need to parse the main object, the to-be-patched object and the
+    // libpulp object. The first two can be found easily, but not the latter,
+    // because paths can change.
+    // We can't enforce all to be parsed, because some files may be moved, as
+    // when we have a livepatch object loaded and the uninstalled. The "needed"
+    // workaround enforces the first two to be patched, while allowing some
+    // loaded objects to be bypassed. If libpulp is not this tool will cry later
+    // about absence of a trigger reference. So, no big harm.
+    if (ulp.objs && strcmp(ulp.objs->name, obj->filename)==0) needed = 1;
+    if (parse_file_symtab(obj, needed)) return NULL;
 
     obj->link_map = *link_map;
     obj->trigger = get_loaded_symbol_addr(obj, "__ulp_trigger");
     obj->loop = get_loaded_symbol_addr(obj, "__ulp_loop");
     obj->path_buffer = get_loaded_symbol_addr(obj, "__ulp_get_path_buffer");
     obj->check = get_loaded_symbol_addr(obj, "__ulp_check_patched");
-    obj->set_pending = get_loaded_symbol_addr(obj, "__ulp_set_pending");
-    obj->get_pending = get_loaded_symbol_addr(obj, "__ulp_get_pending");
 
     return link_map;
 }
@@ -411,8 +420,6 @@ int initialize_data_structures(int pid, char *livepatch)
         if (o->trigger) addr.trigger = o->trigger;
         if (o->path_buffer) addr.path_buffer = o->path_buffer;
         if (o->check) addr.check = o->check;
-        if (o->set_pending) addr.set_pending = o->set_pending;
-        if (o->get_pending) addr.get_pending = o->get_pending;
     }
 
     if (!(addr.loop)) {
@@ -431,19 +438,11 @@ int initialize_data_structures(int pid, char *livepatch)
         WARN("ulp check address not found.");
         return 8;
     }
-    if (!(addr.set_pending)) {
-        WARN("ulp set_pending address not found.");
-        return 9;
-    }
-    if (!(addr.get_pending)) {
-        WARN("ulp get_pending address not found.");
-        return 10;
-    }
 
     return 0;
 }
 
-int hijack_threads(int set_pending)
+int hijack_threads()
 {
     struct ulp_thread *t;
     struct user_regs_struct context;
@@ -469,8 +468,7 @@ int hijack_threads(int set_pending)
 	};
 
 	context = t->context;
-	if (set_pending) context.rip = addr.set_pending + 2;
-	else context.rip = addr.loop + 2;
+	context.rip = addr.loop + 2;
 
 	if (set_regs(t->tid, &context))
 	{
@@ -630,6 +628,8 @@ int load_patch_info(char *livepatch)
 	WARN("Unable to allocate memory for the patch objects.");
 	return 7;
     }
+
+    ulp.objs = obj;
     obj->units = NULL;
 
     if (fread(&c, sizeof(uint32_t), 1, file) < 1)
@@ -673,13 +673,15 @@ int load_patch_info(char *livepatch)
 	return 13;
     }
 
+    if (ulp.type == 2) return 1;
+
     if (fread(&obj->nunits, sizeof(uint32_t), 1, file) < 1)
     {
 	WARN("Unable to read number of patching units.");
 	return 14;
     }
 
-    ulp.objs = obj;
+
     /* read all patching units for object */
     for (j = 0; j < obj->nunits; j++)
     {
@@ -781,7 +783,7 @@ int check_patch_sanity()
     struct ulp_dynobj *d;
 
     /* check if ulp functions exist in main */
-    if (!(addr.loop && addr.trigger && addr.path_buffer && addr.set_pending))
+    if (!(addr.loop && addr.trigger && addr.path_buffer))
     {
 	WARN("ulp functions not found in main object.");
 	return 1;
@@ -807,7 +809,7 @@ int check_patch_sanity()
     }
 
     /* check if to-be-patched objects support ulp */
-    if (!d->get_pending)
+    if (!d->loop)
     {
 	WARN("to be patched object does not support ulp. BREAK");
 	return 4;

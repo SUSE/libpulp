@@ -51,6 +51,7 @@ mkdir -p %{buildroot}/var/ulp/
 mv rpm/build/libpulp.so %{buildroot}/usr/ulp/libpulp/libpulp.so
 mv rpm/build/trigger %{buildroot}%_bindir/ulp_trigger
 mv rpm/build/packer %{buildroot}%_bindir/ulp_packer
+mv rpm/build/reverse %{buildroot}%_bindir/ulp_reverse
 mv rpm/build/dynsym_gate %{buildroot}%_bindir/ulp_dynsym_gate
 mv rpm/build/checker %{buildroot}%_bindir/ulp_check
 mv tools/dispatcher/dispatcher.lua %{buildroot}%_bindir/ulp_dispatcher
@@ -63,3 +64,4 @@ mv tools/dispatcher/dispatcher.lua %{buildroot}%_bindir/ulp_dispatcher
 %{_bindir}/ulp_dynsym_gate
 %{_bindir}/ulp_check
 %{_bindir}/ulp_dispatcher
+%{_bindir}/ulp_reverse
