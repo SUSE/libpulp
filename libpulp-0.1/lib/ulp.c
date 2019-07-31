@@ -258,7 +258,7 @@ int parse_metadata(struct ulp_metadata *ulp)
 	WARN("Unable to read so filename length.");
 	return 0;
     }
-    ulp->so_filename = calloc(c, sizeof(char));
+    ulp->so_filename = calloc(c + 1, sizeof(char));
     if (!ulp->so_filename) {
 	WARN("Unable to allocate so filename buffer.");
 	return 0;
@@ -299,7 +299,7 @@ int parse_metadata(struct ulp_metadata *ulp)
     ulp->objs = obj;
 
     /* shared object: fill data + read patching units */
-    obj->name = calloc(c, sizeof(char));
+    obj->name = calloc(c + 1, sizeof(char));
     if (!obj->name) {
 	WARN("Unable to allocate object name buffer.");
 	return 0;
@@ -326,7 +326,7 @@ int parse_metadata(struct ulp_metadata *ulp)
 	    WARN("Unable to read unit old function name length.");
 	    return 0;
 	}
-	unit->old_fname = calloc(c, sizeof(char));
+	unit->old_fname = calloc(c + 1, sizeof(char));
 	if (!unit->old_fname) {
 	    WARN("Unable to allocate unit old function name buffer.");
 	    return 0;
@@ -340,7 +340,7 @@ int parse_metadata(struct ulp_metadata *ulp)
 	    WARN("Unable to read unit new function name length.");
 	    return 0;
 	}
-	unit->new_fname = calloc(c, sizeof(char));
+	unit->new_fname = calloc(c + 1, sizeof(char));
 	if (!unit->new_fname) {
 	    WARN("Unable to allocate unit new function name buffer.");
 	    return 0;
