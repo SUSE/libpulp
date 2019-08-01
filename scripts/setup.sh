@@ -23,4 +23,5 @@ sudo rpm -e libdummy-0.1-0.x86_64
 
 ./scripts/build_libpulp.sh
 ./scripts/build_libdummy.sh
+./scripts/build_libfibo.sh
 ./scripts/build_lp_libdummy.sh

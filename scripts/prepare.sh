@@ -20,11 +20,16 @@ rm -f libdummy_livepatch_1-0.1.tar.bz2
 rm -f libdummy_livepatch_2-0.1.tar.bz2
 rm -f libpulp-0.1.tar.bz2
 rm -f libdummy-0.1.tar.bz2
+rm -f libfibo-0.1.tar.bz2
+rm -f libfibo_livepatch-0.1.tar.bz2
 
 # ensure that trm.S is up to date
 cp libpulp-0.1/lib/trm.S libdummy-0.1/libdummy/trm.S
+cp libpulp-0.1/lib/trm.S libfibo-0.1/libfibo/trm.S
 
 tar cjvf libpulp-0.1.tar.bz2 libpulp-0.1
 tar cjvf libdummy-0.1.tar.bz2 libdummy-0.1
 tar cjvf libdummy_livepatch_1-0.1.tar.bz2 libdummy_livepatch_1-0.1
 tar cjvf libdummy_livepatch_2-0.1.tar.bz2 libdummy_livepatch_2-0.1
+tar cjvf libfibo-0.1.tar.bz2 libfibo-0.1
+tar cjvf libfibo_livepatch-0.1.tar.bz2 libfibo_livepatch-0.1
