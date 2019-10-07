@@ -1,0 +1,153 @@
+diff -rup /matz/git//binutils-gdb/binutils-gdb/bfd/elflink.c ./bfd/elflink.c
+--- /matz/git//binutils-gdb/binutils-gdb/bfd/elflink.c	2019-10-07 19:12:55.000000000 +0200
++++ ./bfd/elflink.c	2019-10-07 18:00:25.000000000 +0200
+@@ -22,6 +22,7 @@
+ #include "bfd.h"
+ #include "bfdlink.h"
+ #include "libbfd.h"
++#include "ulp.h"
+ #define ARCH_SIZE 0
+ #include "elf-bfd.h"
+ #include "safe-ctype.h"
+@@ -7010,6 +7011,11 @@ bfd_elf_size_dynamic_sections (bfd *outp
+ 	  s = bfd_get_linker_section (dynobj, ".gnu.version");
+ 	  s->flags |= SEC_EXCLUDE;
+ 	}
++
++      if (bfd_is_ulp_enabled(output_bfd))
++        {
++          bfd_setup_ulp(info);
++        }
+     }
+   return TRUE;
+ }
+diff -rup /matz/git//binutils-gdb/binutils-gdb/bfd/elfxx-x86.c ./bfd/elfxx-x86.c
+--- /matz/git//binutils-gdb/binutils-gdb/bfd/elfxx-x86.c	2019-10-07 19:12:55.000000000 +0200
++++ ./bfd/elfxx-x86.c	2019-10-07 18:00:25.000000000 +0200
+@@ -23,6 +23,7 @@
+ #include "objalloc.h"
+ #include "elf/i386.h"
+ #include "elf/x86-64.h"
++#include "ulp.h"
+ 
+ /* The name of the dynamic interpreter.  This is put in the .interp
+    section.  */
+@@ -952,6 +953,64 @@ _bfd_x86_elf_link_check_relocs (bfd *abf
+   return _bfd_elf_link_check_relocs (abfd, info);
+ }
+ 
++/* Check if input bfds are ulp-enabled by containing .ulp.track section */
++
++bfd_boolean
++bfd_x86_elf_is_ulp_enabled (struct bfd *input_bfd)
++{
++  while (input_bfd != NULL)
++  for (; input_bfd != NULL; input_bfd = input_bfd->link.next)
++    {
++      if (input_bfd->section_count == 0) continue;
++      if (bfd_get_section_by_name (input_bfd, ".ulp.track")) return TRUE;
++    }
++  return FALSE;
++}
++
++/* To be used by elf_link_hash_traverse when computing the ulp length */
++
++static bfd_boolean
++bfd_x86_elf_link_compute_ulp (struct elf_link_hash_entry *h, void *data)
++{
++  unsigned long *ulp_length = (unsigned long *) data;
++
++  if (h->dynindx != -1 && h->type == STT_FUNC && !h->def_dynamic)
++    {
++      ++(*ulp_length);
++    }
++  return TRUE;
++}
++
++/* Fill the user-space live patching section */
++
++bfd_boolean
++bfd_x86_elf_setup_ulp (struct bfd_link_info *info)
++{
++  struct elf_x86_link_hash_table *htab;
++  asection *ulp;
++  unsigned int ulp_length = 0;
++
++  htab = elf_x86_hash_table (info, X86_64_ELF_DATA);
++
++  elf_link_hash_traverse (elf_hash_table (info),
++                          bfd_x86_elf_link_compute_ulp,
++                          &ulp_length);
++
++  ulp = htab->ulp;
++
++  ulp->size = ulp_length * ULP_ENTRY_LEN;
++
++  ulp->contents = (bfd_byte *) bfd_malloc (ulp->size);
++  if (ulp->contents == NULL)
++    return FALSE;
++
++  if (!ulp->contents)
++    return FALSE;
++
++  memset(ulp->contents, 0x00, ulp->size);
++  return TRUE;
++}
++
+ /* Set the sizes of the dynamic sections.  */
+ 
+ bfd_boolean
+@@ -2870,7 +2929,26 @@ error_alignment:
+ 
+ 	      htab->plt_second = sec;
+ 	    }
+-	}
++
++         /* create sections to support user-space live patching */
++         if (bfd_x86_elf_is_ulp_enabled(info->input_bfds))
++           {
++             flagword flags = (bed->dynamic_sec_flags
++                               | SEC_ALLOC
++                               | SEC_CODE
++                               | SEC_LOAD
++                               | SEC_READONLY);
++
++              sec = bfd_make_section_anyway_with_flags (dynobj, ".ulp", flags);
++              if (sec == NULL)
++                info->callbacks->einfo (_("%F%P: failed to create ULP section\n"));
++
++              if (!bfd_set_section_alignment (dynobj, sec,  plt_alignment))
++                goto error_alignment;
++
++              htab->ulp = sec;
++           }
++      }
+ 
+       if (!info->no_ld_generated_unwind_info)
+ 	{
+diff -rup /matz/git//binutils-gdb/binutils-gdb/bfd/elfxx-x86.h ./bfd/elfxx-x86.h
+--- /matz/git//binutils-gdb/binutils-gdb/bfd/elfxx-x86.h	2019-10-07 19:12:55.000000000 +0200
++++ ./bfd/elfxx-x86.h	2019-10-07 18:00:25.000000000 +0200
+@@ -445,6 +445,7 @@ struct elf_x86_link_hash_table
+   asection *plt_second_eh_frame;
+   asection *plt_got;
+   asection *plt_got_eh_frame;
++  asection *ulp;
+ 
+   /* Parameters describing PLT generation, lazy or non-lazy.  */
+   struct elf_x86_plt_layout plt;
+--- /matz/git//binutils-gdb/binutils-gdb/bfd/ulp.h	1970-01-01 01:00:00.000000000 +0100
++++ ./bfd/ulp.h	2019-10-07 18:00:25.000000000 +0200
+@@ -0,0 +1,12 @@
++extern bfd_boolean bfd_x86_elf_is_ulp_enabled
++  (struct bfd *);
++
++extern bfd_boolean bfd_x86_elf_setup_ulp
++  (struct bfd_link_info *);
++
++#define bfd_is_ulp_enabled bfd_x86_elf_is_ulp_enabled
++
++#define bfd_setup_ulp bfd_x86_elf_setup_ulp
++
++#define ULP_ENTRY_LEN 16
++

@@ -1,0 +1,19 @@
+commit 33011f30120f958b14d8036a38ca27c7456b8244
+Author: Joao Moreira <jmoreira@suse.de>
+Date:   Fri Apr 5 00:47:26 2019 -0300
+
+    Fix gcc section _fpatchable_function_entry flags
+
+diff --git a/libpulp-0.1/gcc/gcc/targhooks.c b/libpulp-0.1/gcc/gcc/targhooks.c
+index 138f8d7..9fbaa25 100644
+--- a/libpulp-0.1/gcc/gcc/targhooks.c
++++ b/libpulp-0.1/gcc/gcc/targhooks.c
+@@ -1814,7 +1814,7 @@ default_print_patchable_function_entry (FILE *file,
+       ASM_GENERATE_INTERNAL_LABEL (buf, "LPFE", patch_area_number);
+ 
+       switch_to_section (get_section ("__patchable_function_entries",
+-				      SECTION_RELRO , NULL));
++				      SECTION_WRITE | SECTION_RELRO , NULL));
+       fputs (asm_op, file);
+       assemble_name_raw (file, buf);
+       fputc ('\n', file);
