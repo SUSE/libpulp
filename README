@@ -113,21 +113,6 @@ if the given process was previously patched.
 
 An example livepatch for libdummy.
 
--- scripts
-
-build_*: These scripts are used to build each component of the project
-individually.
-
-prepare: Used to prepare the .tar.gz files to be used in the RPM packaging.
-
-setup: Builds and reinstall each component of the project.
-
-rerun: Runs basic use-case testing.
-
--- Other details
-
-The packages built in the project will install files to /usr/ulp/*
-
 -------------------------------------------------------------------------------
 * 5 * Description file syntax
 
