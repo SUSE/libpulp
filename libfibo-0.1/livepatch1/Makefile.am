@@ -23,11 +23,8 @@ clean-local:
 patch1.so: patch.o
 	$(LINK) -shared -Wl,--build-id $^
 
-metadata1.ulp: patch1.so					\
-		$(srcdir)/descr.txt				\
-		$(top_builddir)/libfibo-0.1/libfibo.so
-	$(ULP_PACKER) $(srcdir)/descr.txt \
-		$(top_builddir)/libfibo-0.1/libfibo.so
+metadata1.ulp: patch1.so $(srcdir)/descr.txt ../libfibo.so
+	$(ULP_PACKER) $(srcdir)/descr.txt ../libfibo.so
 	mv metadata.ulp $@
 
 reverse1.ulp: metadata1.ulp

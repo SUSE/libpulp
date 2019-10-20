@@ -20,6 +20,6 @@ AC_CONFIG_FILES([Makefile
 		 libdummy-0.1/livepatch1/Makefile
 		 libdummy-0.1/livepatch2/Makefile
 		 libfibo-0.1/Makefile
-		 libfibo_livepatch-0.1/Makefile])
+		 libfibo-0.1/livepatch1/Makefile])
 
 AC_OUTPUT

@@ -1,3 +1,5 @@
+SUBDIRS = . livepatch1
+
 check_PROGRAMS = ex1
 
 EXTRA_DIST = libfibo.c

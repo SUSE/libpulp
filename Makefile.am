@@ -5,5 +5,4 @@ SUBDIRS =				\
 	lib				\
 	tools				\
 	libdummy-0.1			\
-	libfibo-0.1			\
-	libfibo_livepatch-0.1
+	libfibo-0.1
