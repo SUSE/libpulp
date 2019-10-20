@@ -69,11 +69,6 @@ consistent).
 -------------------------------------------------------------------------------
 * 4 * Project structure and tools
 
--- libdummy-0.1
-
-This a dummy example library and applications, used to test and verify that
-Libpulp works properly.
-
 -- lib
 
 Contains the Libpulp library (which has the routines used by the live patching
@@ -112,6 +107,11 @@ metadata file and verifies all the running process which have the target library
 loaded. If the argument "patch" is supplied, it invokes the trigger tool for
 every process in the list. If the argument "check" is supplied, it only verifies
 if the given process was previously patched.
+
+-- examples
+
+Contains example libraries, applications and live patches, used to test and
+verify that Libpulp works properly.
 
 -------------------------------------------------------------------------------
 * 5 * Description file syntax

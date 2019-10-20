@@ -16,10 +16,11 @@ AC_CONFIG_FILES([Makefile
 		 tools/dynsym_gate/Makefile
 		 tools/packer/Makefile
 		 tools/trigger/Makefile
-		 libdummy-0.1/Makefile
-		 libdummy-0.1/livepatch1/Makefile
-		 libdummy-0.1/livepatch2/Makefile
-		 libfibo-0.1/Makefile
-		 libfibo-0.1/livepatch1/Makefile])
+		 examples/Makefile
+		 examples/dummy/Makefile
+		 examples/dummy/livepatch1/Makefile
+		 examples/dummy/livepatch2/Makefile
+		 examples/fibo/Makefile
+		 examples/fibo/livepatch1/Makefile])
 
 AC_OUTPUT
