@@ -25,9 +25,9 @@ patch1.so: patch.o
 
 metadata1.ulp: patch1.so						\
 		$(srcdir)/src/patch/descr.txt				\
-		$(top_builddir)/libfibo-0.1/libfibo/libfibo.so
+		$(top_builddir)/libfibo-0.1/libfibo.so
 	$(ULP_PACKER) $(srcdir)/src/patch/descr.txt \
-		$(top_builddir)/libfibo-0.1/libfibo/libfibo.so
+		$(top_builddir)/libfibo-0.1/libfibo.so
 	mv metadata.ulp $@
 
 reverse1.ulp: metadata1.ulp
