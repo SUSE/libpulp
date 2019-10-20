@@ -1,4 +1,4 @@
-ulp_tools_builddir = $(top_builddir)/libpulp-0.1/tools
+ulp_tools_builddir = $(top_builddir)/tools
 ULP_PACKER = $(ulp_tools_builddir)/packer/ulp_packer
 ULP_REVERSE=$(ulp_tools_builddir)/packer/ulp_reverse
 

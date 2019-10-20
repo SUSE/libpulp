@@ -74,10 +74,10 @@ consistent).
 This a dummy example library and applications, used to test and verify that
 Libpulp works properly.
 
--- libpulp-0.1
+-- lib
 
 Contains the Libpulp library (which has the routines used by the live patching
-procedures) and the tools used to trigger, check and build live patches.
+procedures).
 
 The library objects are:
 - trm.S: This is an object that must be linked into libraries which will later
@@ -86,6 +86,10 @@ entry points and routines used to later verify the consistency of given threads.
 - libpulp.c: This object will later be compiled into the libpulp.so, which can
 be preloaded by any process. It contains the routines which will later be
 redirected to through ptrace and will make the actual patching happen.
+
+-- tools
+
+Contains the tools used to trigger, check and build live patches.
 
 The tools are:
 - dynsym_gate: This tool is used to modify the library entry points to the

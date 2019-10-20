@@ -1,7 +1,9 @@
 ACLOCAL_AMFLAGS = -I config
 
 SUBDIRS =				\
-	libpulp-0.1			\
+	include			\
+	lib				\
+	tools				\
 	libdummy-0.1			\
 	libdummy_livepatch_1-0.1	\
 	libdummy_livepatch_2-0.1	\

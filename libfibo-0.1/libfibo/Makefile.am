@@ -1,4 +1,4 @@
-ulp_tools_builddir = $(top_builddir)/libpulp-0.1/tools
+ulp_tools_builddir = $(top_builddir)/tools
 ULP_DYNSYM_GATE = $(ulp_tools_builddir)/dynsym_gate/ulp_dynsym_gate
 
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
@@ -21,6 +21,6 @@ clean-local:
 	-rm -f *.o
 	-rm -f *.so
 
-libfibo.so: libfibo.o $(top_builddir)/libpulp-0.1/lib/trm.o
+libfibo.so: libfibo.o $(top_builddir)/lib/trm.o
 	$(LINK) -shared -Wl,--build-id $^
 	$(ULP_DYNSYM_GATE) $@
