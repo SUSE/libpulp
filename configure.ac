@@ -17,8 +17,8 @@ AC_CONFIG_FILES([Makefile
 		 tools/packer/Makefile
 		 tools/trigger/Makefile
 		 libdummy-0.1/Makefile
-		 libdummy_livepatch_1-0.1/Makefile
-		 libdummy_livepatch_2-0.1/Makefile
+		 libdummy-0.1/livepatch1/Makefile
+		 libdummy-0.1/livepatch2/Makefile
 		 libfibo-0.1/Makefile
 		 libfibo_livepatch-0.1/Makefile])
 

@@ -113,10 +113,6 @@ loaded. If the argument "patch" is supplied, it invokes the trigger tool for
 every process in the list. If the argument "check" is supplied, it only verifies
 if the given process was previously patched.
 
--- libdummy_livepatch-0.1
-
-An example livepatch for libdummy.
-
 -------------------------------------------------------------------------------
 * 5 * Description file syntax
 

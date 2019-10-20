@@ -13,23 +13,20 @@ LINK = $(CC) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 
 EXTRA_DIST = patch.c descr.txt
 
-check-local: metadata2.ulp reverse2.ulp
+check-local: metadata1.ulp reverse1.ulp
 
 clean-local:
 	-rm -f *.o
 	-rm -f *.so
 	-rm -f *.ulp
 
-patch2.so: patch.o
+patch1.so: patch.o
 	$(LINK) -shared -Wl,--build-id $^
 
-metadata2.ulp: patch2.so					\
-		$(srcdir)/descr.txt				\
-		$(top_builddir)/libdummy-0.1/libdummy.so
-	$(ULP_PACKER) $(srcdir)/descr.txt \
-		$(top_builddir)/libdummy-0.1/libdummy.so
+metadata1.ulp: patch1.so $(srcdir)/descr.txt ../libdummy.so
+	$(ULP_PACKER) $(srcdir)/descr.txt ../libdummy.so
 	mv metadata.ulp $@
 
-reverse2.ulp: metadata2.ulp
+reverse1.ulp: metadata1.ulp
 	$(ULP_REVERSE) $<
 	mv reverse.ulp $@

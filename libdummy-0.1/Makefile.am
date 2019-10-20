@@ -1,3 +1,5 @@
+SUBDIRS = . livepatch1 livepatch2
+
 check_PROGRAMS = ex1 ex2 ex3 ex4
 
 noinst_HEADERS = libdummy.h
