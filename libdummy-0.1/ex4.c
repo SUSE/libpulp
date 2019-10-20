@@ -2,7 +2,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include "../libdummy/libdummy.h"
+#include "libdummy.h"
 
 void *f1(void *arg) {
     while (sleeping_bar(1)) {};

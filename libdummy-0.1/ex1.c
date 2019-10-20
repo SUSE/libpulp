@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <unistd.h>
-#include "../libdummy/libdummy.h"
+#include "libdummy.h"
 
 int main() {
     fprintf(stderr, "dummyapp: Hello there :))\n");

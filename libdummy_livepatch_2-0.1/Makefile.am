@@ -25,9 +25,9 @@ patch2.so: patch.o
 
 metadata2.ulp: patch2.so						\
 		$(srcdir)/src/patch/descr.txt				\
-		$(top_builddir)/libdummy-0.1/libdummy/libdummy.so
+		$(top_builddir)/libdummy-0.1/libdummy.so
 	$(ULP_PACKER) $(srcdir)/src/patch/descr.txt \
-		$(top_builddir)/libdummy-0.1/libdummy/libdummy.so
+		$(top_builddir)/libdummy-0.1/libdummy.so
 	mv metadata.ulp $@
 
 reverse2.ulp: metadata2.ulp

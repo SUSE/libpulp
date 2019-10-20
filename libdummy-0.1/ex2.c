@@ -2,7 +2,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include "../libdummy/libdummy.h"
+#include "libdummy.h"
 
 void *f1(void *arg) {
     fprintf(stderr, "ex2: Thread 1: entering bar from f1()\n");
