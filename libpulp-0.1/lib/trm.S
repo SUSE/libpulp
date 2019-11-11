@@ -53,7 +53,7 @@ __ulp_trm_epilogue:
 __ulp_trm_return:
     mov	    __ulp_ret@gottpoff(%rip), %r10
     mov	    %fs:(%r10), %r11
-    movl    $0x0, %fs:(%r10)
+    movq    $0x0, %fs:(%r10)
     jmp	    *%r11
 
 .align  8
@@ -75,4 +75,4 @@ __ulp_get_flag:
 .size   __ulp_ret, 8
 .global __ulp_ret
 __ulp_ret:
-.word   0x0
+.quad   0x0
