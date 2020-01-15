@@ -44,7 +44,7 @@ int check_args(int argc, char *argv[])
 {
     if (argc != 3)
     {
-	WARN("Usage: %s <pid> <livepatch path>", argv[0]);
+	WARN("Usage: %s <pid> <livepatch metadata path>", argv[0]);
 	return 1;
     }
 
