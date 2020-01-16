@@ -389,7 +389,7 @@ int initialize_data_structures(int pid, char *livepatch)
 
     target.pid = pid;
 
-    if (!load_patch_info(livepatch))
+    if (load_patch_info(livepatch))
     {
 	WARN("Unable to load patch info.");
 	return 1;
@@ -774,7 +774,7 @@ int load_patch_info(char *livepatch)
 	prev_dep = dep;
     }
 
-    return 1;
+    return 0;
 }
 
 int check_patch_sanity()
