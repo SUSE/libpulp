@@ -7,6 +7,8 @@ EXTRA_DIST = libdummy.c weak.c
 
 clean-local:
 	-rm -f *.so
+	-rm -f .deps/libdummy.Po
+	-rm -f .deps/weak.Po
 
 
 ulp_tools_builddir = $(top_builddir)/tools

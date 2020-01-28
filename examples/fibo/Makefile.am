@@ -6,6 +6,7 @@ EXTRA_DIST = libfibo.c
 
 clean-local:
 	-rm -f *.so
+	-rm -f .deps/libfibo.Po
 
 
 ulp_tools_builddir = $(top_builddir)/tools
