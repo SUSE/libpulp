@@ -18,8 +18,6 @@ AC_CONFIG_FILES([Makefile
 		 tools/trigger/Makefile
 		 examples/Makefile
 		 examples/dummy/Makefile
-		 examples/dummy/livepatch1/Makefile
-		 examples/dummy/livepatch2/Makefile
 		 examples/fibo/Makefile
 		 examples/fibo/livepatch1/Makefile])
 

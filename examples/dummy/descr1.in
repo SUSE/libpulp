@@ -1,4 +1,4 @@
 __ABS_BUILDDIR__/patch1.so
-@__ABS_TOP_BUILDDIR__/examples/dummy/libdummy.so
+@__ABS_BUILDDIR__/libdummy.so
 bar:new_bar
 sleeping_bar:new_sleeping_bar
