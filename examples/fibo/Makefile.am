@@ -4,8 +4,6 @@ check_PROGRAMS = ex1
 
 EXTRA_DIST = libfibo.c
 
-check-local: libfibo.so
-
 clean-local:
 	-rm -f *.so
 

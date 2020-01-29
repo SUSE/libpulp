@@ -5,8 +5,6 @@ check_PROGRAMS = ex1 ex2 ex3 ex4
 noinst_HEADERS = libdummy.h
 EXTRA_DIST = libdummy.c weak.c
 
-check-local: libdummy.so
-
 clean-local:
 	-rm -f *.so
 
