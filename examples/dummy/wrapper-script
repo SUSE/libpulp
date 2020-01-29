@@ -1,0 +1,61 @@
+#!/bin/bash
+
+# Print the arguments when in debugging mode
+if [ -v DEBUG ]
+then
+  printf "List of arguments send from make to the test wrapper:\n"
+  for i in `seq 0 $#`
+  do
+    printf "arg #$i: '${!i}'\n"
+  done
+fi
+
+# Sleep for SLEEP_AMOUNT seconds before applying the live pacthes or
+# before killing the application to let it print its message to the log
+# file.  A value of 0 will prevent most, if not all, messages from being
+# printed, which might make it harder to debug, but allows for faster
+# execution of 'make check'.
+SLEEP_AMOUNT=0
+
+# The dummy examples are supposed to be executed in two major steps:
+#   1. start one of the dummy programs (arg #1) with libpulp preloaded;
+#   2. use ulp_trigger, twice, to patch the program.
+
+# Start the program and save its pid.
+testcase=$1
+LD_PRELOAD=$PWD/../../lib/.libs/libulp.so $testcase &
+testcase_pid=$!
+
+# Patch the program twice.
+patching_errors=0
+for i in 1 2
+do
+  sleep $SLEEP_AMOUNT
+  if ! $PWD/../../tools/trigger/ulp_trigger $testcase_pid metadata$i.ulp
+  then
+    printf "Live patch #$i failed to apply.\n"
+    patching_errors=$(($patching_errors+1))
+  fi
+done
+
+# Kill the test program.
+sleep $SLEEP_AMOUNT
+kill $testcase_pid
+
+# Return an error code to the test driver.
+
+# One or two errors means that one or both of the live patching attempts
+# failed, so return 1 (failure).
+if [ $patching_errors -eq 1 ] || [ $patching_errors -eq 2 ]
+then
+  exit 1
+fi
+
+# No errors means that both live patches applied successfully.
+if [ $patching_errors -eq 0 ]
+then
+  exit 0
+fi
+
+# Anything different than that is unexpected, so return a hard error.
+exit 99
