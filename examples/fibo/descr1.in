@@ -1,0 +1,3 @@
+__ABS_BUILDDIR__/patch1.so
+@__ABS_BUILDDIR__/libfibo.so
+fibo:new_fibo

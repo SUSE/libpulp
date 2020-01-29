@@ -1,3 +1,0 @@
-/var/ulp/libfibo_livepatch-0.1/patch1.so
-@/usr/ulp/libfibo/libfibo.so
-fibo:new_fibo

@@ -18,7 +18,6 @@ AC_CONFIG_FILES([Makefile
 		 tools/trigger/Makefile
 		 examples/Makefile
 		 examples/dummy/Makefile
-		 examples/fibo/Makefile
-		 examples/fibo/livepatch1/Makefile])
+		 examples/fibo/Makefile])
 
 AC_OUTPUT
