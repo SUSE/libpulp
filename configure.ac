@@ -23,6 +23,11 @@ AM_PROG_AS
 AX_CHECK_COMPILE_FLAG([-fpatchable-function-entry=1],, AC_MSG_ERROR([\
 Required compiler option missing: -fpatchable-function-entry]))
 
+# Check if the assembler accepts the weak directive, needed in trm.S.
+AX_GCC_VAR_ATTRIBUTE(weak)
+AS_IF([test "$ax_cv_have_var_attribute_weak" != "yes"], AC_MSG_ERROR([\
+The .weak assembler directive is required in trm.S]))
+
 # Check if the linker emits the .ulp section required to hold the live
 # patching trampolines.
 AC_MSG_CHECKING([whether the linker emits .ulp sections])
