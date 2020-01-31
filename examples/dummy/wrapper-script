@@ -17,13 +17,27 @@ fi
 # execution of 'make check'.
 SLEEP_AMOUNT=0
 
+# Makefile.am uses the variables TESTS and AM_LOG_FLAGS to control the
+# execeution of libpulp tests, as follows:
+#   TESTS:
+#     Lists the test program that must be executed by this script.  For
+#     each item in TESTS, this script is called once.
+#   AM_LOG_FLAGS:
+#     Lists additional parameters to be passed to this script, apart
+#     from the name of the test program (defined in TESTS), which comes
+#     as the last argument.  Currently, AM_LOG_FLAGS only adds the path
+#     to the top-level build directory ($(abs_top_builddir)), which is
+#     enough to derive the names of the other files (libulp.so and
+#     ulp_trigger) required to run the test cases.
+builddir=$1
+testcase=$2
+
 # The dummy examples are supposed to be executed in two major steps:
-#   1. start one of the dummy programs (arg #1) with libpulp preloaded;
+#   1. start one of the dummy programs with libpulp preloaded;
 #   2. use ulp_trigger, twice, to patch the program.
 
 # Start the program and save its pid.
-testcase=$1
-LD_PRELOAD=$PWD/../../lib/.libs/libulp.so $testcase &
+LD_PRELOAD=$builddir/lib/.libs/libulp.so $testcase &
 testcase_pid=$!
 
 # Patch the program twice.
@@ -31,7 +45,7 @@ patching_errors=0
 for i in 1 2
 do
   sleep $SLEEP_AMOUNT
-  if ! $PWD/../../tools/trigger/ulp_trigger $testcase_pid metadata$i.ulp
+  if ! $builddir/tools/trigger/ulp_trigger $testcase_pid metadata$i.ulp
   then
     printf "Live patch #$i failed to apply.\n"
     patching_errors=$(($patching_errors+1))

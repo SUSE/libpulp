@@ -77,4 +77,5 @@ reverse%.ulp: metadata%.ulp
 
 TESTS = ex1 ex2 ex3 ex4
 LOG_COMPILER = $(srcdir)/wrapper-script
+AM_LOG_FLAGS = $(abs_top_builddir)
 EXTRA_DIST += wrapper-script
