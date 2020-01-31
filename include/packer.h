@@ -45,7 +45,7 @@ int get_object_metadata(Elf *elf, struct ulp_object *obj);
 
 int get_elf_tgt_addrs(Elf *elf, struct ulp_object *obj, Elf_Scn *st);
 
-int create_patch_metadata_file(struct ulp_metadata *ulp);
+int create_patch_metadata_file(struct ulp_metadata *ulp, char *filename);
 
 int add_dependency(struct ulp_metadata *ulp, struct ulp_dependency *dep,
     char *filename);

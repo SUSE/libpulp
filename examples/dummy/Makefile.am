@@ -68,12 +68,10 @@ descr%.txt: descr%.in
 	sed -e "s|__ABS_BUILDDIR__|$(abs_builddir)|" $^ > $@
 
 metadata%.ulp: patch%.so descr%.txt libdummy.so
-	$(ULP_PACKER) descr$*.txt libdummy.so
-	mv metadata.ulp $@
+	$(ULP_PACKER) descr$*.txt libdummy.so $@
 
 reverse%.ulp: metadata%.ulp
-	$(ULP_REVERSE) $<
-	mv reverse.ulp $@
+	$(ULP_REVERSE) $< $@
 
 TESTS = ex1 ex2 ex3 ex4
 LOG_COMPILER = $(srcdir)/wrapper-script

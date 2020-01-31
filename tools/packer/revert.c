@@ -28,23 +28,28 @@
 #include <stdio.h>
 #include <gelf.h>
 #include <libgen.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include "../../include/packer.h"
 
 void usage(char *name)
 {
-    fprintf(stderr, "Usage: %s <ulp metadata file>\n", name);
+    fprintf(stderr, "Usage: %s <ulp metadata file> [output filename]\n",
+            name);
 }
 
-int write_reverse_patch(struct ulp_metadata *ulp)
+int write_reverse_patch(struct ulp_metadata *ulp, char *filename)
 {
     FILE *file;
     char type = 2;
     struct ulp_object *obj;
     int c;
 
-    file = fopen(OUT_REVERSE_NAME, "w");
+    if (filename == NULL)
+	file = fopen(OUT_REVERSE_NAME, "w");
+    else
+	file = fopen(filename, "w");
     if (!file) {
 	WARN("unable to open output metadata file.");
 	return 0;
@@ -170,10 +175,15 @@ struct ulp_metadata *parse_metadata(char *filename, struct ulp_metadata *ulp)
 int main(int argc, char **argv)
 {
     struct ulp_metadata ulp;
+    char *filename = NULL;
 
-    if (argc != 2) {
+    if (argc < 2) {
         usage(argv[0]);
         return 1;
+    }
+
+    if (argc > 2) {
+        filename = strndup(argv[2], NAME_MAX);
     }
 
     if (!parse_metadata(argv[1], &ulp)) {
@@ -181,7 +191,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    if (!write_reverse_patch(&ulp)) {
+    if (!write_reverse_patch(&ulp, filename)) {
         WARN("Error gerenating reverse live patch.\n");
         return 2;
     }

@@ -26,15 +26,18 @@
 #include <stdio.h>
 #include <gelf.h>
 #include <libgen.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include "../../include/packer.h"
 
 void usage(char *name)
 {
-    fprintf(stderr, "Usage: %s <descr.txt> <target.so>", name);
+    fprintf(stderr, "Usage: %s <descr.txt> <target.so> [output file]", name);
     fprintf(stderr, " * <descr.txt>: Text-file with patch description.\n");
-    fprintf(stderr, " * <target.so>: .so with to-be-patched function.\n\n");
+    fprintf(stderr, " * <target.so>: .so with to-be-patched function.\n");
+    fprintf(stderr, " * [output file] (optional): write to output file,\n");
+    fprintf(stderr, "   instead of to the standard, hardcoded path.\n\n");
     fprintf(stderr, "   descr.txt format:\n\n");
     fprintf(stderr, "   absolute path to patch.so\n");
     fprintf(stderr, "   tgt_func1:patch_func1\n");
@@ -192,7 +195,7 @@ int get_elf_tgt_addrs(Elf *elf, struct ulp_object *obj, Elf_Scn *st)
     return 1;
 }
 
-int create_patch_metadata_file(struct ulp_metadata *ulp)
+int create_patch_metadata_file(struct ulp_metadata *ulp, char *filename)
 {
     FILE *file;
     struct ulp_unit *unit;
@@ -201,7 +204,10 @@ int create_patch_metadata_file(struct ulp_metadata *ulp)
     uint32_t c;
     uint8_t type = 1;
 
-    file = fopen(OUT_PATCH_NAME, "w");
+    if (filename == NULL)
+        file = fopen(OUT_PATCH_NAME, "w");
+    else
+        file = fopen(filename, "w");
     if (!file) {
 	WARN("unable to open output metadata file.");
 	return 0;
@@ -519,12 +525,17 @@ int main(int argc, char **argv)
     struct ulp_metadata ulp;
     Elf *target_elf = NULL;
     int fd;
+    char *filename = NULL;
 
     memset(&ulp, 0, sizeof(ulp));
 
     if (argc < 3) {
 	usage(argv[0]);
 	return 1;
+    }
+
+    if (argc > 3) {
+	filename = strndup(argv[3], NAME_MAX);
     }
 
     elf_version(EV_CURRENT);
@@ -535,17 +546,14 @@ int main(int argc, char **argv)
     }
 
     fd = 0;
-    if (argc != 3) {
-        WARN("Provided object names do not match description.\n");
-        goto main_error;
-    }
     target_elf = load_elf(argv[2], &fd);
     if (!target_elf) goto main_error;
     if (!get_ulp_elf_metadata(target_elf, ulp.objs, &ulp)) goto main_error;
     unload_elf(&target_elf, &fd);
 
     if (!generate_random_patch_id(&ulp)) goto main_error;
-    if (!create_patch_metadata_file(&ulp)) goto main_error;
+    if (!create_patch_metadata_file(&ulp, filename))
+        goto main_error;
 
     free_metadata(&ulp);
     return 0;
