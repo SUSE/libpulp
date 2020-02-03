@@ -256,7 +256,11 @@ int dig_load_bias(struct ulp_dynobj *obj)
     }
 
     do {
-	read(auxv, &at, sizeof(Elf64_auxv_t));
+	if (read(auxv, &at, sizeof(Elf64_auxv_t))
+	    != sizeof(Elf64_auxv_t)) {
+	    WARN("error: unable to read auxv.");
+	    return 2;
+	}
 	if (at.a_type == AT_ENTRY) {
 	    entry = at.a_un.a_val;
 	    break;

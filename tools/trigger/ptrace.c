@@ -159,12 +159,12 @@ int read_string(char **buffer, int pid, Elf64_Addr addr)
 /* Signaling functions */
 int stop(int pid)
 {
-    kill(pid, SIGSTOP);
+    return kill(pid, SIGSTOP);
 }
 
 int restart(int pid)
 {
-    kill(pid, SIGCONT);
+    return kill(pid, SIGCONT);
 }
 
 /* attach/detach and run functions */
