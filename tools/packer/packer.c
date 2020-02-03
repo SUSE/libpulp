@@ -510,7 +510,7 @@ void *get_symbol_addr(Elf *elf, Elf_Scn *s, char *search){
 int generate_random_patch_id(struct ulp_metadata *ulp)
 {
     int r;
-    r = open("/dev/urandom", 'r');
+    r = open("/dev/urandom", O_RDONLY);
     if (read(r, &ulp->patch_id, 32) < 0) {
 	WARN("Error generating patch id.");
 	close(r);
