@@ -145,11 +145,20 @@ int unload_handlers(struct ulp_metadata *ulp)
 
 void *get_fentry_from_ulp(void *func)
 {
+    /* The jump slots in the .ulp section have the address of the
+     * destination function hardcoded as a displacement from %rip.
+     *
+     * The displacement is the 4-byte immediate field in the lea
+     * instruction (first instruction in each jump-slot), which requires
+     * a 32-bits variable (int32_t).  The immediate field begins at the
+     * forth byte in the instruction, hence the addition of 3 bytes to
+     * the address where memcpy begins copying from.  Finally, lea
+     * itself is 7-bytes long, hence the subtraction of 7 bytes after
+     * the load.  */
     void *address;
-    int offset = 0;
-    memcpy(&offset, func + 3, 8);
+    int32_t offset = 0;
+    memcpy(&offset, func + 3, 4);
     address = func + offset + 7;
-    memcpy(&offset, address, sizeof(offset));
     return address;
 }
 
