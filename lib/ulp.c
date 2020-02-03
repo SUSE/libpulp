@@ -102,7 +102,7 @@ int __ulp_check_applied_patch()
 void free_metadata(struct ulp_metadata *ulp)
 {
     struct ulp_unit *unit, *next_unit;
-    struct ulp_object *obj, *next_obj;
+    struct ulp_object *obj;
 
     if (ulp) {
 	obj = ulp->objs;
@@ -419,7 +419,6 @@ void *load_so(char *obj)
 int load_patch()
 {
     struct ulp_metadata *ulp = NULL;
-    struct ulp_object *obj;
     struct ulp_applied_patch *patch_entry;
     int patch;
 
@@ -466,7 +465,6 @@ int ulp_can_revert_patch(struct ulp_metadata *ulp)
     int i;
     struct ulp_applied_patch *patch, *applied_patch;
     struct ulp_dependency *dep;
-    struct ulp_object *obj;
 
     /* check if patch exists */
     applied_patch = ulp_get_applied_patch(id);
@@ -540,8 +538,6 @@ int ulp_apply_all_units(struct ulp_metadata *ulp)
     struct ulp_object *obj = ulp->objs;
     struct ulp_unit *unit;
     struct ulp_detour_root *root;
-    unsigned long universe;
-    unsigned int index;
 
     __ulp_global_universe++;
 
@@ -739,11 +735,8 @@ int compare_build_ids(struct dl_phdr_info *info, size_t size, void *data)
     int i;
     char *note_ptr, *build_id_ptr, *note_sec;
     uint32_t note_type, build_id_len, name_len, sec_size, next = 0;
-    struct ulp_object *obj;
     struct ulp_metadata *ulp;
     ulp = (struct ulp_metadata *) data;
-
-    obj = ulp->objs;
 
     /* algorithm goes as follows:
      * 1 - check every object inside ulp_metadata
@@ -989,7 +982,6 @@ int ulp_revert_all_units(char *patch_id)
 {
     struct ulp_detour_root *r;
     struct ulp_detour *d;
-    int i;
 
     for (r = __ulp_root; r != NULL; r = r->next)
         for (d = r->detours; d != NULL; d = d->next)

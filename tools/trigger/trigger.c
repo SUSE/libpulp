@@ -90,8 +90,6 @@ int apply_patch(char *path)
 int main(int argc, char **argv)
 {
     int pid;
-    int var;
-    int consistent;
     char *livepatch;
     int patched = 0;
 

@@ -216,7 +216,6 @@ Elf64_Addr get_loaded_symbol_addr(struct ulp_dynobj *obj, char *sym)
 {
     unsigned int i;
     Elf64_Addr sym_addr, ptr = 0;
-    long int var;
 
     for (i = 0; i < obj->symtab_len; i++) {
 	if (strcmp(bfd_asymbol_name(obj->symtab[i]), sym)==0) {
@@ -522,7 +521,6 @@ int set_path_buffer(char *path, struct ulp_thread *t)
 {
     struct user_regs_struct context;
     Elf64_Addr path_addr;
-    long int aux;
 
     context = t->context;
     context.rip = addr.path_buffer + 2;
@@ -547,7 +545,6 @@ int set_path_buffer(char *path, struct ulp_thread *t)
 int restore_threads()
 {
     struct ulp_thread *t;
-    struct user_regs_struct context, main_ctx;
 
     for (t = target.threads; t != NULL; t = t->next)
     {
@@ -575,7 +572,7 @@ int load_patch_info(char *livepatch)
 {
     uint32_t c;
     int i, j;
-    struct ulp_object *obj, *prev_obj;
+    struct ulp_object *obj;
     struct ulp_unit *unit, *prev_unit;
     struct ulp_dependency *dep, *prev_dep;
     FILE *file;

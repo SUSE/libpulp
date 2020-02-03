@@ -84,8 +84,6 @@ int patch_applied()
 int main(int argc, char **argv)
 {
     int pid;
-    int var;
-    int consistent;
     char *livepatch;
     int patched = -1;
 
