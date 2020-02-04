@@ -15,7 +15,10 @@ fi
 # file.  A value of 0 will prevent most, if not all, messages from being
 # printed, which might make it harder to debug, but allows for faster
 # execution of 'make check'.
-SLEEP_AMOUNT=0
+if [ ! -v SLEEP_AMOUNT ]
+then
+  SLEEP_AMOUNT=0
+fi
 
 # Makefile.am uses the variables TESTS and AM_LOG_FLAGS to control the
 # execeution of libpulp tests, as follows:
