@@ -127,7 +127,7 @@ int ulp_revert_patch(unsigned char *id);
 
 int ulp_state_remove(struct ulp_applied_patch *rm_patch);
 
-int ulp_revert_all_units(char *patch_id);
+int ulp_revert_all_units(unsigned char *patch_id);
 
 int get_active_func_dl_info(unsigned long p, Dl_info *info);
 
@@ -135,7 +135,7 @@ int ulp_unpatch_addr(void *addr, char *previous);
 
 unsigned int get_next_function_index();
 
-unsigned int push_new_detour(unsigned long universe, char *patch_id,
+unsigned int push_new_detour(unsigned long universe, unsigned char *patch_id,
                              struct ulp_detour_root *root, void *new_faddr);
 
 struct ulp_detour_root *get_detour_root_by_address(void *addr);

@@ -865,7 +865,7 @@ unsigned int get_next_function_index()
     return __ulp_root_index_counter++;
 }
 
-unsigned int push_new_detour(unsigned long universe, char *patch_id,
+unsigned int push_new_detour(unsigned long universe, unsigned char *patch_id,
                              struct ulp_detour_root *root, void *new_faddr)
 {
     struct ulp_detour *detour, *detour_aux;
@@ -882,7 +882,7 @@ unsigned int push_new_detour(unsigned long universe, char *patch_id,
     detour->target_addr = new_faddr;
     detour->universe = universe;
     detour->active = 1;
-    strncpy(detour->patch_id, patch_id, 32);
+    memcpy(detour->patch_id, patch_id, 32);
 
     return 1;
 }
@@ -978,14 +978,14 @@ int ulp_state_remove(struct ulp_applied_patch *rm_patch)
     return 1;
 }
 
-int ulp_revert_all_units(char *patch_id)
+int ulp_revert_all_units(unsigned char *patch_id)
 {
     struct ulp_detour_root *r;
     struct ulp_detour *d;
 
     for (r = __ulp_root; r != NULL; r = r->next)
         for (d = r->detours; d != NULL; d = d->next)
-            if (strncmp(d->patch_id, patch_id,32)==0)
+            if (memcmp(d->patch_id, patch_id,32)==0)
                 d->active = 0;
 
     return 1;

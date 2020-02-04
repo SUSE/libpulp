@@ -97,7 +97,7 @@ int initialize_data_structures(int pid, char *livepatch);
 
 int hijack_threads();
 
-int set_id_buffer(char *patch_id, struct ulp_thread *t);
+int set_id_buffer(unsigned char *patch_id, struct ulp_thread *t);
 
 int set_path_buffer(char *path, struct ulp_thread *t);
 

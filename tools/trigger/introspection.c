@@ -490,7 +490,7 @@ int hijack_threads()
     return 0;
 }
 
-int set_id_buffer(char *patch_id, struct ulp_thread *t)
+int set_id_buffer(unsigned char *patch_id, struct ulp_thread *t)
 {
     struct user_regs_struct context;
     Elf64_Addr path_addr;
