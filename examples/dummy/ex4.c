@@ -4,12 +4,14 @@
 #include <stdlib.h>
 #include "libdummy.h"
 
-void *f1(void *arg) {
+void *f1(void *arg __attribute__ ((unused))) {
     while (sleeping_bar(1)) {};
+    return NULL;
 }
 
-void *f2(void *arg) {
+void *f2(void *arg __attribute__ ((unused))) {
     eternal_sleeper_bar(1);
+    return NULL;
 }
 
 int main() {

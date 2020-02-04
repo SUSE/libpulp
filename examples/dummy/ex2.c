@@ -4,22 +4,25 @@
 #include <stdlib.h>
 #include "libdummy.h"
 
-void *f1(void *arg) {
+void *f1(void *arg __attribute__ ((unused))) {
     fprintf(stderr, "ex2: Thread 1: entering bar from f1()\n");
     while (sleeping_bar(1)) { sleep(rand() % 3); }
     fprintf(stderr, "ex2: Thread 1: left bar from f1()\n");
+    return NULL;
 }
 
-void *f2(void *arg) {
+void *f2(void *arg __attribute__ ((unused))) {
     fprintf(stderr, "ex2: Thread 2: entering bar from f2()\n");
     loop_bar(20);
     fprintf(stderr, "ex2: Thread 2: left bar from f2()\n");
+    return NULL;
 }
 
-void *f3(void *arg) {
+void *f3(void *arg __attribute__ ((unused))) {
     fprintf(stderr, "ex2: Thread 3: entering bar from f3()\n");
     while (sleeping_bar(10)) { sleep(rand() % 3); }
     fprintf(stderr, "ex2: Thread 3: left bar from f3()\n");
+    return NULL;
 }
 
 int main() {
