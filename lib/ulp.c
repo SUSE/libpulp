@@ -730,7 +730,8 @@ int check_patch_dependencies(struct ulp_metadata *ulp)
     return 1;
 }
 
-int compare_build_ids(struct dl_phdr_info *info, size_t size, void *data)
+int compare_build_ids(struct dl_phdr_info *info,
+		      size_t __attribute__ ((unused)) size, void *data)
 {
     int i;
     char *note_ptr, *build_id_ptr, *note_sec;
