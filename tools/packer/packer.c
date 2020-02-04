@@ -150,8 +150,7 @@ Elf_Scn *get_build_id_note(Elf *elf) {
     return NULL;
 }
 
-int get_ulp_elf_metadata(Elf *elf, struct ulp_object *obj,
-	struct ulp_metadata *ulp)
+int get_ulp_elf_metadata(Elf *elf, struct ulp_object *obj)
 {
 
     Elf_Scn *symtab;
@@ -548,7 +547,7 @@ int main(int argc, char **argv)
     fd = 0;
     target_elf = load_elf(argv[2], &fd);
     if (!target_elf) goto main_error;
-    if (!get_ulp_elf_metadata(target_elf, ulp.objs, &ulp)) goto main_error;
+    if (!get_ulp_elf_metadata(target_elf, ulp.objs)) goto main_error;
     unload_elf(&target_elf, &fd);
 
     if (!generate_random_patch_id(&ulp)) goto main_error;

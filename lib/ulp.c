@@ -567,7 +567,7 @@ int ulp_apply_all_units(struct ulp_metadata *ulp)
             return 0;
         }
 
-        if (!(ulp_patch_addr(old_fun, new_fun, root->index)))
+        if (!(ulp_patch_addr(old_fun, root->index)))
         {
             WARN("error patching address %p", old_fun);
             return 0;
@@ -892,7 +892,7 @@ void ulp_patch_addr_absolute(void *old_fentry, void *manager)
     memcpy(old_fentry + 14, &manager, sizeof(void *));
 }
 
-int ulp_patch_addr(void *old_faddr, void *new_faddr, unsigned int index)
+int ulp_patch_addr(void *old_faddr, unsigned int index)
 {
     void *old_fentry = old_faddr - PRE_NOPS_LEN;
     void *manage;

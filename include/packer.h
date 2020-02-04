@@ -38,8 +38,7 @@ Elf_Scn *get_symtab(Elf *elf);
 
 Elf_Scn *get_build_id_note(Elf *elf);
 
-int get_ulp_elf_metadata(Elf *elf, struct ulp_object *obj,
-    struct ulp_metadata *ulp);
+int get_ulp_elf_metadata(Elf *elf, struct ulp_object *obj);
 
 int get_object_metadata(Elf *elf, struct ulp_object *obj);
 
