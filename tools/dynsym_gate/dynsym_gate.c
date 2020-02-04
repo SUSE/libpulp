@@ -151,6 +151,11 @@ int main(int argc, char **argv) {
     elf_section *patchable = NULL;
     elf_section *sec = NULL;
 
+    if (argc != 2) {
+	WARN("Usage: %s <library.so>", argv[0]);
+	return 1;
+    }
+
     fd = 0;
     gelf = load_elf(argv[1], &fd);
 
