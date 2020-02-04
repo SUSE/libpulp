@@ -21,6 +21,9 @@
  *  Author: Joao Moreira <jmoreira@suse.de>
  */
 
+/* Prevent the stack from being needlessly set to executable.  */
+.section .note.GNU-stack,"",%progbits
+
 .section .ulp.track,"ax",@progbits
 
 .weak   __ulp_global_universe

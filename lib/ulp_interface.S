@@ -21,6 +21,9 @@
  *  Author: Joao Moreira <jmoreira@suse.de>
  */
 
+/* Prevent the stack from being needlessly set to executable.  */
+.section .note.GNU-stack,"",%progbits
+
 .section .text,"ax",@progbits
 
 .align  8
