@@ -96,7 +96,7 @@ int get_main_symtab_length()
 
 int dig_main_link_map(struct link_map *main_link_map)
 {
-    Elf64_Addr dyn_addr, link_map, link_map_addr, r_debug = 0;
+    Elf64_Addr dyn_addr = 0, link_map, link_map_addr, r_debug = 0;
     int nentries, i, r_map_offset;
     ElfW(Dyn) dyn;
     asymbol **symtab;
@@ -235,8 +235,8 @@ int dig_load_bias(struct ulp_dynobj *obj)
     int auxv, i;
     char *format_str, *filename;
     Elf64_auxv_t at;
-    uint64_t entry;
-    Elf64_Addr _start;
+    uint64_t addrof_entry = 0;
+    Elf64_Addr addrof_start = 0;
 
     if (!obj->symtab)
     {
@@ -262,19 +262,27 @@ int dig_load_bias(struct ulp_dynobj *obj)
 	    return 2;
 	}
 	if (at.a_type == AT_ENTRY) {
-	    entry = at.a_un.a_val;
+	    addrof_entry = at.a_un.a_val;
 	    break;
 	}
     } while (at.a_type != AT_NULL);
+    if (addrof_entry == 0) {
+	WARN("error: unable to find entry address for the executable");
+	return 3;
+    }
 
     for (i = 0; i < obj->symtab_len; i++) {
 	if (strcmp(bfd_asymbol_name(obj->symtab[i]),"_start")==0) {
-	    _start = bfd_asymbol_value(obj->symtab[i]);
+	    addrof_start = bfd_asymbol_value(obj->symtab[i]);
 	    break;
 	}
     }
+    if (addrof_start == 0) {
+	WARN("error: unable to find address for _start");
+	return 4;
+    }
 
-    target.load_bias = entry - _start;
+    target.load_bias = addrof_entry - addrof_start;
     free(filename);
     return 0;
 }
@@ -577,8 +585,8 @@ int load_patch_info(char *livepatch)
     uint32_t c;
     uint32_t i, j;
     struct ulp_object *obj;
-    struct ulp_unit *unit, *prev_unit;
-    struct ulp_dependency *dep, *prev_dep;
+    struct ulp_unit *unit, *prev_unit = NULL;
+    struct ulp_dependency *dep, *prev_dep = NULL;
     FILE *file;
 
 

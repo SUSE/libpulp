@@ -524,6 +524,7 @@ int main(int argc, char **argv)
     int fd;
     char *filename = NULL;
 
+    fd = 0;
     memset(&ulp, 0, sizeof(ulp));
 
     if (argc < 3) {
@@ -542,7 +543,6 @@ int main(int argc, char **argv)
 	goto main_error;
     }
 
-    fd = 0;
     target_elf = load_elf(argv[2], &fd);
     if (!target_elf) goto main_error;
     if (!get_ulp_elf_metadata(target_elf, ulp.objs)) goto main_error;

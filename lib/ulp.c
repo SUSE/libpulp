@@ -238,8 +238,8 @@ int parse_metadata(struct ulp_metadata *ulp)
     uint32_t c;
     uint32_t i, j;
     struct ulp_object *obj;
-    struct ulp_unit *unit, *prev_unit;
-    struct ulp_dependency *dep, *prev_dep;
+    struct ulp_unit *unit, *prev_unit = NULL;
+    struct ulp_dependency *dep, *prev_dep = NULL;
 
     file = fopen(__ulp_path_buffer, "rb");
     if (!file) {
@@ -581,8 +581,8 @@ int ulp_apply_all_units(struct ulp_metadata *ulp)
 
 struct ulp_applied_patch *ulp_state_update(struct ulp_metadata *ulp)
 {
-    struct ulp_applied_patch *a_patch, *prev_patch;
-    struct ulp_applied_unit *a_unit, *prev_unit;
+    struct ulp_applied_patch *a_patch, *prev_patch = NULL;
+    struct ulp_applied_unit *a_unit, *prev_unit = NULL;
     struct ulp_object *obj;
     struct ulp_unit *unit;
     struct ulp_dependency *dep, *a_dep;
@@ -801,9 +801,8 @@ int compare_build_ids(struct dl_phdr_info *info,
 
 int all_build_ids_checked(struct ulp_metadata *ulp)
 {
-    struct ulp_object *obj;
     if (!ulp->objs->build_id_check) {
-	WARN("Could not match patch target build id %s.", obj->name);
+	WARN("Could not match patch target build id %s.", ulp->objs->name);
 	return 0;
     }
     return 1;

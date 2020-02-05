@@ -268,7 +268,7 @@ int main(int argc, char **argv) {
     if (count > 0) {
 	elf_flagehdr(gelf, ELF_C_SET, ELF_F_DIRTY | ELF_F_LAYOUT);
         for (i = 0; i < nr; i++) {
-            sec = sections[j];
+            sec = sections[i];
             if (sec->update)
                 elf_flagscn(sec->sec, ELF_C_SET, ELF_F_DIRTY | ELF_F_LAYOUT);
         }
