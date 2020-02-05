@@ -81,7 +81,7 @@ Elf *load_elf(char *obj, int *fd)
 void unload_elf(Elf **elf, int *fd)
 {
     if (elf) elf_end(*elf);
-    if (fd > 0) close(*fd);
+    if (*fd > 0) close(*fd);
     *fd = 0;
     *elf = NULL;
 }

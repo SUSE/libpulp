@@ -72,7 +72,7 @@ void free_metadata(struct ulp_metadata *ulp)
 
 void unload_elf(Elf **elf, int *fd)
 {
-    if (fd > 0) close(*fd);
+    if (*fd > 0) close(*fd);
     if (elf) elf_end(*elf);
     *fd = 0;
     *elf = NULL;
