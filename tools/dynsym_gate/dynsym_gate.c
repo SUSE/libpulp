@@ -138,7 +138,8 @@ int main(int argc, char **argv) {
     Elf_Scn *s = NULL;
     GElf_Shdr sh;
     size_t shstrndx, nr;
-    int i, j, fd;
+    unsigned int i, j;
+    int fd;
     Elf64_Sym *sym;
     char *sym_name, *str;
     int bind, type;

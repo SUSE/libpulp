@@ -98,8 +98,7 @@ Elf *load_elf(char *obj, int *fd)
 }
 
 Elf_Scn *get_symtab(Elf *elf) {
-    int i;
-    size_t nsecs;
+    size_t i, nsecs;
     Elf_Scn *s;
     GElf_Shdr sh;
 
@@ -124,8 +123,7 @@ Elf_Scn *get_symtab(Elf *elf) {
 }
 
 Elf_Scn *get_build_id_note(Elf *elf) {
-    int i;
-    size_t nsecs, shstrndx;
+    size_t i, nsecs, shstrndx;
     Elf_Scn *s;
     GElf_Shdr sh;
     char *sec_name;
@@ -310,8 +308,8 @@ int parse_description(char *filename, struct ulp_metadata *ulp)
     FILE *file;
     char *first;
     char *second;
-    size_t len = 0;
-    int i, n;
+    size_t i, len = 0;
+    int n;
 
     /* zero the entire structure before filling */
     memset(ulp, 0, sizeof(struct ulp_metadata));

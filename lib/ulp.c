@@ -236,7 +236,7 @@ int parse_metadata(struct ulp_metadata *ulp)
 {
     FILE *file;
     uint32_t c;
-    int i, j;
+    uint32_t i, j;
     struct ulp_object *obj;
     struct ulp_unit *unit, *prev_unit;
     struct ulp_dependency *dep, *prev_dep;

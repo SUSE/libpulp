@@ -91,7 +91,7 @@ struct ulp_metadata *parse_metadata(char *filename, struct ulp_metadata *ulp)
 {
     FILE *file;
     struct ulp_object *obj;
-    int c;
+    uint32_t c;
 
     file = fopen(filename, "rb");
     if (!file) {

@@ -96,7 +96,7 @@ int read_byte(char *byte, int pid, Elf64_Addr addr)
 
 int read_memory(char *byte, size_t len, int pid, Elf64_Addr addr)
 {
-    int i;
+    size_t i;
 
     if (attach(pid))
     {

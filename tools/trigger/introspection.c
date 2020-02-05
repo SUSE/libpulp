@@ -163,7 +163,7 @@ int parse_threads(int pid)
     char *format_str, *dirname;
     DIR *tasks_dir;
     struct dirent *dir;
-    unsigned int tid;
+    int tid;
 
     format_str = "/proc/%d/task/";
     dirname = calloc(strlen(format_str) + 10, 1);
@@ -214,7 +214,7 @@ int parse_threads(int pid)
 
 Elf64_Addr get_loaded_symbol_addr(struct ulp_dynobj *obj, char *sym)
 {
-    unsigned int i;
+    int i;
     Elf64_Addr sym_addr, ptr = 0;
 
     for (i = 0; i < obj->symtab_len; i++) {
@@ -575,7 +575,7 @@ int restore_threads()
 int load_patch_info(char *livepatch)
 {
     uint32_t c;
-    int i, j;
+    uint32_t i, j;
     struct ulp_object *obj;
     struct ulp_unit *unit, *prev_unit;
     struct ulp_dependency *dep, *prev_dep;
