@@ -7,6 +7,8 @@ LT_INIT([shared disable-static])
 AC_PROG_CC
 AM_PROG_AS
 
+AC_SUBST(AM_CFLAGS, ["-Wall -Wextra -Werror"])
+
 AC_SUBST([ULP_NOP_LENGTH], [24,22])
 
 AC_CONFIG_FILES([Makefile
