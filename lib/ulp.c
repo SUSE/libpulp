@@ -92,8 +92,7 @@ int __ulp_check_applied_patch()
 {
     struct ulp_applied_patch *patch;
 
-    __ulp_path_buffer[33] = '\0';
-    patch = ulp_get_applied_patch(__ulp_path_buffer);
+    patch = ulp_get_applied_patch(__ulp_metadata_ref->patch_id);
     if (patch) return 1;
     else return 0;
 }
