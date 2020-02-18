@@ -29,10 +29,6 @@
 
 /* TODO: check/remove these OLD structures */
 
-struct ulp_patching_state {
-    struct ulp_applied_patch *patches;
-};
-
 struct ulp_applied_patch {
     unsigned char patch_id[32];
     struct ulp_applied_unit *units;

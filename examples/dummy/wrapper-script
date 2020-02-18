@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# C/C++ error codes (error.h) returned by ulp_trigger and ulp_check.
+EAGAIN=11
+
 # Print the arguments when in debugging mode
 if [ -v DEBUG ]
 then
@@ -48,9 +51,35 @@ patching_errors=0
 for i in 1 2
 do
   sleep $SLEEP_AMOUNT
-  if ! $builddir/tools/trigger/ulp_trigger $testcase_pid metadata$i.ulp
+
+  failed=0
+  retry=0
+  while [ $retry -lt 10 ]
+  do
+    $builddir/tools/trigger/ulp_trigger $testcase_pid metadata$i.ulp
+    ret=$?
+    if [ $ret -ne 0 ]
+    then
+      printf "Attempt $retry to apply live patch #$i failed "
+      if [ $ret -eq 4 ] || [ $ret -eq $EAGAIN ]
+      then
+        printf "(ulp resources are not ready ($ret)). "
+      else
+        printf "(unknown error ($ret)). "
+      fi
+      printf "Try again later.\n"
+      failed=1
+    else
+      printf "Live patch #$i applied successfully.\n"
+      failed=0
+      break
+    fi
+    retry=$(($retry+1))
+    sleep $SLEEP_AMOUNT
+  done
+
+  if [ $failed -ne 0 ]
   then
-    printf "Live patch #$i failed to apply.\n"
     patching_errors=$(($patching_errors+1))
   fi
 done

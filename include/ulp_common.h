@@ -37,6 +37,11 @@
 
 extern __thread int __ulp_pending;
 
+struct ulp_patching_state {
+    char load_state;
+    struct ulp_applied_patch *patches;
+};
+
 struct ulp_metadata {
   unsigned char patch_id[32];
   char *so_filename;

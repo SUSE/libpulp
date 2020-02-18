@@ -54,6 +54,7 @@ struct ulp_dynobj
     Elf64_Addr trigger;
     Elf64_Addr check;
     Elf64_Addr path_buffer;
+    Elf64_Addr state;
 
     struct ulp_dynobj *next;
 };
@@ -64,6 +65,7 @@ struct ulp_addresses
     Elf64_Addr trigger;
     Elf64_Addr path_buffer;
     Elf64_Addr check;
+    Elf64_Addr state;
 };
 
 typedef struct ulp_process ulp_process;

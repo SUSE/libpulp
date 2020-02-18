@@ -35,7 +35,7 @@
 #include "../include/ulp.h"
 
 /* ulp data structures */
-struct ulp_patching_state __ulp_state;
+struct ulp_patching_state __ulp_state = {0, NULL};
 char __ulp_path_buffer[256] = "";
 struct ulp_metadata *__ulp_metadata_ref = NULL;
 struct ulp_detour_root *__ulp_root = NULL;
@@ -65,6 +65,7 @@ extern void __ulp_prologue();
 
 __attribute__ ((constructor)) void begin(void)
 {
+    __ulp_state.load_state = 1;
     fprintf(stderr, "libpulp loaded...\n");
 }
 

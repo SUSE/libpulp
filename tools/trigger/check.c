@@ -86,15 +86,18 @@ int main(int argc, char **argv)
     int pid;
     char *livepatch;
     int patched = -1;
+    int ret;
 
     if (check_args(argc, argv)) return 2;
     pid = atoi(argv[1]);
     livepatch = argv[2];
 
     if (stop(pid)) return 3;
-    if (initialize_data_structures(pid, livepatch)) {
+    ret = initialize_data_structures(pid, livepatch);
+    if (ret) {
       restart(pid);
-      return 4;
+      if (ret == EAGAIN) return EAGAIN;
+      else return 4;
     }
 
     /* verify if to-be-patched libs support libpulp */

@@ -307,6 +307,7 @@ int parse_main_dynobj(char *objname)
     obj->loop = get_loaded_symbol_addr(obj, "__ulp_loop");
     obj->path_buffer = get_loaded_symbol_addr(obj, "__ulp_get_path_buffer");
     obj->check = get_loaded_symbol_addr(obj, "__ulp_check_patched");
+    obj->state = get_loaded_symbol_addr(obj, "__ulp_state");
 
     target.dynobjs = obj;
 
@@ -377,6 +378,7 @@ struct link_map *parse_lib_dynobj(struct link_map *link_map_addr)
     obj->loop = get_loaded_symbol_addr(obj, "__ulp_loop");
     obj->path_buffer = get_loaded_symbol_addr(obj, "__ulp_get_path_buffer");
     obj->check = get_loaded_symbol_addr(obj, "__ulp_check_patched");
+    obj->state = get_loaded_symbol_addr(obj, "__ulp_state");
 
     return link_map;
 }
@@ -431,6 +433,7 @@ int initialize_data_structures(int pid, char *livepatch)
         if (o->trigger) addr.trigger = o->trigger;
         if (o->path_buffer) addr.path_buffer = o->path_buffer;
         if (o->check) addr.check = o->check;
+        if (o->state) addr.state = o->state;
     }
 
     if (!(addr.loop)) {
@@ -448,6 +451,19 @@ int initialize_data_structures(int pid, char *livepatch)
     if (!(addr.check)) {
         WARN("ulp check address not found.");
         return 8;
+    }
+    if (!(addr.state)) {
+        WARN("ulp state address not found.");
+        return 9;
+    }
+
+    /* Check if libulp constructor has already been executed.  */
+    struct ulp_patching_state ulp_state;
+    if (read_memory((char *) &ulp_state, sizeof(ulp_state), pid,
+                    addr.state)
+        || ulp_state.load_state == 0) {
+      restart(pid);
+      return EAGAIN;
     }
 
     return 0;
