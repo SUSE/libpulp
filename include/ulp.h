@@ -119,7 +119,7 @@ int ulp_patch_addr(void *old_faddr, unsigned int index);
 
 struct ulp_applied_patch *ulp_get_applied_patch(unsigned char *id);
 
-int ulp_revert_patch(unsigned char *id);
+int ulp_revert_patch(struct ulp_metadata *ulp);
 
 int ulp_state_remove(struct ulp_applied_patch *rm_patch);
 
