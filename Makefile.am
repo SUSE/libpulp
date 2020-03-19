@@ -4,4 +4,5 @@ SUBDIRS =				\
 	include			\
 	lib				\
 	tools				\
-	examples
+	examples			\
+	tests

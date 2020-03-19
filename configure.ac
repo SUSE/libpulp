@@ -2,6 +2,7 @@ AC_INIT([libpulp], [0.0.1], [noreply@suse.com])
 AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_MACRO_DIRS([config])
 AM_INIT_AUTOMAKE
+AM_PATH_PYTHON([3])
 LT_INIT([shared disable-static])
 
 AC_PROG_CC
@@ -14,6 +15,7 @@ AC_SUBST([ULP_NOP_LENGTH], [24,22])
 AC_CONFIG_FILES([Makefile
 		 include/Makefile
 		 lib/Makefile
+		 tests/Makefile
 		 tools/Makefile
 		 tools/dynsym_gate/Makefile
 		 tools/packer/Makefile
