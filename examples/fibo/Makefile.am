@@ -49,7 +49,7 @@ descr1.txt: descr1.in
 	sed -e "s|__ABS_BUILDDIR__|$(abs_builddir)|" $^ > $@
 
 metadata1.ulp: patch1.so descr1.txt libfibo.so
-	$(ULP_PACKER) descr1.txt libfibo.so $@
+	$(ULP_PACKER) descr1.txt $@
 
 reverse1.ulp: metadata1.ulp
 	$(ULP_REVERSE) $< $@

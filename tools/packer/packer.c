@@ -523,17 +523,18 @@ int main(int argc, char **argv)
     Elf *target_elf = NULL;
     int fd;
     char *filename = NULL;
+    char *target_filename = NULL;
 
     fd = 0;
     memset(&ulp, 0, sizeof(ulp));
 
-    if (argc < 3) {
+    if (argc < 2) {
 	usage(argv[0]);
 	return 1;
     }
 
-    if (argc > 3) {
-	filename = strndup(argv[3], NAME_MAX);
+    if (argc > 2) {
+	filename = strndup(argv[2], NAME_MAX);
     }
 
     elf_version(EV_CURRENT);
@@ -543,7 +544,10 @@ int main(int argc, char **argv)
 	goto main_error;
     }
 
-    target_elf = load_elf(argv[2], &fd);
+    /* Get the target library filename from the description file. */
+    target_filename = ulp.objs->name;
+
+    target_elf = load_elf(target_filename, &fd);
     if (!target_elf) goto main_error;
     if (!get_ulp_elf_metadata(target_elf, ulp.objs)) goto main_error;
     unload_elf(&target_elf, &fd);

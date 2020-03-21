@@ -68,7 +68,7 @@ descr%.txt: descr%.in
 	sed -e "s|__ABS_BUILDDIR__|$(abs_builddir)|" $^ > $@
 
 metadata%.ulp: patch%.so descr%.txt libdummy.so
-	$(ULP_PACKER) descr$*.txt libdummy.so $@
+	$(ULP_PACKER) descr$*.txt $@
 
 reverse%.ulp: metadata%.ulp
 	$(ULP_REVERSE) $< $@
