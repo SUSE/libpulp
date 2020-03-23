@@ -634,7 +634,7 @@ int load_patch_info(char *livepatch)
 	return 4;
     }
 
-    ulp.so_filename = calloc(c, sizeof(char));
+    ulp.so_filename = calloc(c + 1, sizeof(char));
     if (!ulp.so_filename)
     {
 	WARN("Unable to allocate so filename buffer.");
@@ -685,7 +685,7 @@ int load_patch_info(char *livepatch)
     }
 
     /* shared object: fill data + read patching units */
-    obj->name = calloc(c, sizeof(char));
+    obj->name = calloc(c + 1, sizeof(char));
     if (!obj->name)
     {
 	WARN("Unable to allocate object name buffer.");
@@ -723,7 +723,7 @@ int load_patch_info(char *livepatch)
 	    return 16;
 	}
 
-	unit->old_fname = calloc(c, sizeof(char));
+	unit->old_fname = calloc(c + 1, sizeof(char));
 	if (!unit->old_fname)
 	{
 	    WARN("Unable to allocate unit old function name buffer.");
@@ -742,7 +742,7 @@ int load_patch_info(char *livepatch)
 	    return 19;
 	}
 
-	unit->new_fname = calloc(c, sizeof(char));
+	unit->new_fname = calloc(c + 1, sizeof(char));
 	if (!unit->new_fname)
 	{
 	    WARN("Unable to allocate unit new function name buffer.");

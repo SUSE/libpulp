@@ -118,7 +118,7 @@ struct ulp_metadata *parse_metadata(char *filename, struct ulp_metadata *ulp)
 	WARN("Unable to read so filename length.");
 	return NULL;
     }
-    ulp->so_filename = calloc(c, sizeof(char));
+    ulp->so_filename = calloc(c + 1, sizeof(char));
     if (!ulp->so_filename) {
 	WARN("Unable to allocate so filename buffer.");
 	return NULL;
@@ -159,7 +159,7 @@ struct ulp_metadata *parse_metadata(char *filename, struct ulp_metadata *ulp)
     ulp->objs = obj;
 
     /* shared object: fill data + read patching units */
-    obj->name = calloc(c, sizeof(char));
+    obj->name = calloc(c + 1, sizeof(char));
     if (!obj->name) {
 	WARN("Unable to allocate object name buffer.");
 	return NULL;

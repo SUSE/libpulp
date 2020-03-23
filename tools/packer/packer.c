@@ -331,7 +331,7 @@ int parse_description(char *filename, struct ulp_metadata *ulp)
 	return 0;
     }
 
-    ulp->so_filename = calloc(n, sizeof(char));
+    ulp->so_filename = calloc(n + 1, sizeof(char));
     if (!ulp->so_filename) {
 	WARN("Unable to allocate memory for patch so filename.");
 	return 0;
