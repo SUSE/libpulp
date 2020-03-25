@@ -1,28 +1,5 @@
-# When building sources in different directories, store object files in
-# their respective paths.  For example, trm.o, which is needed by the
-# libraries under test, is left in the same path as trm.S, not here.
-AUTOMAKE_OPTIONS = subdir-objects
-
-# TODO: Move this to a higher level Makefile
-#
-# ULP tools location
-ULP_DYNSYM_GATE = $(top_builddir)/tools/dynsym_gate/ulp_dynsym_gate
-ULP_PACKER = $(top_builddir)/tools/packer/ulp_packer
-ULP_REVERSE = $(top_builddir)/tools/packer/ulp_reverse
-
-# TODO: Move this to a higher level Makefile
-#
-# Build and link requirements for live-patchable (target) libraries.
-ULP_NOP_LENGTH = @ULP_NOP_LENGTH@
-TARGET_CFLAGS = -fPIC -fpatchable-function-entry=$(ULP_NOP_LENGTH)
-TARGET_LDFLAGS = --build-id
-TARGET_TRM_SOURCES = $(top_srcdir)/lib/trm.S
-
-# In libtool, convenience libraries are not installed, so they do not
-# need -rpath, which causes them to be statically linked.  However,
-# libpulp can only live patch dynamically linked libraries, so pass
-# -rpath to libtool, which causes the linking to become dynamic.
-CONVENIENCE_LDFLAGS = -rpath $(libdir)
+# Include common definitions
+include $(top_srcdir)/Makefile.common
 
 # Convenience libraries.
 check_LTLIBRARIES = libdozens.la libhundreds.la
@@ -61,29 +38,6 @@ EXTRA_DIST = \
 
 clean-local:
 	rm -f $(METADATA)
-
-# The following custom rules are triggered by <testname>_DEPENDENCIES:
-
-# This rule causes the target library to be post-processed with
-# ulp_dynsym_gate, so that its .ulp section gets filled.  Files with
-# .post extension track whether the respective libraries have already
-# been post-processed.
-.libs/lib%.post: lib%.la
-	$(ULP_DYNSYM_GATE) .libs/lib$*.so
-	touch $@
-
-# These rules cause the livepatch metadata to be built.  The .ulp target
-# depends on check_LTLIBRARIES, because .la targets indirectly produce
-# the .so files they need (it is impossible to have .ulp targets depend
-# directly on .so files, because libtool does not create .so targets).
-%.dsc: %.in
-	sed -e "s|__ABS_BUILDDIR__|$(abs_builddir)|" $^ > $@
-
-%.ulp: %.dsc $(check_LTLIBRARIES)
-	$(ULP_PACKER) $< $@
-
-%.rev: %.ulp
-	$(ULP_REVERSE) $< $@
 
 # Test programs
 check_PROGRAMS = numserv

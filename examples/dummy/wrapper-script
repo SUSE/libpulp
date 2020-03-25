@@ -56,7 +56,9 @@ do
   retry=0
   while [ $retry -lt 10 ]
   do
-    $builddir/tools/trigger/ulp_trigger $testcase_pid metadata$i.ulp
+    $builddir/tools/trigger/ulp_trigger \
+      $testcase_pid \
+      libdummy_livepatch$i.ulp
     ret=$?
     if [ $ret -ne 0 ]
     then

@@ -2,5 +2,5 @@
 
 libtoolize -c
 aclocal
-automake --add-missing -c --foreign
+automake --add-missing -c
 autoconf
