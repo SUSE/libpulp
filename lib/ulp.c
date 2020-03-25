@@ -59,14 +59,76 @@ char ulp_prologue[24] = {0x57,
                          0xeb, - (PRE_NOPS_LEN + 2)};
 
 unsigned int __ulp_root_index_counter = 0;
-unsigned long __ulp_global_universe = 0;
+unsigned long *__ulp_global_universe = NULL;
+unsigned long __libulp_universe;
 
 extern void __ulp_prologue();
 
 __attribute__ ((constructor)) void begin(void)
 {
+    void *handle;
+    void *global = NULL;
+    void *local;
+    struct link_map *map = NULL;
+    struct link_map *iter;
+
+    /* Get the main program handle and the link map */
+    handle = dlopen(NULL, RTLD_LAZY | RTLD_LOCAL | RTLD_NOLOAD);
+    if (handle == NULL) {
+      fprintf(stderr, "Main program handle not found...\n");
+      goto begin_failure;
+    }
+    if (dlinfo(handle, RTLD_DI_LINKMAP, &map)){
+      fprintf(stderr, "List of loaded libraries not found...\n");
+      goto begin_failure;
+    }
+
+    /* Iterate over the list of loaded libraries to find libulp.so and
+       the global counter __libulp_universe.  Skip the link map root,
+       which refers to the main program */
+    iter = map->l_next;
+    while (iter) {
+      if (strstr(iter->l_name, "libulp.so")) {
+        handle = dlopen(iter->l_name,
+                        RTLD_LAZY | RTLD_LOCAL | RTLD_NOLOAD);
+        if (handle == NULL) {
+          fprintf(stderr, "Unable to dlopen libulp.so...\n");
+          goto begin_failure;
+        }
+        global = dlsym(handle, "__libulp_universe");
+        break;
+      }
+      iter = iter->l_next;
+    }
+    if (global == NULL) {
+      fprintf(stderr, "Unable to find __libulp_universe...\n");
+      goto begin_failure;
+    }
+
+    /* Iterate over the list of loaded libraries to find all per-library
+       __ulp_global_universe objects and make them point to the global
+       counter, __libulp_universe */
+    iter = map->l_next;
+    while (iter) {
+      handle = dlopen(iter->l_name,
+                      RTLD_LAZY | RTLD_LOCAL | RTLD_NOLOAD);
+      if (handle == NULL) {
+        fprintf(stderr, "Unable to dlopen %s...\n", iter->l_name);
+        goto begin_failure;
+      }
+      local = dlsym(handle, "__ulp_global_universe");
+      if (local)
+        *((typeof(__ulp_global_universe) **)local) = global;
+      iter = iter->l_next;
+    }
+
     __ulp_state.load_state = 1;
     fprintf(stderr, "libpulp loaded...\n");
+    return;
+
+begin_failure:
+    fprintf(stderr, "Userspace live patching features disabled.\n");
+    return;
 }
 
 /* libpulp interfaces for livepatch trigger */
@@ -539,7 +601,7 @@ int ulp_apply_all_units(struct ulp_metadata *ulp)
     struct ulp_unit *unit;
     struct ulp_detour_root *root;
 
-    __ulp_global_universe++;
+    __libulp_universe++;
 
     /* only shared objs have units, this loop never runs for main obj */
     unit = obj->units;
@@ -560,7 +622,7 @@ int ulp_apply_all_units(struct ulp_metadata *ulp)
             root->handler = obj->dl_handler;
         }
 
-        if (!(push_new_detour(__ulp_global_universe, ulp->patch_id,
+        if (!(push_new_detour(__libulp_universe, ulp->patch_id,
                               root, new_fun)))
         {
             WARN("error setting ulp data structure\n");
@@ -923,7 +985,7 @@ int ulp_revert_patch(unsigned char *id)
 {
     struct ulp_applied_patch *patch;
 
-    __ulp_global_universe++;
+    __libulp_universe++;
     patch = ulp_get_applied_patch(id);
 
     if (ulp_revert_all_units(id)) {

@@ -60,6 +60,13 @@ __ulp_entry:
     call    __tls_get_addr@PLT
     movq    __ulp_global_universe@GOTPCREL(%rip), %rdi
     movq    (%rdi), %rdi
+    # If __ulp_global_universe has not been initialized by libulp, skip
+    # the universe check and fallback to unpatched functions.
+    cmpq    $0x0, %rdi
+    jz      __ulp_entry_bypass
+    # Otherwise, update the thread counter and let the universe check
+    # happen.
+    movq    (%rdi), %rdi
     movq    %rdi, __ulp_thread_universe@dtpoff(%rax)
 
    // call original function
