@@ -59,6 +59,7 @@ char ulp_prologue[24] = {0x57,
                          0xeb, - (PRE_NOPS_LEN + 2)};
 
 unsigned int __ulp_root_index_counter = 0;
+unsigned long __ulp_global_universe = 0;
 
 extern void __ulp_prologue();
 
@@ -440,7 +441,7 @@ int load_patch()
 	case 2: /* revert patch */
 	    if (!ulp_can_revert_patch(ulp))
 		break;
-	    if (!ulp_revert_patch(ulp)) {
+	    if (!ulp_revert_patch(ulp->patch_id)) {
 		WARN("Unable to revert patch.");
 		break;
 	    }
@@ -538,14 +539,7 @@ int ulp_apply_all_units(struct ulp_metadata *ulp)
     struct ulp_unit *unit;
     struct ulp_detour_root *root;
 
-    /* Find the address where the per-library global counter
-       (__ulp_global_universe) has been loaded in the memory, then
-       increment it. */
-    unsigned long *global_universe;
-    global_universe = (unsigned long *)
-                      load_so_symbol("__ulp_global_universe",
-                                     obj->dl_handler, 0);
-    *global_universe = *global_universe + 1;
+    __ulp_global_universe++;
 
     /* only shared objs have units, this loop never runs for main obj */
     unit = obj->units;
@@ -566,7 +560,7 @@ int ulp_apply_all_units(struct ulp_metadata *ulp)
             root->handler = obj->dl_handler;
         }
 
-        if (!(push_new_detour(*global_universe, ulp->patch_id,
+        if (!(push_new_detour(__ulp_global_universe, ulp->patch_id,
                               root, new_fun)))
         {
             WARN("error setting ulp data structure\n");
@@ -925,21 +919,11 @@ struct ulp_applied_patch *ulp_get_applied_patch(unsigned char *id)
     return NULL;
 }
 
-int ulp_revert_patch(struct ulp_metadata *ulp)
+int ulp_revert_patch(unsigned char *id)
 {
     struct ulp_applied_patch *patch;
-    unsigned char *id;
 
-    /* Find the address where the per-library global counter
-       (__ulp_global_universe) has been loaded in the memory, then
-       increment it. */
-    unsigned long *global_universe;
-    global_universe = (unsigned long *)
-                      load_so_symbol("__ulp_global_universe",
-                                     ulp->objs->dl_handler, 0);
-    *global_universe = *global_universe + 1;
-
-    id = ulp->patch_id;
+    __ulp_global_universe++;
     patch = ulp_get_applied_patch(id);
 
     if (ulp_revert_all_units(id)) {
