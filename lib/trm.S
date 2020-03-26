@@ -26,7 +26,20 @@
 
 .section .ulp.track,"ax",@progbits
 
+// A weak symbol for __ulp_global_universe is needed so that __ulp_entry
+// can reference it via GOT, however, there should be no definition,
+// hence no object, for it in this file.  Otherwise, when linking with
+// -Bsymbolic, the GOT reference becomes a reference to the local object
+// and the intended, external object in libulp.so will not be reachable.
+//
+// This works if libulp.so is LD_PRELOAD'ed, because the GOT entry will
+// be filled in during relocation, which makes the address of the global
+// counter (__ulp_global_universe) available to __ulp_entry.  As well as
+// it works if libulp isn't PRELOAD'ed, because then the GOT entry will
+// be left zeroed out, which __ulp_entry tests for, and regular
+// execution of the library happens.
 .weak   __ulp_global_universe
+
 .local	__ulp_entry
 .type	__ulp_entry,@function
 .align 8
@@ -56,10 +69,18 @@ __ulp_entry:
     // one movq instruction in place of the load, cmp, jne, movq sequence.
     // - the above should be properly benchmarked.
 
+    // Find the address of the thread-local (TLS) counter.
     leaq    __ulp_thread_universe@tlsld(%rip), %rdi
     call    __tls_get_addr@PLT
+    // Check if the address of the global counter has been filled in the
+    // GOT entry during initialization (only happens when libulp.so has
+    // been LD_PRELOAD'ed).  In case it has, read the contents.
+    // Otherwise, the uninitialized value, zero, can be used directly.
     movq    __ulp_global_universe@GOTPCREL(%rip), %rdi
+    test    %rdi, %rdi
+    jz      __ulp_thread_counter_update
     movq    (%rdi), %rdi
+__ulp_thread_counter_update:
     movq    %rdi, __ulp_thread_universe@dtpoff(%rax)
 
    // call original function
@@ -136,13 +157,6 @@ __ulp_loop:
     nop
     nop
     jmp	    __ulp_loop
-
-.section .data
-.align 8
-.type __ulp_global_universe, @object
-.size __ulp_global_universe, 8
-__ulp_global_universe:
-.zero 0x8
 
 .section .tbss,"awT",@nobits
 .align  8

@@ -88,7 +88,6 @@ numserv_bsymbolic_LDADD = libdozens_bsymbolic.la libhundreds_bsymbolic.la
 numserv_bsymbolic_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
 TESTS = numserv.py numserv_bsymbolic.py
-XFAIL_TESTS = numserv_bsymbolic.py
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON)
 
