@@ -2,14 +2,22 @@
 
 import os
 import pexpect
+import re
 import subprocess
+import sys
 
+# ULP tools location
 builddir = os.getcwd()
 trigger = builddir + '/../tools/trigger/ulp_trigger'
 preload = {'LD_PRELOAD': builddir + '/../lib/.libs/libulp.so'}
 
+# Test case name and live patch selection variable
+testname = os.path.splitext(sys.argv[0])
+testname = os.path.basename(testname[0])
+bsymbolic = re.search('_bsymbolic', testname)
+
 # Start the test program and check default behavior
-child = pexpect.spawn('./numserv', timeout=1, env=preload)
+child = pexpect.spawn('./' + testname, timeout=1, env=preload)
 
 child.expect('Waiting for input.')
 print('Greeting... ok.')
@@ -23,7 +31,9 @@ child.expect('100');
 print('First call to libhundreds... ok.')
 
 # Apply live patch and check for new behavior
-ret = subprocess.run([trigger, str(child.pid), 'libdozens_livepatch1.ulp'])
+ret = subprocess.run([trigger, str(child.pid),
+                     'libdozens_livepatch1.ulp' if not bsymbolic else
+                     'libdozens_bsymbolic_livepatch1.ulp'])
 if ret.returncode:
   print('Failed to apply livepatch #1 for libdozens')
   exit(1)
@@ -42,7 +52,9 @@ child.expect('100');
 print('Second call to libhundreds... ok.')
 
 # Apply live patch and check for new behavior
-ret = subprocess.run([trigger, str(child.pid), 'libhundreds_livepatch1.ulp'])
+ret = subprocess.run([trigger, str(child.pid),
+                     'libhundreds_livepatch1.ulp' if not bsymbolic else
+                     'libhundreds_bsymbolic_livepatch1.ulp'])
 if ret.returncode:
   print('Failed to apply livepatch #1 for libhundreds')
   exit(1)
