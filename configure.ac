@@ -17,6 +17,12 @@ LT_INIT([shared disable-static])
 
 AC_PROG_CC
 AM_PROG_AS
+
+# Check if the compiler provides the -fpatchable-function-entry option,
+# needed to create the nop paddings in function entries.
+AX_CHECK_COMPILE_FLAG([-fpatchable-function-entry=1],, AC_MSG_ERROR([\
+Required compiler option missing: -fpatchable-function-entry]))
+
 AM_PATH_PYTHON([3])
 
 AC_SUBST(AM_CFLAGS, ["-Wall -Wextra -Werror"])
