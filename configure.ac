@@ -23,6 +23,23 @@ AM_PROG_AS
 AX_CHECK_COMPILE_FLAG([-fpatchable-function-entry=1],, AC_MSG_ERROR([\
 Required compiler option missing: -fpatchable-function-entry]))
 
+# Check if the linker emits the .ulp section required to hold the live
+# patching trampolines.
+AC_MSG_CHECKING([whether the linker emits .ulp sections])
+AC_LINK_IFELSE([AC_LANG_SOURCE([
+asm (".section .ulp.track");
+int main(void) {return 0;}
+])],[
+if readelf -S conftest$EXEEXT | grep -E "\.ulp " > /dev/null; then
+AC_MSG_RESULT([yes])
+else
+AC_MSG_RESULT([no])
+AC_MSG_ERROR([
+Libpulp requires an assembler that emits the .ulp section when linking \
+objects that contain a .ulp-track section])
+fi
+],[AC_MSG_ERROR([Unexpected configure error.])])
+
 AM_PATH_PYTHON([3])
 
 AC_SUBST(AM_CFLAGS, ["-Wall -Wextra -Werror"])
