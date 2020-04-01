@@ -27,7 +27,8 @@ Required compiler option missing: -fpatchable-function-entry]))
 # patching trampolines.
 AC_MSG_CHECKING([whether the linker emits .ulp sections])
 AC_LINK_IFELSE([AC_LANG_SOURCE([
-asm (".section .ulp.track");
+asm (".pushsection .ulp.track");
+asm (".popsection");
 int main(void) {return 0;}
 ])],[
 if readelf -S conftest$EXEEXT | grep -E "\.ulp " > /dev/null; then
