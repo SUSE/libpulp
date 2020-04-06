@@ -41,6 +41,14 @@ objects that contain a .ulp-track section])
 fi
 ],[AC_MSG_ERROR([Unexpected configure error.])])
 
+# The following headers are required to build libpulp's tools.
+AC_CHECK_HEADERS([bfd.h gelf.h],
+[build_ulp_tools=yes],
+[build_ulp_tools=no; break])
+AM_CONDITIONAL([BUILD_ULP_TOOLS], [test "$build_ulp_tools" = "yes"])
+AS_IF([test "$build_ulp_tools" = "no"], AC_MSG_WARN([\
+Not building the tools because of missing headers.]))
+
 AM_PATH_PYTHON([3])
 
 AC_SUBST(AM_CFLAGS, ["-Wall -Wextra -Werror"])
