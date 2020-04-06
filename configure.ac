@@ -49,7 +49,9 @@ AM_CONDITIONAL([BUILD_ULP_TOOLS], [test "$build_ulp_tools" = "yes"])
 AS_IF([test "$build_ulp_tools" = "no"], AC_MSG_WARN([\
 Not building the tools because of missing headers.]))
 
+# Python and python's pexpect are required to run the tests.
 AM_PATH_PYTHON([3])
+AX_PYTHON_MODULE([pexpect], [fatal])
 
 AC_SUBST(AM_CFLAGS, ["-Wall -Wextra -Werror"])
 
