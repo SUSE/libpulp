@@ -9,3 +9,10 @@ all-local: trm.o
 
 trm.o: $(srcdir)/trm.S
 	$(CPPASCOMPILE) -fPIC -c -o $@ $^
+
+install-exec-local: trm.o
+	install -d $(DESTDIR)/$(libdir)
+	install -t $(DESTDIR)/$(libdir) $^
+
+uninstall-local:
+	rm -f $(DESTDIR)/$(libdir)/trm.o
