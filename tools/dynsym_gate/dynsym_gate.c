@@ -215,10 +215,16 @@ int main(int argc, char **argv) {
 	}
     }
 
-    if (!stubs) {
-       fprintf(stderr, "stubs section not found!\n");
-       exit(1);
-    }
+#define CHECK_SECTION(section) \
+ if (!section) { \
+    fprintf(stderr, #section " section not found!\n"); \
+    exit(1); \
+ }
+    CHECK_SECTION (dynsym)
+    CHECK_SECTION (symtab)
+    CHECK_SECTION (stubs)
+    CHECK_SECTION (patchable)
+#undef CHECK_SECTION
 
     // step 2: find __ulp_entry offset in symtab
     for (i = 0; i < symtab->len; i++) {
