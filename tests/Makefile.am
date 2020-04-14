@@ -110,7 +110,6 @@ parameters_LDADD = libparameters.la
 parameters_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
 TESTS = numserv.py numserv_bsymbolic.py parameters.py
-XFAIL_TESTS = parameters.py
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON)
 
