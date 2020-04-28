@@ -54,3 +54,8 @@ __ulp_check_patched:
     call   __ulp_check_applied_patch@PLT
     pop    %rsp
     int3
+
+__ulp_loop:
+    nop
+    nop
+    jmp	    __ulp_loop

@@ -833,12 +833,5 @@ int check_patch_sanity()
 	return 3;
     }
 
-    /* check if to-be-patched objects support ulp */
-    if (!d->loop)
-    {
-	WARN("to be patched object does not support ulp. BREAK");
-	return 4;
-    }
-
     return 0;
 }

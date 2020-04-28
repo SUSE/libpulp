@@ -151,13 +151,6 @@ __ulp_entry_bypass:
 //    popq    %rdx
 //    retq
 
-.global __ulp_loop
-.type   __ulp_loop,@function
-__ulp_loop:
-    nop
-    nop
-    jmp	    __ulp_loop
-
 .section .tbss,"awT",@nobits
 .align  8
 
