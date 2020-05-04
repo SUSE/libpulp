@@ -26,6 +26,7 @@
 #include <errno.h>
 #include <string.h>
 #include <link.h>
+#include <limits.h>
 #include <dirent.h>
 #include <bfd.h>
 #include <stddef.h>
@@ -37,8 +38,6 @@
 #include "introspection.h"
 #include "../../include/ulp_common.h"
 
-ulp_process target;
-ulp_addresses addr;
 struct ulp_metadata ulp;
 
 int parse_file_symtab(ulp_dynobj *obj, char needed)
@@ -75,34 +74,15 @@ int parse_file_symtab(ulp_dynobj *obj, char needed)
     return 0;
 }
 
-asymbol **get_main_symtab()
-{
-    ulp_dynobj *o;
-    for (o = target.dynobjs; o != NULL; o = o->next)
-    {
-	if (o->main) return o->symtab;
-    }
-    return NULL;
-}
-
-int get_main_symtab_length()
-{
-    ulp_dynobj *o;
-    for (o = target.dynobjs; o != NULL; o = o->next)
-	if (o->main) return o->symtab_len;
-
-    return 0;
-}
-
-int dig_main_link_map(struct link_map *main_link_map)
+int dig_main_link_map(struct ulp_process *process)
 {
     Elf64_Addr dyn_addr = 0, link_map, link_map_addr, r_debug = 0;
     int nentries, i, r_map_offset;
     ElfW(Dyn) dyn;
     asymbol **symtab;
 
-    symtab = get_main_symtab();
-    nentries = get_main_symtab_length();
+    symtab = process->dynobj_main->symtab;
+    nentries = process->dynobj_main->symtab_len;
 
     for (i = 0; i < nentries; i++) {
 	if (strcmp(bfd_asymbol_name(symtab[i]),"_DYNAMIC")==0) {
@@ -111,7 +91,7 @@ int dig_main_link_map(struct link_map *main_link_map)
 	}
     }
     /* fix for PIE executables */
-    dyn_addr = dyn_addr + target.load_bias;
+    dyn_addr = dyn_addr + process->load_bias;
 
     if (i == nentries) {
 	WARN("error parsing _DYNAMIC.");
@@ -119,7 +99,8 @@ int dig_main_link_map(struct link_map *main_link_map)
     };
 
     while(1) {
-	if (read_memory((char *) &dyn, sizeof(ElfW(Dyn)), target.pid, dyn_addr))
+	if (read_memory((char *) &dyn, sizeof(ElfW(Dyn)), process->pid,
+			dyn_addr))
 	{
 	    WARN("error reading _DYNAMIC array.");
 	    free(symtab);
@@ -139,15 +120,15 @@ int dig_main_link_map(struct link_map *main_link_map)
     r_map_offset = offsetof(struct r_debug, r_map);
     link_map_addr = r_debug + r_map_offset;
 
-    if (read_memory((char *) &link_map, sizeof(void *), target.pid,
-		link_map_addr))
+    if (read_memory((char *) &link_map, sizeof(void *), process->pid,
+		    link_map_addr))
     {
 	WARN("error reading link_map address.");
 	return 4;
     }
 
-    if (read_memory((char *) main_link_map, sizeof(struct link_map), target.pid,
-		link_map))
+    if (read_memory((char *) &process->dynobj_main->link_map,
+		    sizeof(struct link_map), process->pid, link_map))
     {
 	WARN("error reading link_map address.");
 	return 5;
@@ -157,7 +138,7 @@ int dig_main_link_map(struct link_map *main_link_map)
     return 0;
 }
 
-int parse_threads(int pid)
+int parse_threads(struct ulp_process *process)
 {
     struct ulp_thread *t, *prev_t;
     char *format_str, *dirname;
@@ -167,7 +148,7 @@ int parse_threads(int pid)
 
     format_str = "/proc/%d/task/";
     dirname = calloc(strlen(format_str) + 10, 1);
-    sprintf(dirname, format_str, pid);
+    sprintf(dirname, format_str, process->pid);
 
     prev_t = NULL;
 
@@ -177,7 +158,7 @@ int parse_threads(int pid)
 	while (dir != NULL) {
 	    tid = atoi(dir->d_name);
 	    /* add main thread in front, after this loop */
-	    if (!tid || tid == pid)
+	    if (!tid || tid == process->pid)
 	    {
 		dir = readdir(tasks_dir);
 		continue;
@@ -204,10 +185,10 @@ int parse_threads(int pid)
 	WARN("Unable to allocate main thread structure.");
 	return 1;
     }
-    t->tid = pid;
+    t->tid = process->pid;
     t->next = prev_t;
     t->consistent = 0;
-    target.threads = t;
+    process->threads = t;
 
     return 0;
 }
@@ -230,13 +211,16 @@ Elf64_Addr get_loaded_symbol_addr(struct ulp_dynobj *obj, char *sym)
     return sym_addr;
 }
 
-int dig_load_bias(struct ulp_dynobj *obj)
+int dig_load_bias(struct ulp_process *process)
 {
     int auxv, i;
     char *format_str, *filename;
     Elf64_auxv_t at;
     uint64_t addrof_entry = 0;
     Elf64_Addr addrof_start = 0;
+    struct ulp_dynobj *obj;
+
+    obj = process->dynobj_main;
 
     if (!obj->symtab)
     {
@@ -246,7 +230,7 @@ int dig_load_bias(struct ulp_dynobj *obj)
 
     format_str = "/proc/%d/auxv";
     filename = calloc(strlen(format_str) + 10, 1);
-    sprintf(filename, format_str, target.pid);
+    sprintf(filename, format_str, process->pid);
 
     auxv = open(filename, O_RDONLY);
     if (!auxv)
@@ -282,12 +266,12 @@ int dig_load_bias(struct ulp_dynobj *obj)
 	return 4;
     }
 
-    target.load_bias = addrof_entry - addrof_start;
+    process->load_bias = addrof_entry - addrof_start;
     free(filename);
     return 0;
 }
 
-int parse_main_dynobj(char *objname)
+int parse_main_dynobj(struct ulp_process *process)
 {
     struct ulp_dynobj *obj;
     /* calloc initializes all to zero */
@@ -297,39 +281,48 @@ int parse_main_dynobj(char *objname)
 	WARN("Unable to allocate object structure.");
 	return 1;
     }
-    obj->filename = objname;
+
+    obj->filename = malloc (PATH_MAX);
+    snprintf (obj->filename, PATH_MAX, "/proc/%d/exe", process->pid);
 
     if (parse_file_symtab(obj, 1)) return 2;
-    obj->main = 1;
-    obj->next = target.dynobjs;
+    obj->next = NULL;
 
-    obj->trigger = get_loaded_symbol_addr(obj, "__ulp_trigger");
-    obj->loop = get_loaded_symbol_addr(obj, "__ulp_loop");
-    obj->path_buffer = get_loaded_symbol_addr(obj, "__ulp_get_path_buffer");
-    obj->check = get_loaded_symbol_addr(obj, "__ulp_check_patched");
-    obj->state = get_loaded_symbol_addr(obj, "__ulp_state");
+    process->dynobj_main = obj;
 
-    target.dynobjs = obj;
-
-    if (dig_load_bias(obj)) return 3;
-    if (dig_main_link_map(&obj->link_map)) return 4;
+    if (dig_load_bias(process)) return 3;
+    if (dig_main_link_map(process)) return 4;
 
     return 0;
 }
 
-int is_main_object_parsed()
+int parse_libs_dynobj(struct ulp_process *process)
 {
-    ulp_dynobj *o;
+  struct link_map *obj_link_map, *aux_link_map;
 
-    for (o = target.dynobjs; o != NULL; o = o->next)
-    {
-	if (o->main) return 1;
-    }
+  /* Iterate over the link map to build the list of libraries. */
+  obj_link_map = process->dynobj_main->link_map.l_next;
+  while(obj_link_map)
+  {
+    aux_link_map = parse_lib_dynobj(process, obj_link_map);
+    if (!aux_link_map) break;
+    obj_link_map = aux_link_map->l_next;
+  }
 
-    return 0;
+  /* When libulp has been loaded (usually with LD_PRELOAD),
+   * parse_lib_dynobj will find the symbols it provides, such as
+   * __ulp_loop, which are all required for userspace live-patching. If
+   * libulp has not been found, process->dynobj_libulp will be NULL and
+   * this function returns an error.
+   */
+  if (process->dynobj_libulp == NULL)
+    return 1;
+
+  return 0;
 }
 
-struct link_map *parse_lib_dynobj(struct link_map *link_map_addr)
+struct link_map *parse_lib_dynobj(struct ulp_process *process,
+                                  struct link_map *link_map_addr)
 {
     struct ulp_dynobj *obj;
     struct link_map *link_map;
@@ -340,15 +333,16 @@ struct link_map *parse_lib_dynobj(struct link_map *link_map_addr)
     obj = calloc(sizeof(struct ulp_dynobj), 1);
     link_map = calloc(sizeof(struct link_map), 1);
 
-    if (read_memory((char *) link_map, sizeof(struct link_map), target.pid,
-		(Elf64_Addr) link_map_addr))
+    if (read_memory((char *) link_map, sizeof(struct link_map),
+		    process->pid, (Elf64_Addr) link_map_addr))
     {
 	WARN("error reading link_map address.");
 	return NULL;
     }
 
     libname = calloc(PATH_MAX, 1);
-    if (read_string(&libname, target.pid, (Elf64_Addr) link_map->l_name))
+    if (read_string(&libname, process->pid,
+                    (Elf64_Addr) link_map->l_name))
     {
 	WARN("error reading link_map string.");
 	return NULL;
@@ -357,11 +351,9 @@ struct link_map *parse_lib_dynobj(struct link_map *link_map_addr)
     if (libname[0] != '/') return link_map;
 
     obj->filename = libname;
-    obj->next = target.dynobjs;
-    target.dynobjs = obj;
 
     /* ensure that PIE was verified */
-    if (!is_main_object_parsed()) return NULL;
+    if (!process->dynobj_main) return NULL;
 
     // We always need to parse the main object, the to-be-patched object and the
     // libpulp object. The first two can be found easily, but not the latter,
@@ -381,27 +373,30 @@ struct link_map *parse_lib_dynobj(struct link_map *link_map_addr)
     obj->check = get_loaded_symbol_addr(obj, "__ulp_check_patched");
     obj->state = get_loaded_symbol_addr(obj, "__ulp_state");
 
+    /* libulp must expose all these symbols. */
+    if (obj->loop && obj->trigger && obj->path_buffer && obj->check &&
+	obj->state) {
+	obj->next = NULL;
+	process->dynobj_libulp = obj;
+    }
+    /* No other library should expose these symbols. */
+    else if (obj->loop || obj->trigger || obj->path_buffer ||
+	     obj->check || obj->state)
+	WARN("libulp symbol exposed by some other library.");
+    /* All other libraries go into the generic list. */
+    else {
+	obj->next = process->dynobjs;
+	process->dynobjs = obj;
+    }
+
     return link_map;
 }
 
-struct link_map get_link_map(char *name)
+int initialize_data_structures(struct ulp_process *process,
+                               char *livepatch)
 {
-    ulp_dynobj *o;
-    for (o = target.dynobjs; o != NULL; o = o->next)
-    {
-	if (strcmp(o->filename, name)==0) break;
-    }
-    return o->link_map;
-}
-
-int initialize_data_structures(int pid, char *livepatch)
-{
-    char *format_str;
-    char *filename;
-    struct link_map main_link_map, *obj_link_map, *aux_link_map;
-    ulp_dynobj *o;
-
-    target.pid = pid;
+    if (!process)
+      return 1;
 
     if (load_patch_info(livepatch))
     {
@@ -411,57 +406,15 @@ int initialize_data_structures(int pid, char *livepatch)
 
     bfd_init();
 
-    format_str = "/proc/%d/exe";
-    filename = calloc(strlen(format_str) + 10, 1);
-    sprintf(filename, format_str, pid);
+    if (parse_threads(process)) return 2;
 
-    if (parse_threads(target.pid)) return 2;
-
-    if (parse_main_dynobj(filename)) return 3;
-    main_link_map = get_link_map(filename);
-    obj_link_map = main_link_map.l_next;
-
-    while(obj_link_map)
-    {
-	aux_link_map = parse_lib_dynobj(obj_link_map);
-	if (!aux_link_map) return 4;
-	obj_link_map = aux_link_map->l_next;
-    }
-
-    for (o = target.dynobjs; o != NULL; o = o->next)
-    {
-        if (o->loop) addr.loop = o->loop;
-        if (o->trigger) addr.trigger = o->trigger;
-        if (o->path_buffer) addr.path_buffer = o->path_buffer;
-        if (o->check) addr.check = o->check;
-        if (o->state) addr.state = o->state;
-    }
-
-    if (!(addr.loop)) {
-        WARN("ulp loop address not found.");
-        return 5;
-    }
-    if (!(addr.trigger)) {
-        WARN("ulp trigger address not found.");
-        return 6;
-    }
-    if (!(addr.path_buffer)) {
-        WARN("ulp path_buffer address not found.");
-        return 7;
-    }
-    if (!(addr.check)) {
-        WARN("ulp check address not found.");
-        return 8;
-    }
-    if (!(addr.state)) {
-        WARN("ulp state address not found.");
-        return 9;
-    }
+    if (parse_main_dynobj(process)) return 3;
+    if (parse_libs_dynobj(process)) return 3;
 
     /* Check if libulp constructor has already been executed.  */
     struct ulp_patching_state ulp_state;
-    if (read_memory((char *) &ulp_state, sizeof(ulp_state), pid,
-                    addr.state)
+    if (read_memory((char *) &ulp_state, sizeof(ulp_state),
+                    process->pid, process->dynobj_libulp->state)
         || ulp_state.load_state == 0) {
       return EAGAIN;
     }
@@ -469,17 +422,17 @@ int initialize_data_structures(int pid, char *livepatch)
     return 0;
 }
 
-int hijack_threads()
+int hijack_threads(struct ulp_process *process)
 {
     struct ulp_thread *t;
     struct user_regs_struct context;
 
-    if (!addr.loop) {
+    if (!process->dynobj_libulp->loop) {
 	WARN("error: loop not found.");
 	return 1;
     }
 
-    for (t = target.threads; t != NULL; t = t->next)
+    for (t = process->threads; t != NULL; t = t->next)
     {
 	if (attach(t->tid))
 	{
@@ -495,7 +448,7 @@ int hijack_threads()
 	};
 
 	context = t->context;
-	context.rip = addr.loop + 2;
+	context.rip = process->dynobj_libulp->loop + 2;
 
 	if (set_regs(t->tid, &context))
 	{
@@ -514,16 +467,19 @@ int hijack_threads()
     return 0;
 }
 
-int set_id_buffer(unsigned char *patch_id, struct ulp_thread *t)
+int set_id_buffer(struct ulp_process *process, unsigned char *patch_id)
 {
+    struct ulp_thread *thread;
     struct user_regs_struct context;
     Elf64_Addr path_addr;
     int i;
 
-    context = t->context;
-    context.rip = addr.path_buffer + 2;
+    thread = process->threads;
+    context = thread->context;
+    context.rip = process->dynobj_libulp->path_buffer + 2;
 
-    if (run_and_redirect(t->tid, &context, addr.loop))
+    if (run_and_redirect(thread->tid, &context,
+			 process->dynobj_libulp->loop))
     {
 	WARN("set_id_buffer error 1.");
 	return 1;
@@ -534,7 +490,7 @@ int set_id_buffer(unsigned char *patch_id, struct ulp_thread *t)
 
     for (i = 0; i < 32; i++)
     {
-      if (write_byte(patch_id[i], t->tid, path_addr + i))
+      if (write_byte(patch_id[i], thread->tid, path_addr + i))
       {
         WARN("Unable to write id byte %d.", i);
         return 2;
@@ -545,15 +501,18 @@ int set_id_buffer(unsigned char *patch_id, struct ulp_thread *t)
 }
 
 
-int set_path_buffer(char *path, struct ulp_thread *t)
+int set_path_buffer(struct ulp_process *process, char *path)
 {
+    struct ulp_thread *thread;
     struct user_regs_struct context;
     Elf64_Addr path_addr;
 
-    context = t->context;
-    context.rip = addr.path_buffer + 2;
+    thread = process->threads;
+    context = thread->context;
+    context.rip = process->dynobj_libulp->path_buffer + 2;
 
-    if (run_and_redirect(t->tid, &context, addr.loop))
+    if (run_and_redirect(thread->tid, &context,
+			 process->dynobj_libulp->loop))
     {
 	WARN("set_path_buffer error 1.");
 	return 1;
@@ -561,7 +520,7 @@ int set_path_buffer(char *path, struct ulp_thread *t)
 
     path_addr = context.rax;
 
-    if (write_string(path, t->tid, path_addr))
+    if (write_string(path, thread->tid, path_addr))
     {
 	WARN("set_path_buffer error 2.");
 	return 2;
@@ -570,11 +529,11 @@ int set_path_buffer(char *path, struct ulp_thread *t)
     return 0;
 }
 
-int restore_threads()
+int restore_threads(struct ulp_process *process)
 {
     struct ulp_thread *t;
 
-    for (t = target.threads; t != NULL; t = t->next)
+    for (t = process->threads; t != NULL; t = t->next)
     {
 	if (attach(t->tid))
 	{
@@ -802,15 +761,15 @@ int load_patch_info(char *livepatch)
     return 0;
 }
 
-int check_patch_sanity()
+int check_patch_sanity(struct ulp_process *process)
 {
     struct ulp_object *obj;
     struct ulp_dynobj *d;
 
-    /* check if ulp functions exist in main */
-    if (!(addr.loop && addr.trigger && addr.path_buffer))
+    /* check if libulp, hence ulp functions, are loaded */
+    if (!(process->dynobj_libulp))
     {
-	WARN("ulp functions not found in main object.");
+	WARN("libulp not loaded, thus ulp functions not available.");
 	return 1;
     }
 
@@ -822,7 +781,7 @@ int check_patch_sanity()
 	return 2;
     }
 
-    for (d = target.dynobjs; d != NULL; d = d->next)
+    for (d = process->dynobjs; d != NULL; d = d->next)
     {
 	if (strcmp(d->filename, obj->name)==0) break;
     }

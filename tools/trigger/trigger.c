@@ -37,7 +37,6 @@
 #include "../../include/ulp_common.h"
 
 ulp_process target;
-ulp_addresses addr;
 struct ulp_metadata ulp;
 
 int check_args(int argc, char *argv[])
@@ -64,13 +63,13 @@ int apply_patch(char *path)
     int patched;
 
     t = target.threads;
-    if (set_path_buffer(path, t)) return 2;
+    if (set_path_buffer(&target, path)) return 2;
 
     /* redirect control-flow to trigger */
     context = t->context;
-    context.rip = addr.trigger + 2;
+    context.rip = target.dynobj_libulp->trigger + 2;
 
-    if (run_and_redirect(t->tid, &context, addr.loop))
+    if (run_and_redirect(t->tid, &context, target.dynobj_libulp->loop))
     {
 	WARN("error: unable to trig thread %d.", t->tid);
 	return 1;
@@ -98,8 +97,10 @@ int main(int argc, char **argv)
     pid = atoi(argv[1]);
     livepatch = argv[2];
 
+    target.pid = pid;
+
     if (stop(pid)) return 3;
-    ret = initialize_data_structures(pid, livepatch);
+    ret = initialize_data_structures(&target, livepatch);
     if (ret) {
       restart(pid);
       if (ret == EAGAIN) return EAGAIN;
@@ -107,12 +108,12 @@ int main(int argc, char **argv)
     }
 
     /* verify if to-be-patched libs support libpulp */
-    if (check_patch_sanity(livepatch)) {
+    if (check_patch_sanity(&target)) {
       restart(pid);
       return 5;
     }
 
-    if (hijack_threads(1)) return 6;
+    if (hijack_threads(&target)) return 6;
 
     if (restart(pid)) return 7;
 
@@ -121,7 +122,7 @@ int main(int argc, char **argv)
 
     if (stop(pid)) return 8;
 
-    if (restore_threads()) return 9;
+    if (restore_threads(&target)) return 9;
 
     if (restart(pid)) return 10;
 

@@ -31,6 +31,9 @@ struct ulp_process
     Elf64_Addr load_bias;
 
     struct ulp_thread *threads;
+
+    struct ulp_dynobj *dynobj_main;
+    struct ulp_dynobj *dynobj_libulp;
     struct ulp_dynobj *dynobjs;
 };
 
@@ -45,7 +48,6 @@ struct ulp_thread
 struct ulp_dynobj
 {
     char *filename;
-    int main;
     struct link_map link_map;
     asymbol **symtab;
     int symtab_len;
@@ -75,35 +77,31 @@ typedef struct ulp_addresses ulp_addresses;
 
 int parse_file_symtab(ulp_dynobj *obj, char needed);
 
-asymbol **get_main_symtab();
+int dig_main_link_map(struct ulp_process *process);
 
-int get_main_symtab_length();
-
-int dig_main_link_map(struct link_map *main_link_map);
-
-int parse_threads(int pid);
+int parse_threads(struct ulp_process *process);
 
 Elf64_Addr get_loaded_symbol_addr(struct ulp_dynobj *obj, char *sym);
 
-int dig_load_bias(struct ulp_dynobj *obj);
+int dig_load_bias(struct ulp_process *process);
 
-int parse_main_dynobj(char *objname);
+int parse_main_dynobj(struct ulp_process *process);
 
-int is_main_object_parsed();
+int parse_libs_dynobj(struct ulp_process *process);
 
-struct link_map *parse_lib_dynobj(struct link_map *link_map_addr);
+struct link_map *parse_lib_dynobj(struct ulp_process *process,
+                                  struct link_map *link_map_addr);
 
-struct link_map get_link_map(char *name);
+int initialize_data_structures(struct ulp_process *process,
+                               char *livepatch);
 
-int initialize_data_structures(int pid, char *livepatch);
+int hijack_threads(struct ulp_process *process);
 
-int hijack_threads();
+int set_id_buffer(struct ulp_process *process, unsigned char *patch_id);
 
-int set_id_buffer(unsigned char *patch_id, struct ulp_thread *t);
+int set_path_buffer(struct ulp_process *process, char *path);
 
-int set_path_buffer(char *path, struct ulp_thread *t);
-
-int restore_threads();
+int restore_threads(struct ulp_process *process);
 
 int load_patch_info(char *livepatch);
 
