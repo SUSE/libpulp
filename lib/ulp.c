@@ -98,6 +98,11 @@ int __ulp_check_applied_patch()
     else return 0;
 }
 
+unsigned long __ulp_get_global_universe_value()
+{
+    return __ulp_global_universe;
+}
+
 /* libpulp functions */
 void free_metadata(struct ulp_metadata *ulp)
 {

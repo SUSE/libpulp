@@ -1,4 +1,4 @@
-bin_PROGRAMS = ulp_trigger ulp_check
+bin_PROGRAMS = ulp_trigger ulp_check ulp
 
 noinst_HEADERS = introspection.h ptrace.h
 
@@ -11,3 +11,6 @@ ulp_trigger_LDADD = libcommon.la
 
 ulp_check_SOURCES = check.c
 ulp_check_LDADD = libcommon.la
+
+ulp_SOURCES = ulp.c
+ulp_LDADD = libcommon.la

@@ -55,6 +55,15 @@ __ulp_check_patched:
     pop    %rsp
     int3
 
+__ulp_get_global_universe:
+    nop
+    nop
+    push   %rsp
+    and    $0xfffffffffffffff0, %rsp
+    call   __ulp_get_global_universe_value@PLT
+    pop    %rsp
+    int3
+
 __ulp_loop:
     nop
     nop

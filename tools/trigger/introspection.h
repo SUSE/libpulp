@@ -24,6 +24,8 @@
 #include <link.h>
 #include <bfd.h>
 
+#include "ptrace.h"
+
 struct ulp_process
 {
     int pid;
@@ -34,7 +36,13 @@ struct ulp_process
 
     struct ulp_dynobj *dynobj_main;
     struct ulp_dynobj *dynobj_libulp;
-    struct ulp_dynobj *dynobjs;
+    struct ulp_dynobj *dynobj_targets;
+    struct ulp_dynobj *dynobj_patches;
+    struct ulp_dynobj *dynobj_others;
+
+    unsigned long global_universe;
+
+    struct ulp_process *next;
 };
 
 struct ulp_thread
@@ -43,6 +51,14 @@ struct ulp_thread
     struct user_regs_struct context;
     int consistent;
     struct ulp_thread *next;
+};
+
+struct thread_state
+{
+    int tid;
+    unsigned long universe;
+
+    struct thread_state *next;
 };
 
 struct ulp_dynobj
@@ -57,6 +73,10 @@ struct ulp_dynobj
     Elf64_Addr check;
     Elf64_Addr path_buffer;
     Elf64_Addr state;
+    Elf64_Addr global;
+    Elf64_Addr local;
+
+    struct thread_state *thread_states;
 
     struct ulp_dynobj *next;
 };
@@ -68,6 +88,8 @@ struct ulp_addresses
     Elf64_Addr path_buffer;
     Elf64_Addr check;
     Elf64_Addr state;
+    Elf64_Addr global;
+    Elf64_Addr local;
 };
 
 int parse_file_symtab(struct ulp_dynobj *obj, char needed);
@@ -100,6 +122,14 @@ int patch_applied(struct ulp_process *process, unsigned char *patch_id);
 int apply_patch(struct ulp_process *process, char *metadata);
 
 int restore_threads(struct ulp_process *process);
+
+int read_global_universe (struct ulp_process *process);
+
+unsigned long read_local_universe (struct ulp_process *process,
+                                   struct ulp_dynobj *library,
+                                   struct ulp_thread *thread);
+
+int read_local_universes (struct ulp_process *process);
 
 int load_patch_info(char *livepatch);
 

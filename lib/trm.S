@@ -134,22 +134,27 @@ __ulp_entry_bypass:
     pop     %r11
     jmp     *%r11
 
-//.global __ulp_get_universe
-//.type   __ulp_get_universe,@function
-//__ulp_get_universe:
-//    pushq   %rdx
-//    pushq   %rcx
-//    pushq   %rdi
-//    pushq   %rax
-//    leaq    __ulp_ret@tlsld(%rip), %rdi
-//    call    __tls_get_addr@PLT
-//    movq    __ulp_ret@dtpoff(%rax), %r11
-//    cmp     $0x0, __ulp_ret@dtpoff(%rax)
-//    popq    %rax
-//    popq    %rdi
-//    popq    %rcx
-//    popq    %rdx
-//    retq
+.global __ulp_get_local_universe
+.type   __ulp_get_local_universe,@function
+__ulp_get_local_universe:
+    nop
+    nop
+    // If the thread is not within the library, the current local
+    // universe value is meaningless, because the thread universe will
+    // be updated upon the next library entrance.  Thus, return a
+    // special code (all digits zeroed).
+    leaq    __ulp_ret@tlsld(%rip), %rdi
+    call    __tls_get_addr@PLT
+    cmp     $0x0, __ulp_ret@dtpoff(%rax)
+    jnz     __ulp_get_local_universe_value
+    mov     $-1, %rax
+    int3
+__ulp_get_local_universe_value:
+    // Read the thread universe into %rax.
+    leaq    __ulp_thread_universe@tlsld(%rip), %rdi
+    call    __tls_get_addr@PLT
+    movq    __ulp_thread_universe@dtpoff(%rax), %rax
+    int3
 
 .section .tbss,"awT",@nobits
 .align  8

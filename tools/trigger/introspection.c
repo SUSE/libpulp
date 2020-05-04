@@ -28,19 +28,22 @@
  * Typically, an introspecting program will perform the following
  * operations:
  *
- *   1. Initialize a livepatch object by reading a livepatch metadata
- *      file with load_patch_info();
+ *   1. (Optional) Initialize a livepatch object by reading a livepatch
+ *      metadata file with load_patch_info();
  *   2. Allocate space for a ulp_process structure and set its pid
  *      member to the pid of the process it wants to instropect into
  *   3. Initialize this object by calling initialize_data_structures();
- *   4. Verify, with check_patch_sanity(), that the livepatch and the
- *      process make sense together, i.e. that the livepatch is for a
- *      library that has been dynamically loaded by the process.
+ *   4. (Optional) Verify, with check_patch_sanity(), that the livepatch
+ *      and the process make sense together, i.e. that the livepatch is
+ *      for a library that has been dynamically loaded by the process.
  *   5. Hijack the threads of the process with hijack_threads();
  *   6. Call one or more of the critical section routines:
  *        High-level routines:
  *          - apply_patch() to apply a live patch.
  *          - patch_applied() to verify if a live patch is applied.
+ *          - read_global_universe() to read the global universe.
+ *          - read_local_universes() to read all of the per-library,
+ *            per-thread universes.
  *        Low-level routines (typically only used within this library):
  *          - set_id_buffer()
  *          - set_path_buffer()
@@ -60,7 +63,6 @@
 #include <sys/user.h>
 #include <unistd.h>
 
-#include "ptrace.h"
 #include "introspection.h"
 #include "../../include/ulp_common.h"
 
@@ -438,21 +440,38 @@ struct link_map *parse_lib_dynobj(struct ulp_process *process,
     obj->path_buffer = get_loaded_symbol_addr(obj, "__ulp_get_path_buffer");
     obj->check = get_loaded_symbol_addr(obj, "__ulp_check_patched");
     obj->state = get_loaded_symbol_addr(obj, "__ulp_state");
+    obj->global = get_loaded_symbol_addr(obj, "__ulp_get_global_universe");
+    obj->local = get_loaded_symbol_addr(obj, "__ulp_get_local_universe");
 
     /* libulp must expose all these symbols. */
     if (obj->loop && obj->trigger && obj->path_buffer && obj->check &&
-	obj->state) {
+	obj->state && obj->global) {
 	obj->next = NULL;
 	process->dynobj_libulp = obj;
     }
     /* No other library should expose these symbols. */
     else if (obj->loop || obj->trigger || obj->path_buffer ||
-	     obj->check || obj->state)
+	     obj->check || obj->state || obj->global)
 	WARN("libulp symbol exposed by some other library.");
+    /* Live-patchable libraries expose the local universe. */
+    else if (obj->local) {
+	obj->next = process->dynobj_targets;
+	process->dynobj_targets = obj;
+    }
+    /* Live patch objects. */
+    /* XXX: Searching for the '_livepatch' substring in the filename of
+     * a dynamically loaded object is rather frail. Alternatives:
+     *   A. Have live patch DSOs expose some predefined symbol.
+     *   B. Have libulp mmap a .ulp or .rev file into memory.
+     */
+    else if (strstr (obj->filename, "_livepatch")) {
+	obj->next = process->dynobj_patches;
+	process->dynobj_patches = obj;
+    }
     /* All other libraries go into the generic list. */
     else {
-	obj->next = process->dynobjs;
-	process->dynobjs = obj;
+	obj->next = process->dynobj_others;
+	process->dynobj_others = obj;
     }
 
     return link_map;
@@ -692,6 +711,78 @@ int apply_patch(struct ulp_process *process, char *metadata)
     }
 
     return 0;
+}
+
+/* Reads the global universe counter in PROCESS. Returns the
+ * non-negative integer corresponding to the counter, or -1 on error.
+ */
+int read_global_universe (struct ulp_process *process)
+{
+    struct ulp_thread *thread;
+    struct user_regs_struct context;
+
+    thread = process->threads;
+    context = thread->context;
+    context.rip = process->dynobj_libulp->global + 2;
+
+    if (run_and_redirect(thread->tid, &context,
+                         process->dynobj_libulp->loop))
+    {
+        WARN("error: unable to read global universe from thread %d.",
+             thread->tid);
+        return -1;
+    };
+
+    process->global_universe = context.rax;
+    return 0;
+}
+
+/* Returns the local universe counter for the THREAD-LIBRARY pair in
+ * PROCESS. The return value does not distinguish between successfull
+ * and erroneous reads, although an error messages gets printed.
+ */
+unsigned long read_local_universe (struct ulp_process *process,
+                                   struct ulp_dynobj *library,
+                                   struct ulp_thread *thread)
+{
+    struct user_regs_struct context;
+
+    context = thread->context;
+    context.rip = library->local + 2;
+
+    if (run_and_redirect(thread->tid, &context,
+                         process->dynobj_libulp->loop))
+      WARN("error: unable to read local universe from thread %d.",
+           thread->tid);
+
+    return context.rax;
+}
+
+/* For each pair of library and thread in PROCESS, reads its
+ * per-library, per-thread universe counter (only libraries that are
+ * live patchable are taken into account). Always returns 0.
+ */
+int read_local_universes (struct ulp_process *process)
+{
+  struct ulp_dynobj *library;
+  struct ulp_thread *thread;
+  struct thread_state *state;
+
+  library = process->dynobj_targets;
+  while (library) {
+    library->thread_states = NULL;
+    thread = process->threads;
+    while (thread) {
+      state = malloc (sizeof (struct thread_state));
+      state->tid = thread->tid;
+      state->universe = read_local_universe (process, library, thread);
+      state->next = library->thread_states;
+      library->thread_states = state;
+      thread = thread->next;
+    }
+    library = library->next;
+  }
+  return 0;
 }
 
 /* Restores the threads in PROCESS to their normal state, i.e. removes
@@ -984,7 +1075,7 @@ int check_patch_sanity(struct ulp_process *process)
     }
 
     /* check if the affected library is present in the process. */
-    for (d = process->dynobjs; d != NULL; d = d->next)
+    for (d = process->dynobj_targets; d != NULL; d = d->next)
     {
 	if (strcmp(d->filename, obj->name)==0) break;
     }
