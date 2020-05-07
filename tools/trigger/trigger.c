@@ -97,10 +97,16 @@ int main(int argc, char **argv)
     pid = atoi(argv[1]);
     livepatch = argv[2];
 
+    if (load_patch_info(livepatch))
+    {
+	WARN("Unable to load patch info.");
+	return 3;
+    }
+
     target.pid = pid;
 
     if (stop(pid)) return 3;
-    ret = initialize_data_structures(&target, livepatch);
+    ret = initialize_data_structures(&target);
     if (ret) {
       restart(pid);
       if (ret == EAGAIN) return EAGAIN;

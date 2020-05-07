@@ -392,17 +392,10 @@ struct link_map *parse_lib_dynobj(struct ulp_process *process,
     return link_map;
 }
 
-int initialize_data_structures(struct ulp_process *process,
-                               char *livepatch)
+int initialize_data_structures(struct ulp_process *process)
 {
     if (!process)
       return 1;
-
-    if (load_patch_info(livepatch))
-    {
-	WARN("Unable to load patch info.");
-	return 1;
-    }
 
     bfd_init();
 
