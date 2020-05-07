@@ -104,20 +104,17 @@ int main(int argc, char **argv)
     }
 
     target.pid = pid;
-
-    if (stop(pid)) return 3;
     ret = initialize_data_structures(&target);
     if (ret) {
-      restart(pid);
       if (ret == EAGAIN) return EAGAIN;
       else return 4;
     }
 
     /* verify if to-be-patched libs support libpulp */
-    if (check_patch_sanity(&target)) {
-      restart(pid);
+    if (check_patch_sanity(&target))
       return 5;
-    }
+
+    if (stop(pid)) return 3;
 
     if (hijack_threads(&target)) return 6;
 
