@@ -72,7 +72,7 @@ int patch_applied()
     if (run_and_redirect(t->tid, &context, target.dynobj_libulp->loop))
     {
 	WARN("error: unable to trig thread %d.", t->tid);
-	return 1;
+	return 2;
     };
 
     /* capture trigger return */
@@ -108,24 +108,14 @@ int main(int argc, char **argv)
     if (check_patch_sanity(&target))
       return 5;
 
-    if (stop(pid)) return 3;
-
     if (hijack_threads(&target)) return 6;
 
-    if (restart(pid)) return 7;
-
-    if (patch_applied())
-    {
-        patched = 1;
-    } else {
-        patched = 0;
-    }
-
-    if (stop(pid)) return 8;
+    if (patch_applied() == 1)
+      patched = 1;
+    else
+      patched = 0;
 
     if (restore_threads(&target)) return 9;
-
-    if (restart(pid)) return 10;
 
     return patched;
 }

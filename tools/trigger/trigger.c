@@ -90,7 +90,6 @@ int main(int argc, char **argv)
 {
     int pid;
     char *livepatch;
-    int patched = 0;
     int ret;
 
     if (check_args(argc, argv)) return 2;
@@ -114,21 +113,12 @@ int main(int argc, char **argv)
     if (check_patch_sanity(&target))
       return 5;
 
-    if (stop(pid)) return 3;
-
     if (hijack_threads(&target)) return 6;
-
-    if (restart(pid)) return 7;
 
     if (apply_patch(livepatch)) WARN("Apply patch to %d failed.", pid);
     else WARN("Patching %d succesful.", pid);
 
-    if (stop(pid)) return 8;
-
     if (restore_threads(&target)) return 9;
 
-    if (restart(pid)) return 10;
-
-    //WARN("Patching attempt finished.");
-    return patched;
+    return 0;
 }

@@ -417,6 +417,7 @@ int initialize_data_structures(struct ulp_process *process)
 
 int hijack_threads(struct ulp_process *process)
 {
+    int errors;
     struct ulp_thread *t;
     struct user_regs_struct context;
 
@@ -425,19 +426,27 @@ int hijack_threads(struct ulp_process *process)
 	return 1;
     }
 
+    if (stop(process->pid)) {
+	WARN("Hijack prologue failed (stop).");
+	return 1;
+    }
+
+    errors = 0;
     for (t = process->threads; t != NULL; t = t->next)
     {
 	if (attach(t->tid))
 	{
 	    WARN("Hijack %d failed (attach).", t->tid);
-	    return 2;
+	    errors = 1;
+	    break;
 	};
 
 	if (get_regs(t->tid, &t->context))
 	{
 	    WARN("Hijack %d failed (get_regs).", t->tid);
 	    detach(t->tid);
-	    return 3;
+	    errors = 1;
+	    break;
 	};
 
 	context = t->context;
@@ -447,17 +456,24 @@ int hijack_threads(struct ulp_process *process)
 	{
 	    WARN("Hijack %d failed (set_regs).", t->tid);
 	    detach (t->tid);
-	    return 4;
+	    errors = 1;
+	    break;
 	};
 
 	if (detach(t->tid))
 	{
 	    WARN("Hijack %d failed (detach).", t->tid);
-	    return 5;
+	    errors = 1;
+	    break;
 	};
     }
 
-    return 0;
+    if (restart(process->pid)) {
+	WARN("Hijack epilogue failed (restart).");
+	return 1;
+    }
+
+    return errors;
 }
 
 int set_id_buffer(struct ulp_process *process, unsigned char *patch_id)
@@ -524,28 +540,48 @@ int set_path_buffer(struct ulp_process *process, char *path)
 
 int restore_threads(struct ulp_process *process)
 {
+    int errors;
     struct ulp_thread *t;
 
+    if (!process->dynobj_libulp->loop) {
+	WARN("error: loop not found.");
+	return 1;
+    }
+
+    if (stop(process->pid)) {
+	WARN("Hijack prologue failed (stop).");
+	return 1;
+    }
+
+    errors = 0;
     for (t = process->threads; t != NULL; t = t->next)
     {
 	if (attach(t->tid))
 	{
 	    WARN("Restore threads error (can't attach).");
-	    return 1;
+	    errors = 1;
+            break;
 	};
 	if (set_regs(t->tid, &t->context))
 	{
 	    WARN("Restore threads error (can't set regs).");
-	    return 2;
+	    errors = 1;
+            break;
 	};
 	if (detach(t->tid))
 	{
 	    WARN("Restore threads error (can't detatch).");
-	    return 3;
+	    errors = 1;
+            break;
 	};
     }
 
-    return 0;
+    if (restart(process->pid)) {
+	WARN("Hijack epilogue failed (restart).");
+	return 1;
+    }
+
+    return errors;
 }
 
 int load_patch_info(char *livepatch)
