@@ -538,6 +538,54 @@ int set_path_buffer(struct ulp_process *process, char *path)
     return 0;
 }
 
+int patch_applied(struct ulp_process *process, unsigned char *patch_id)
+{
+    struct ulp_thread *thread;
+    struct user_regs_struct context;
+
+    if (set_id_buffer(process, patch_id)) return 2;
+
+    thread = process->threads;
+    context = thread->context;
+    context.rip = process->dynobj_libulp->check + 2;
+
+    if (run_and_redirect(thread->tid, &context,
+			 process->dynobj_libulp->loop))
+    {
+	WARN("error: unable to trig thread %d.", thread->tid);
+	return 2;
+    };
+
+    return context.rax;
+}
+
+int apply_patch(struct ulp_process *process, char *metadata)
+{
+    struct ulp_thread *thread;
+    struct user_regs_struct context;
+
+    if (set_path_buffer(process, metadata)) return 1;
+
+    thread = process->threads;
+    context = thread->context;
+    context.rip = process->dynobj_libulp->trigger + 2;
+
+    if (run_and_redirect(thread->tid, &context,
+			 process->dynobj_libulp->loop))
+    {
+	WARN("error: unable to trig thread %d.", thread->tid);
+	return 1;
+    };
+
+    if (!context.rax)
+    {
+	WARN("apply patch error: patch not applied.");
+	return 1;
+    }
+
+    return 0;
+}
+
 int restore_threads(struct ulp_process *process)
 {
     int errors;

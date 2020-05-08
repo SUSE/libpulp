@@ -95,6 +95,10 @@ int set_id_buffer(struct ulp_process *process, unsigned char *patch_id);
 
 int set_path_buffer(struct ulp_process *process, char *path);
 
+int patch_applied(struct ulp_process *process, unsigned char *patch_id);
+
+int apply_patch(struct ulp_process *process, char *metadata);
+
 int restore_threads(struct ulp_process *process);
 
 int load_patch_info(char *livepatch);

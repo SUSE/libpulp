@@ -32,7 +32,6 @@
 #include <fcntl.h>
 #include <sys/user.h>
 
-#include "ptrace.h"
 #include "introspection.h"
 #include "../../include/ulp_common.h"
 
@@ -50,36 +49,6 @@ int check_args(int argc, char *argv[])
     if (strlen(argv[2]) > ULP_PATH_LEN)
     {
 	WARN("livepatch path is limited to %d bytes.", ULP_PATH_LEN);
-	return 2;
-    }
-
-    return 0;
-}
-
-int apply_patch(char *path)
-{
-    struct ulp_thread *t;
-    struct user_regs_struct context;
-    int patched;
-
-    t = target.threads;
-    if (set_path_buffer(&target, path)) return 2;
-
-    /* redirect control-flow to trigger */
-    context = t->context;
-    context.rip = target.dynobj_libulp->trigger + 2;
-
-    if (run_and_redirect(t->tid, &context, target.dynobj_libulp->loop))
-    {
-	WARN("error: unable to trig thread %d.", t->tid);
-	return 1;
-    };
-
-    /* capture trigger return */
-    patched = context.rax;
-    if (!patched)
-    {
-	WARN("apply patch error: patch not applied.");
 	return 2;
     }
 
@@ -115,8 +84,10 @@ int main(int argc, char **argv)
 
     if (hijack_threads(&target)) return 6;
 
-    if (apply_patch(livepatch)) WARN("Apply patch to %d failed.", pid);
-    else WARN("Patching %d succesful.", pid);
+    if (apply_patch(&target, livepatch))
+      WARN("Apply patch to %d failed.", pid);
+    else
+      WARN("Patching %d succesful.", pid);
 
     if (restore_threads(&target)) return 9;
 

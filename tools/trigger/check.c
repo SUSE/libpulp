@@ -32,7 +32,6 @@
 #include <fcntl.h>
 #include <sys/user.h>
 
-#include "ptrace.h"
 #include "introspection.h"
 #include "../../include/ulp_common.h"
 
@@ -54,30 +53,6 @@ int check_args(int argc, char *argv[])
     }
 
     return 0;
-}
-
-int patch_applied()
-{
-    struct ulp_thread *t;
-    struct user_regs_struct context;
-    int patched;
-
-    t = target.threads;
-    if (set_id_buffer(&target, ulp.patch_id)) return 2;
-
-    /* redirect control-flow to trigger */
-    context = t->context;
-    context.rip = target.dynobj_libulp->check + 2;
-
-    if (run_and_redirect(t->tid, &context, target.dynobj_libulp->loop))
-    {
-	WARN("error: unable to trig thread %d.", t->tid);
-	return 2;
-    };
-
-    /* capture trigger return */
-    patched = context.rax;
-    return patched;
 }
 
 int main(int argc, char **argv)
@@ -110,7 +85,7 @@ int main(int argc, char **argv)
 
     if (hijack_threads(&target)) return 6;
 
-    if (patch_applied() == 1)
+    if (patch_applied(&target, ulp.patch_id) == 1)
       patched = 1;
     else
       patched = 0;
