@@ -21,6 +21,32 @@
  *  Author: Joao Moreira <jmoreira@suse.de>
  */
 
+/* Usage
+ *
+ * Information about live-patchable processes can be collected with the
+ * help of a couple of functions from this introspection library.
+ * Typically, an introspecting program will perform the following
+ * operations:
+ *
+ *   1. Initialize a livepatch object by reading a livepatch metadata
+ *      file with load_patch_info();
+ *   2. Allocate space for a ulp_process structure and set its pid
+ *      member to the pid of the process it wants to instropect into
+ *   3. Initialize this object by calling initialize_data_structures();
+ *   4. Verify, with check_patch_sanity(), that the livepatch and the
+ *      process make sense together, i.e. that the livepatch is for a
+ *      library that has been dynamically loaded by the process.
+ *   5. Hijack the threads of the process with hijack_threads();
+ *   6. Call one or more of the critical section routines:
+ *        High-level routines:
+ *          - apply_patch() to apply a live patch.
+ *          - patch_applied() to verify if a live patch is applied.
+ *        Low-level routines (typically only used within this library):
+ *          - set_id_buffer()
+ *          - set_path_buffer()
+ *   7. Restore the threads of the process with restore_threads();
+ */
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
@@ -40,6 +66,9 @@
 
 struct ulp_metadata ulp;
 
+/* Opens the file from which OBJ has been dynamically loaded and parses
+ * its symtab (the parsed information gets stored in OBJ itself)
+ * */
 int parse_file_symtab(struct ulp_dynobj *obj, char needed)
 {
     bfd *file;
@@ -74,6 +103,10 @@ int parse_file_symtab(struct ulp_dynobj *obj, char needed)
     return 0;
 }
 
+/* Parses the _DYNAMIC section of PROCESS, finds the DT_DEBUG entry,
+ * from which the address of the chain of dynamically loaded objects
+ * (link map) can be found, then reads it and stores it in PROCESS.
+ */
 int dig_main_link_map(struct ulp_process *process)
 {
     Elf64_Addr dyn_addr = 0, link_map, link_map_addr, r_debug = 0;
@@ -138,6 +171,9 @@ int dig_main_link_map(struct ulp_process *process)
     return 0;
 }
 
+/* Builds a list of the threads of PROCESS, which must have been
+ * initialized with the pid of the desired process in PROCESS->pid.
+ */
 int parse_threads(struct ulp_process *process)
 {
     struct ulp_thread *t, *prev_t;
@@ -193,6 +229,9 @@ int parse_threads(struct ulp_process *process)
     return 0;
 }
 
+/* Looks for a symbol named SYM in OBJ. If the symbols gets found,
+ * returns its address. Otherwise, returns 0.
+ */
 Elf64_Addr get_loaded_symbol_addr(struct ulp_dynobj *obj, char *sym)
 {
     int i;
@@ -211,6 +250,9 @@ Elf64_Addr get_loaded_symbol_addr(struct ulp_dynobj *obj, char *sym)
     return sym_addr;
 }
 
+/* Calculates the load bias of PROCESS, i.e. the difference between the
+ * adress of _start in the elf file and in memory. Returns 0 on success.
+ */
 int dig_load_bias(struct ulp_process *process)
 {
     int auxv, i;
@@ -271,6 +313,10 @@ int dig_load_bias(struct ulp_process *process)
     return 0;
 }
 
+/* Collects information about the main executable of PROCESS. Collected
+ * information includes: the program symtab, load bias, and address of
+ * the chain of loaded objects. On success, returns 0.
+ */
 int parse_main_dynobj(struct ulp_process *process)
 {
     struct ulp_dynobj *obj;
@@ -296,6 +342,12 @@ int parse_main_dynobj(struct ulp_process *process)
     return 0;
 }
 
+/* Iterates over all objects that have been dynamically loaded into
+ * PROCESS, parsing and sorting them into appropriate lists (for
+ * instance, libulp.so will be stored into PROCESS->dynobj_libulp.
+ * Returns 0, on success. If libulp has not been found among the
+ * dynamically loaded objects, returns 1.
+ */
 int parse_libs_dynobj(struct ulp_process *process)
 {
   struct link_map *obj_link_map, *aux_link_map;
@@ -321,6 +373,20 @@ int parse_libs_dynobj(struct ulp_process *process)
   return 0;
 }
 
+/* Attach into PROCESS, then reads the link_map structure pointed to by
+ * LINK_MAP_ADDR, which contains information about a dynamically loaded
+ * object, such as the name of the file from which it has been loaded.
+ * Opens such file and parses its symtab to look for relevant symbols,
+ * then, based on the symbols found, adds a new ulp_dynobj object into
+ * the appropriate list in PROCESS.
+ *
+ * This function is supposed to be called multiple times, normally by
+ * parse_libs_dynobj(), so that all objects that have been dynamically
+ * loaded into PROCESS are parsed and sorted.
+ *
+ * On success, returns the link_map that has been read from the attached
+ * PROCESS. Otherwise, returns NULL.
+ */
 struct link_map *parse_lib_dynobj(struct ulp_process *process,
                                   struct link_map *link_map_addr)
 {
@@ -392,6 +458,16 @@ struct link_map *parse_lib_dynobj(struct ulp_process *process,
     return link_map;
 }
 
+/* Collects multiple pieces of information about PROCESS, so that it can
+ * be introspected. Collected information includes: list of threads;
+ * list of dynamically loaded objects, including the main executable;
+ * and addresses of required symbols.
+ *
+ * PROCESS cannot be NULL and PROCESS->pid must have been previously
+ * initialized with the pid of the desired process.
+ *
+ * On success, returns 0.
+ */
 int initialize_data_structures(struct ulp_process *process)
 {
     if (!process)
@@ -415,6 +491,12 @@ int initialize_data_structures(struct ulp_process *process)
     return 0;
 }
 
+/* Puts the threads in PROCESS into an infinite loop, so that other
+ * introspection routines, e.g. set_id_buffer() and set_path_buffer(),
+ * can be used. On success, returns 0.
+ *
+ * NOTE: this function marks the beginning of the critical section.
+ */
 int hijack_threads(struct ulp_process *process)
 {
     int errors;
@@ -476,6 +558,13 @@ int hijack_threads(struct ulp_process *process)
     return errors;
 }
 
+/* Jacks into PROCESS and writes PATCH_ID into libulp's
+ * '__ulp_path_buffer'. This operation is a pre-condition to check if a
+ * live patch is applied. On success, returns 0.
+ *
+ * WARNING: this function is in the critical section, so it can only be
+ * called after successful thread hijacking.
+ */
 int set_id_buffer(struct ulp_process *process, unsigned char *patch_id)
 {
     struct ulp_thread *thread;
@@ -509,7 +598,13 @@ int set_id_buffer(struct ulp_process *process, unsigned char *patch_id)
     return 0;
 }
 
-
+/* Jacks into PROCESS and writes PATH into libulp's '__ulp_path_buffer'.
+ * This operation is a pre-condition to apply a new live patch. On
+ * success, returns 0.
+ *
+ * WARNING: this function is in the critical section, so it can only be
+ * called after successful thread hijacking.
+ */
 int set_path_buffer(struct ulp_process *process, char *path)
 {
     struct ulp_thread *thread;
@@ -538,6 +633,13 @@ int set_path_buffer(struct ulp_process *process, char *path)
     return 0;
 }
 
+/* Jacks into PROCESS and checks if the live patch with PATCH_ID has
+ * already been applied. Returns 1 if it has and 0 it if hasn't.
+ * On error, returns 2.
+ *
+ * WARNING: this function is in the critical section, so it can only be
+ * called after successful thread hijacking.
+ */
 int patch_applied(struct ulp_process *process, unsigned char *patch_id)
 {
     struct ulp_thread *thread;
@@ -559,6 +661,12 @@ int patch_applied(struct ulp_process *process, unsigned char *patch_id)
     return context.rax;
 }
 
+/* Jacks into PROCESS and installs the live patch pointed to by the
+ * METADATA file. Returns 0 on success, and 1 otherwise.
+ *
+ * WARNING: this function is in the critical section, so it can only be
+ * called after successful thread hijacking.
+ */
 int apply_patch(struct ulp_process *process, char *metadata)
 {
     struct ulp_thread *thread;
@@ -586,6 +694,12 @@ int apply_patch(struct ulp_process *process, char *metadata)
     return 0;
 }
 
+/* Restores the threads in PROCESS to their normal state, i.e. removes
+ * them from the infinite loop, into which they have been put by a
+ * previous call to hijack_threads(). On success, returns 0.
+ *
+ * NOTE: this function marks the end of the critical section.
+ */
 int restore_threads(struct ulp_process *process)
 {
     int errors;
@@ -632,6 +746,10 @@ int restore_threads(struct ulp_process *process)
     return errors;
 }
 
+/* Takes LIVEPATCH as a path to a livepatch metadata file, opens it,
+ * parses the data, and fills the global variable 'ulp'. On Success,
+ * returns 0.
+ */
 int load_patch_info(char *livepatch)
 {
     uint32_t c;
@@ -838,6 +956,13 @@ int load_patch_info(char *livepatch)
     return 0;
 }
 
+/* Checks if the livepatch parsed into the global variable 'ulp' is
+ * suitable to be applied to PROCESS. Returns 0 if it is. Otherwise,
+ * prints warning messages and returns any other integer.
+ *
+ * Before calling this function, the global variable 'ulp' should have
+ * been initialized, typically by calling load_patch_info().
+ */
 int check_patch_sanity(struct ulp_process *process)
 {
     struct ulp_object *obj;
@@ -858,11 +983,11 @@ int check_patch_sanity(struct ulp_process *process)
 	return 2;
     }
 
+    /* check if the affected library is present in the process. */
     for (d = process->dynobjs; d != NULL; d = d->next)
     {
 	if (strcmp(d->filename, obj->name)==0) break;
     }
-
     if (!d)
     {
 	WARN("to be patched object (%s) not loaded.", obj->name);
