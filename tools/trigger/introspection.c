@@ -40,7 +40,7 @@
 
 struct ulp_metadata ulp;
 
-int parse_file_symtab(ulp_dynobj *obj, char needed)
+int parse_file_symtab(struct ulp_dynobj *obj, char needed)
 {
     bfd *file;
     int symtab_len;

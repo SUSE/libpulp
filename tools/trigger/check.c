@@ -36,7 +36,7 @@
 #include "introspection.h"
 #include "../../include/ulp_common.h"
 
-ulp_process target;
+struct ulp_process target;
 struct ulp_metadata ulp;
 
 int check_args(int argc, char *argv[])

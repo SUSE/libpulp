@@ -70,12 +70,7 @@ struct ulp_addresses
     Elf64_Addr state;
 };
 
-typedef struct ulp_process ulp_process;
-typedef struct ulp_thread ulp_threads;
-typedef struct ulp_dynobj ulp_dynobj;
-typedef struct ulp_addresses ulp_addresses;
-
-int parse_file_symtab(ulp_dynobj *obj, char needed);
+int parse_file_symtab(struct ulp_dynobj *obj, char needed);
 
 int dig_main_link_map(struct ulp_process *process);
 

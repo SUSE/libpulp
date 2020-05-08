@@ -33,8 +33,6 @@
 #include "introspection.h"
 #include "ptrace.h"
 
-extern ulp_process target;
-
 /* Memory read/write helper functions */
 int write_byte(char byte, int pid, Elf64_Addr addr)
 {
