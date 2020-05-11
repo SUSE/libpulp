@@ -347,6 +347,7 @@ struct link_map *parse_lib_dynobj(struct link_map *link_map_addr)
 	return NULL;
     }
 
+    libname = calloc(PATH_MAX, 1);
     if (read_string(&libname, target.pid, (Elf64_Addr) link_map->l_name))
     {
 	WARN("error reading link_map string.");
