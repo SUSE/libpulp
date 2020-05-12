@@ -463,7 +463,6 @@ int initialize_data_structures(int pid, char *livepatch)
     if (read_memory((char *) &ulp_state, sizeof(ulp_state), pid,
                     addr.state)
         || ulp_state.load_state == 0) {
-      restart(pid);
       return EAGAIN;
     }
 
