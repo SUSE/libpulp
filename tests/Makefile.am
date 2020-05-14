@@ -35,7 +35,7 @@ POST_PROCESS = .libs/libdozens.post \
                .libs/libdozens_bsymbolic.post \
                .libs/libhundreds_bsymbolic.post
 
-# More target libraries
+# Target libraries to test function parameters
 check_LTLIBRARIES += libparameters.la
 noinst_HEADERS += libparameters.h
 
@@ -45,12 +45,23 @@ libparameters_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
 POST_PROCESS += .libs/libparameters.post
 
+# Target libraries to test live patches blocked in threads
+check_LTLIBRARIES += libblocked.la
+noinst_HEADERS += libblocked.h
+
+libblocked_la_SOURCES = libblocked.c $(TARGET_TRM_SOURCES)
+libblocked_la_CFLAGS = $(TARGET_CFLAGS)
+libblocked_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
+
+POST_PROCESS += .libs/libblocked.post
+
 # Live patches
 check_LTLIBRARIES += libdozens_livepatch1.la \
                      libhundreds_livepatch1.la \
                      libdozens_bsymbolic_livepatch1.la \
                      libhundreds_bsymbolic_livepatch1.la \
-                     libparameters_livepatch1.la
+                     libparameters_livepatch1.la \
+                     libblocked_livepatch1.la
 
 libdozens_livepatch1_la_SOURCES = libdozens_livepatch1.c
 libdozens_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
@@ -67,6 +78,9 @@ libhundreds_bsymbolic_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 libparameters_livepatch1_la_SOURCES = libparameters_livepatch1.c
 libparameters_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
+libblocked_livepatch1_la_SOURCES = libblocked_livepatch1.c
+libblocked_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
+
 METADATA = \
   libdozens_livepatch1.dsc \
   libdozens_livepatch1.ulp \
@@ -82,20 +96,24 @@ METADATA = \
   libhundreds_bsymbolic_livepatch1.rev \
   libparameters_livepatch1.dsc \
   libparameters_livepatch1.ulp \
-  libparameters_livepatch1.rev
+  libparameters_livepatch1.rev \
+  libblocked_livepatch1.dsc \
+  libblocked_livepatch1.ulp \
+  libblocked_livepatch1.rev
 
 EXTRA_DIST = \
   libdozens_livepatch1.in \
   libhundreds_livepatch1.in \
   libdozens_bsymbolic_livepatch1.in \
   libhundreds_bsymbolic_livepatch1.in \
-  libparameters_livepatch1.in
+  libparameters_livepatch1.in \
+  libblocked_livepatch1.in
 
 clean-local:
 	rm -f $(METADATA)
 
 # Test programs
-check_PROGRAMS = numserv numserv_bsymbolic parameters
+check_PROGRAMS = numserv numserv_bsymbolic parameters blocked
 
 numserv_SOURCES = numserv.c
 numserv_LDADD = libdozens.la libhundreds.la
@@ -109,7 +127,12 @@ parameters_SOURCES = parameters.c
 parameters_LDADD = libparameters.la
 parameters_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
-TESTS = numserv.py numserv_bsymbolic.py parameters.py
+blocked_SOURCES = blocked.c
+blocked_CFLAGS = -pthread
+blocked_LDADD = libblocked.la
+blocked_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
+
+TESTS = numserv.py numserv_bsymbolic.py parameters.py blocked.py
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON)
 
