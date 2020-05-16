@@ -113,7 +113,7 @@ clean-local:
 	rm -f $(METADATA)
 
 # Test programs
-check_PROGRAMS = numserv numserv_bsymbolic parameters blocked
+check_PROGRAMS = numserv numserv_bsymbolic parameters blocked deadlock
 
 numserv_SOURCES = numserv.c
 numserv_LDADD = libdozens.la libhundreds.la
@@ -132,7 +132,20 @@ blocked_CFLAGS = -pthread
 blocked_LDADD = libblocked.la
 blocked_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
-TESTS = numserv.py numserv_bsymbolic.py parameters.py blocked.py
+deadlock_SOURCES = deadlock.c
+deadlock_CFLAGS = -pthread
+deadlock_LDADD = libblocked.la
+deadlock_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
+
+TESTS = \
+  numserv.py \
+  numserv_bsymbolic.py \
+  parameters.py \
+  blocked.py \
+  deadlock.py
+
+XFAIL_TESTS = deadlock.py
+
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON)
 
