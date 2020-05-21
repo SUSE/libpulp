@@ -1,6 +1,7 @@
 lib_LTLIBRARIES = libulp.la
 
-libulp_la_SOURCES = ulp.c ulp_prologue.S ulp_interface.S
+libulp_la_SOURCES = ulp.c alloc.c ulp_prologue.S ulp_interface.S
+libulp_la_CFLAGS = -I$(top_srcdir)/include
 libulp_la_LDFLAGS = -ldl
 
 EXTRA_DIST = trm.S
@@ -16,3 +17,11 @@ install-exec-local: trm.o
 
 uninstall-local:
 	rm -f $(DESTDIR)/$(libdir)/trm.o
+
+check_PROGRAMS = test-alloc
+
+test_alloc_SOURCES = test-alloc.c
+test_alloc_CFLAGS = -I$(top_srcdir)/include
+test_alloc_LDADD = libulp.la
+
+TESTS = test-alloc
