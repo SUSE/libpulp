@@ -229,48 +229,48 @@ struct ulp_metadata *load_metadata()
 
 int parse_metadata(struct ulp_metadata *ulp)
 {
-    FILE *file;
+    int fd;
+    ssize_t ret;
     uint32_t c;
     uint32_t i, j;
     struct ulp_object *obj;
     struct ulp_unit *unit, *prev_unit = NULL;
     struct ulp_dependency *dep, *prev_dep = NULL;
 
-    file = fopen(__ulp_path_buffer, "rb");
-    if (!file) {
+    fd = open(__ulp_path_buffer, O_RDONLY);
+    if (fd == -1) {
 	WARN("Unable to open metadata file: %s.", __ulp_path_buffer);
 	return 0;
     }
 
-    /* read metadata header information */
     ulp->objs = NULL;
 
-    if (fread(&ulp->type, sizeof(uint8_t), 1, file) < 1) {
-	WARN("Unable to read patch type.");
-	return 0;
-    }
+#define READ(from, to, count) \
+   ret = read(from, to, count); \
+   if (ret == -1) { \
+     WARN("Unable to read() to " #to); \
+     return 0; \
+   } \
+   if (ret < (ssize_t) (count)) { \
+     WARN("Not enough data to read() to " #to); \
+     return 0; \
+   }
 
-    if (fread(&ulp->patch_id, sizeof(char), 32, file) < 32) {
-	WARN("Unable to read patch id.");
-	return 0;
-    }
+    /* read metadata header information */
+    READ (fd, &ulp->type, 1 * sizeof(uint8_t));
+    READ (fd, &ulp->patch_id, 32 * sizeof(char));
 
     /* if this is a patch revert, we don't need extra information */
     if (ulp->type == 2) return 2;
 
-    if (fread(&c, sizeof(uint32_t), 1, file) < 1) {
-	WARN("Unable to read so filename length.");
-	return 0;
-    }
+    /* read livepatch DSO filename */
+    READ (fd, &c, 1 * sizeof(uint32_t));
     ulp->so_filename = ulp_scratch_alloc((c + 1) * sizeof(char));
     if (!ulp->so_filename) {
 	WARN("Unable to allocate so filename buffer.");
 	return 0;
     }
-    if (fread(ulp->so_filename, sizeof(char), c, file) < c) {
-	WARN("Unable to read so filename first.");
-	return 0;
-    }
+    READ (fd, ulp->so_filename, c * sizeof(char));
 
     obj = ulp_scratch_alloc(sizeof(struct ulp_object));
     if (!obj) {
@@ -279,27 +279,22 @@ int parse_metadata(struct ulp_metadata *ulp)
     }
     obj->units = NULL;
 
-    if (fread(&c, sizeof(uint32_t), 1, file) < 1) {
-	WARN("Unable to read build id length (ulp).");
-	return 0;
-    }
+    /* read the length of the target library's build-id */
+    READ (fd, &c, 1 * sizeof(uint32_t));
     obj->build_id_len = c;
 
+    /* read the build-id of the target library */
     obj->build_id = ulp_scratch_alloc(c * sizeof(char));
     if (!obj->build_id) {
 	WARN("Unable to allocate build id buffer.");
 	return 0;
     }
-    if (fread(obj->build_id, sizeof(char), c, file) < c) {
-	WARN("Unable to read build id (ulp).");
-	return 0;
-    }
+    READ (fd, obj->build_id, c * sizeof(char));
     obj->build_id_check = 0;
 
-    if (fread(&c, sizeof(uint32_t), 1, file) < 1) {
-	WARN("Unable to read object name length.");
-	return 0;
-    }
+    /* read the length of the target library's name */
+    READ (fd, &c, 1 * sizeof(uint32_t));
+
     ulp->objs = obj;
 
     /* shared object: fill data + read patching units */
@@ -308,15 +303,10 @@ int parse_metadata(struct ulp_metadata *ulp)
 	WARN("Unable to allocate object name buffer.");
 	return 0;
     }
-    if (fread(obj->name, sizeof(char), c, file) < c) {
-	WARN("Unable to read object name.");
-	return 0;
-    }
+    READ (fd, obj->name, c * sizeof(char));
 
-    if (fread(&obj->nunits, sizeof(uint32_t), 1, file) < 1) {
-	WARN("Unable to read number of patching units.");
-	return 0;
-    }
+    /* read the number of patching units */
+    READ (fd, &obj->nunits, 1 * sizeof(uint32_t));
 
     /* read all patching units for object */
     for (j = 0; j < obj->nunits; j++) {
@@ -326,39 +316,28 @@ int parse_metadata(struct ulp_metadata *ulp)
 	    return 0;
 	}
 
-	if (fread(&c, sizeof(uint32_t), 1, file) < 1) {
-	    WARN("Unable to read unit old function name length.");
-	    return 0;
-	}
+	/* read the name of the old function in this unit */
+	READ (fd, &c, 1 * sizeof(uint32_t));
 	unit->old_fname = ulp_scratch_alloc((c + 1) * sizeof(char));
 	if (!unit->old_fname) {
 	    WARN("Unable to allocate unit old function name buffer.");
 	    return 0;
 	}
-	if (fread(unit->old_fname, sizeof(char), c, file) < c) {
-	    WARN("Unable to read unit old function name.");
-	    return 0;
-	}
+	READ (fd, unit->old_fname, c * sizeof(char));
 
-	if (fread(&c, sizeof(uint32_t), 1, file) < 1) {
-	    WARN("Unable to read unit new function name length.");
-	    return 0;
-	}
+	/* read the name of the new function in this unit */
+	READ (fd, &c, 1 * sizeof(uint32_t));
 	unit->new_fname = ulp_scratch_alloc((c + 1) * sizeof(char));
 	if (!unit->new_fname) {
 	    WARN("Unable to allocate unit new function name buffer.");
 	    return 0;
 	}
-	if (fread(unit->new_fname, sizeof(char), c, file) < c) {
-	    WARN("Unable to read unit new function name.");
-	    return 0;
-	}
+	READ (fd, unit->new_fname, c * sizeof(char));
 
-	if (fread(&unit->old_faddr, sizeof(void *), 1, file) < 1) {
-	    WARN("Unable to read old function address.");
-	    return 0;
-	}
+	/* read the address of the old function in this unit */
+	READ (fd, &unit->old_faddr, 1 * sizeof(void *));
 
+	/* update the list of units */
 	if (obj->units) {
 	    prev_unit->next = unit;
 	} else {
@@ -367,22 +346,17 @@ int parse_metadata(struct ulp_metadata *ulp)
 	prev_unit = unit;
     }
 
-    /* read dependencies */
-    if (fread(&c, sizeof(uint32_t), 1, file) < 1) {
-	WARN("Unable to read number of dependencies.");
-	return 0;
-    }
+    /* read number of dependencies */
+    READ (fd, &c, 1 * sizeof(uint32_t));
 
+    /* read all dependencies */
     for (i = 0; i < c; i++) {
 	dep = ulp_scratch_alloc(sizeof(struct ulp_dependency));
 	if (!dep) {
 	    WARN("Unable to allocate memory for dependency state.");
 	    return 0;
 	}
-	if (fread(&dep->dep_id, sizeof(char), 32, file) < 32) {
-	    WARN("Unable to read dependency patch id.");
-	    return 0;
-	}
+	READ (fd, &dep->dep_id, 32 * sizeof(char));
 	if (ulp->deps) {
 	    prev_dep->next = dep;
 	} else {
@@ -390,8 +364,9 @@ int parse_metadata(struct ulp_metadata *ulp)
 	}
 	prev_dep = dep;
     }
+#undef READ
 
-    fclose(file);
+    close(fd);
     if(!check_patch_sanity(ulp)) return 0;
     if(!load_so_handlers(ulp)) return 0;
 
