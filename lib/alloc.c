@@ -6,6 +6,7 @@
 # define INFO(...)
 #endif
 
+#include <errno.h>
 #include <strings.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -33,6 +34,82 @@ __attribute__ ((constructor)) void ulp_alloc_constructor(void)
 }
 
 /*
+ * Initializes the semaphores of the default and scratch arenas. Should
+ * be called during program startup, but only once, because calling
+ * sem_init on an already initialized semaphore invokes undefined
+ * behavior. Returns 0 on success and 1 on error.
+ */
+int
+ulp_arena_init (void)
+{
+  int ret;
+  struct ulp_arena *arena;
+
+  arena = get_default_arena ();
+  ret = sem_init (&arena->semaphore, 0, 1);
+  if (ret) {
+    perror ("Unable to initialize default arena semaphore.");
+    return 1;
+  }
+
+  arena = get_scratch_arena ();
+  ret = sem_init (&arena->semaphore, 0, 1);
+  if (ret) {
+    perror ("Unable to initialize scratch arena semaphore.");
+    return 1;
+  }
+
+  return 0;
+}
+
+/*
+ * Tries to acquire the lock on both arenas. This function returns
+ * immediately (does not block). Returns 0 on success, which means that
+ * both arenas are locked by the calling thread. Otherwise, return 1 and
+ * release any locks it has acquired in the process.
+ */
+int
+ulp_arena_trylock (void)
+{
+  struct ulp_arena *default_arena;
+  struct ulp_arena *scratch_arena;
+
+  default_arena = get_default_arena ();
+  scratch_arena = get_scratch_arena ();
+
+  /* Try to acquire the lock to the default arena. */
+  if (sem_trywait (&default_arena->semaphore))
+    return 1;
+
+  /*
+   * Try to acquire the lock to the scratch arena. If it fails, restore
+   * the lock it just acquired on the default arena.
+   */
+  if (sem_trywait (&scratch_arena->semaphore)) {
+    sem_post (&default_arena->semaphore);
+    return 1;
+  }
+
+  return 0;
+}
+
+/* Unlocks the semaphores to both ulp arenas. Always returns 0. */
+int
+ulp_arena_unlock (void)
+{
+  struct ulp_arena *default_arena;
+  struct ulp_arena *scratch_arena;
+
+  default_arena = get_default_arena ();
+  scratch_arena = get_scratch_arena ();
+
+  sem_post (&default_arena->semaphore);
+  sem_post (&scratch_arena->semaphore);
+
+  return 0;
+}
+
+/*
  * Allocates SIZE bytes of memory within the ulp arena pointed to by
  * ARENA, which cannot be NULL.
  *
@@ -53,11 +130,22 @@ void *
 ulp_alloc (struct ulp_arena *arena, int size, void **base, long *offset)
 {
   int i;
+  int value;
   void *new;
   struct ulp_heap *heap;
 
   if (arena == NULL)
     return NULL;
+
+  /* Check for arena lock. */
+  if (sem_getvalue (&arena->semaphore, &value)) {
+    perror ("Unable to read current arena semaphore.");
+    return NULL;
+  }
+  if (value != 0) {
+    INFO ("Trying to allocate memory without holding a lock.");
+    return NULL;
+  }
 
   if (size > arena->page_size) {
     INFO ("Cannot allocate more bytes than fit on a single page.");
@@ -188,11 +276,22 @@ ulp_scratch_alloc (int size)
 int
 ulp_clear_arena (struct ulp_arena *arena)
 {
+  int value;
   int i;
   struct ulp_heap *heap;
 
   if (arena == NULL)
     return 1;
+
+  /* Check for arena lock. */
+  if (sem_getvalue (&arena->semaphore, &value)) {
+    perror ("Unable to read current arena semaphore.");
+    return 1;
+  }
+  if (value != 0) {
+    INFO ("Trying to clear arena without holding a lock.");
+    return 1;
+  }
 
   for (i = 0; i < arena->available_heaps; i++) {
     heap = &arena->heaps[i];

@@ -67,6 +67,18 @@ extern void __ulp_prologue();
 
 __attribute__ ((constructor)) void begin(void)
 {
+    /*
+     * Initialize the semaphores of the internal allocator, but since
+     * calling sem_init on an already initialized semaphore invokes
+     * undefined-behaviour, do it only once.
+     */
+    if (__ulp_state.load_state == 0)
+      ulp_arena_init ();
+
+    /*
+     * Write to __ulp_state.load_state to signal to external process
+     * that this constructor has already been executed.
+     */
     __ulp_state.load_state = 1;
     fprintf(stderr, "libpulp loaded...\n");
 }
@@ -74,11 +86,26 @@ __attribute__ ((constructor)) void begin(void)
 /* libpulp interfaces for livepatch trigger */
 int __ulp_apply_patch()
 {
+    int ret = 0;
+
+    /* Try to acquire the lock to the semaphores. */
+    if (ulp_arena_trylock ()) {
+	WARN("Patch not applied (unable to get arena locks)");
+	return 1;
+    }
+
+    /* Try to apply the live patch. */
     if (!load_patch()) {
 	WARN("Patch not applied");
-	return 0;
+	ret = 0;
     }
-    return 1;
+    else
+	ret = 1;
+
+    /* Release the lock on the semaphores. */
+    ulp_arena_unlock ();
+
+    return ret;
 }
 
 void __ulp_print()
@@ -93,11 +120,25 @@ void * __ulp_get_path_buffer_addr()
 
 int __ulp_check_applied_patch()
 {
+    int ret;
     struct ulp_applied_patch *patch;
 
+    /* Try to acquire the lock to the semaphores. */
+    if (ulp_arena_trylock ()) {
+	WARN("Patch not checked (unable to get arena locks)");
+	return 2;
+    }
+
     patch = ulp_get_applied_patch(__ulp_metadata_ref->patch_id);
-    if (patch) return 1;
-    else return 0;
+    if (patch)
+	ret = 1;
+    else
+	ret = 0;
+
+    /* Release the lock on the semaphores. */
+    ulp_arena_unlock ();
+
+    return ret;
 }
 
 unsigned long __ulp_get_global_universe_value()
