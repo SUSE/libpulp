@@ -27,6 +27,15 @@
 .section .text,"ax",@progbits
 
 .align  8
+__ulp_testlocks:
+    nop
+    nop
+    push    %rsp
+    and     $0xfffffffffffffff0, %rsp
+    call    __ulp_do_testlocks@PLT
+    pop     %rsp
+    int3
+
 __ulp_trigger:
     nop
     nop

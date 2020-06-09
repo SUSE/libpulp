@@ -75,6 +75,7 @@ struct ulp_dynobj
     Elf64_Addr state;
     Elf64_Addr global;
     Elf64_Addr local;
+    Elf64_Addr testlocks;
 
     struct thread_state *thread_states;
 
@@ -116,6 +117,8 @@ int hijack_threads(struct ulp_process *process);
 int set_id_buffer(struct ulp_process *process, unsigned char *patch_id);
 
 int set_path_buffer(struct ulp_process *process, char *path);
+
+int testlocks(struct ulp_process *process);
 
 int patch_applied(struct ulp_process *process, unsigned char *patch_id);
 

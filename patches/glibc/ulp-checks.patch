@@ -1,0 +1,240 @@
+From 695ca097f28732d0e7be4406112893bb7fc31e35 Mon Sep 17 00:00:00 2001
+From: "Gabriel F. T. Gomes" <gagomes@suse.de>
+Date: Mon, 8 Jun 2020 10:41:30 -0300
+Subject: [PATCH] Expose the status of locks used in malloc and dlopen
+
+When applying live-patches, libpulp uses calloc, dlopen, and dlsym from
+the context of a signal handler.  However, since these functions use
+locks, they are AS-Unsafe, and calling them from a signal handler might
+lead to a deadlock.  To avoid the deadlock, libpulp takes a two-steps
+approach:
+
+  1. Stop all threads in the target process (hijacking);
+  2. Test that all relevant locks are free.
+
+Testing the locks must be a non-blocking operation, otherwise, the
+deadlock would occur while trying to avoid it.  This patch adds
+__libc_ulp_checks and __libdl_ulp_checks to libc and libdl,
+respectively, which are non-blocking functions to test for the locks
+used by calloc, dlopen, and dlsym.
+---
+ elf/Versions               |  3 +++
+ elf/dl-misc.c              | 41 +++++++++++++++++++++++++++++++++++
+ malloc/Versions            |  3 +++
+ malloc/arena.c             | 44 ++++++++++++++++++++++++++++++++++++++
+ nptl/nptl-init.c           |  1 +
+ sysdeps/generic/ldsodefs.h |  5 +++++
+ sysdeps/nptl/libc-lockP.h  | 13 ++++++++---
+ 7 files changed, 107 insertions(+), 3 deletions(-)
+
+diff --git a/elf/Versions b/elf/Versions
+index be88c48e6d..c6886cb9bc 100644
+--- a/elf/Versions
++++ b/elf/Versions
+@@ -76,5 +76,8 @@ ld {
+ 
+     # Set value of a tunable.
+     __tunable_get_val;
++
++    # Libpulp checks.
++    __libdl_ulp_checks;
+   }
+ }
+diff --git a/elf/dl-misc.c b/elf/dl-misc.c
+index ab70481fda..938b89242f 100644
+--- a/elf/dl-misc.c
++++ b/elf/dl-misc.c
+@@ -471,3 +471,44 @@ _dl_strtoul (const char *nptr, char **endptr)
+ 
+   return result;
+ }
++
++/* Non-blocking function to test the locks used by dlopen and friends.
++
++   When applying live-patches, libpulp uses dlopen and dlsym from the
++   context of a signal handler.  However, since dlopen and dlsym use
++   locks, they are AS-Unsafe, and calling them from a signal handler
++   might lead to a deadlock.  To avoid the deadlock, libpulp takes a
++   two-steps approach:
++
++     1. Stop all threads in the target process (hijacking);
++     2. Test that all relevant locks are free.
++
++   Testing the locks must be a non-blocking operation, otherwise, the
++   deadlock would occur while trying to avoid it.
++
++   The following function tests that the locks used by dlopen and dlsym
++   are free, without blocking.
++
++   Return 1 if any of the locks are blocked, and 0 if all free.  */
++int
++__libdl_ulp_checks (void)
++{
++  int read;
++  int write;
++
++  /* Try and get the locks used in dlopen and dlsym.  */
++  read = __rtld_lock_trylock_recursive (GL(dl_load_lock));
++  write = __rtld_lock_trylock_recursive (GL(dl_load_write_lock));
++
++  /* Always release them.  */
++  if (read == 0)
++    __rtld_lock_unlock_recursive (GL(dl_load_lock));
++  if (write == 0)
++    __rtld_lock_unlock_recursive (GL(dl_load_write_lock));
++
++  /* If unable to get any of the locks, return 1; otherwise, 0.  */
++  if (read | write)
++    return 1;
++  return 0;
++}
++rtld_hidden_def (__libdl_ulp_checks)
+diff --git a/malloc/Versions b/malloc/Versions
+index 2357cff3da..f66c9d0154 100644
+--- a/malloc/Versions
++++ b/malloc/Versions
+@@ -92,5 +92,8 @@ libc {
+     __libc_alloc_buffer_copy_bytes;
+     __libc_alloc_buffer_copy_string;
+     __libc_alloc_buffer_create_failure;
++
++    # Libpulp checks
++    __libc_ulp_checks;
+   }
+ }
+diff --git a/malloc/arena.c b/malloc/arena.c
+index cecdb7f4c4..c2309fa0b3 100644
+--- a/malloc/arena.c
++++ b/malloc/arena.c
+@@ -968,6 +968,50 @@ __malloc_arena_thread_freeres (void)
+     }
+ }
+ 
++/* Non-blocking function to test the locks used by malloc and friends.
++
++   When applying live-patches, libpulp uses calloc from the context of a
++   signal handler.  However, since calloc uses locks, it is AS-Unsafe,
++   and calling it from a signal handler might lead to a deadlock.  To
++   avoid the deadlock, libpulp takes a two-steps approach:
++
++     1. Stop all threads in the target process (hijacking);
++     2. Test that all relevant locks are free.
++
++   Testing the locks must be a non-blocking operation, otherwise, the
++   deadlock would occur while trying to avoid it.
++
++   The following function tests that the locks used by calloc are free,
++   without blocking.  More specifically, it iterates over all arenas,
++   checking their locking state, as well as it checks the state of
++   list_lock and free_list_lock.
++
++   Return 1 if any of the locks are blocked, and 0 if all free.  */
++int
++__libc_ulp_checks (void)
++{
++  mstate arena;
++
++  /* Return 1 if any of the lists of arenas is locked. */
++  if (free_list_lock)
++    return 1;
++  if (list_lock)
++    return 1;
++
++  /* The circular linked list of arenas can be acessed from the main
++     arena, which is also part of the list.  So, go over all nodes and
++     stop when back at the main arena.  Return 1, if any of the arenas
++     is locked.  */
++  arena = &main_arena;
++  do {
++    if (arena->mutex)
++      return 1;
++    arena = arena->next;
++  } while (arena != &main_arena);
++
++  return 0;
++}
++
+ /*
+  * Local variables:
+  * c-basic-offset: 2
+diff --git a/nptl/nptl-init.c b/nptl/nptl-init.c
+index 96b1444a01..df9e9b5d38 100644
+--- a/nptl/nptl-init.c
++++ b/nptl/nptl-init.c
+@@ -326,6 +326,7 @@ __pthread_initialize_minimal_internal (void)
+   /* Make __rtld_lock_{,un}lock_recursive use pthread_mutex_{,un}lock,
+      keep the lock count from the ld.so implementation.  */
+   GL(dl_rtld_lock_recursive) = (void *) __pthread_mutex_lock;
++  GL(dl_rtld_trylock_recursive) = (void *) __pthread_mutex_trylock;
+   GL(dl_rtld_unlock_recursive) = (void *) __pthread_mutex_unlock;
+   unsigned int rtld_lock_count = GL(dl_load_lock).mutex.__data.__count;
+   GL(dl_load_lock).mutex.__data.__count = 0;
+diff --git a/sysdeps/generic/ldsodefs.h b/sysdeps/generic/ldsodefs.h
+index d08b97a5ef..65ede4eb9c 100644
+--- a/sysdeps/generic/ldsodefs.h
++++ b/sysdeps/generic/ldsodefs.h
+@@ -401,6 +401,7 @@ struct rtld_global
+ #if defined SHARED && defined _LIBC_REENTRANT \
+     && defined __rtld_lock_default_lock_recursive
+   EXTERN void (*_dl_rtld_lock_recursive) (void *);
++  EXTERN int (*_dl_rtld_trylock_recursive) (void *);
+   EXTERN void (*_dl_rtld_unlock_recursive) (void *);
+ #endif
+ 
+@@ -1199,6 +1200,10 @@ extern void _dl_non_dynamic_init (void)
+ extern void _dl_aux_init (ElfW(auxv_t) *av)
+      attribute_hidden;
+ 
++/* Used by libpulp to test for internal locks in signal handlers.  */
++extern int __libdl_ulp_checks (void);
++rtld_hidden_proto (__libdl_ulp_checks)
++
+ /* Return true if the ld.so copy in this namespace is actually active
+    and working.  If false, the dl_open/dlfcn hooks have to be used to
+    call into the outer dynamic linker (which happens after static
+diff --git a/sysdeps/nptl/libc-lockP.h b/sysdeps/nptl/libc-lockP.h
+index 86d903dddc..48ab411103 100644
+--- a/sysdeps/nptl/libc-lockP.h
++++ b/sysdeps/nptl/libc-lockP.h
+@@ -191,9 +191,6 @@ _Static_assert (LLL_LOCK_INITIALIZER == 0, "LLL_LOCK_INITIALIZER != 0");
+ #define __libc_rwlock_trywrlock(NAME) \
+   __libc_maybe_call (__pthread_rwlock_trywrlock, (&(NAME)), 0)
+ 
+-#define __rtld_lock_trylock_recursive(NAME) \
+-  __libc_maybe_call (__pthread_mutex_trylock, (&(NAME).mutex), 0)
+-
+ /* Unlock the named lock variable.  */
+ #if IS_IN (libc) || IS_IN (libpthread)
+ # define __libc_lock_unlock(NAME) \
+@@ -209,18 +206,28 @@ _Static_assert (LLL_LOCK_INITIALIZER == 0, "LLL_LOCK_INITIALIZER != 0");
+ # define __rtld_lock_default_lock_recursive(lock) \
+   ++((pthread_mutex_t *)(lock))->__data.__count;
+ 
++# define __rtld_lock_default_trylock_recursive(lock) \
++  ++((pthread_mutex_t *)(lock))->__data.__count; \
++  return 0;
++
+ # define __rtld_lock_default_unlock_recursive(lock) \
+   --((pthread_mutex_t *)(lock))->__data.__count;
+ 
+ # define __rtld_lock_lock_recursive(NAME) \
+   GL(dl_rtld_lock_recursive) (&(NAME).mutex)
+ 
++# define __rtld_lock_trylock_recursive(NAME) \
++  GL(dl_rtld_trylock_recursive) (&(NAME).mutex)
++
+ # define __rtld_lock_unlock_recursive(NAME) \
+   GL(dl_rtld_unlock_recursive) (&(NAME).mutex)
+ #else
+ # define __rtld_lock_lock_recursive(NAME) \
+   __libc_maybe_call (__pthread_mutex_lock, (&(NAME).mutex), 0)
+ 
++# define __rtld_lock_trylock_recursive(NAME) \
++  __libc_maybe_call (__pthread_mutex_trylock, (&(NAME).mutex), 0)
++
+ # define __rtld_lock_unlock_recursive(NAME) \
+   __libc_maybe_call (__pthread_mutex_unlock, (&(NAME).mutex), 0)
+ #endif
+-- 
+2.27.0
+

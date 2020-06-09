@@ -22,12 +22,17 @@ testname = os.path.basename(testname[0])
 errors = 0
 for attempt in range(32):
   # Start the test program
-  child = pexpect.spawn('./' + testname, timeout=1, env=preload,
+  child = pexpect.spawn('./' + testname, timeout=20, env=preload,
                         encoding='utf-8')
-  child.logfile = sys.stdout
 
   # Wait for the test program to be ready
-  child.expect('Waiting for signals.\r\n')
+  child.expect('Waiting for input.\r\n')
+
+  # Check default behavior
+  print('Testing output before live patch... ', end='')
+  child.sendline('')
+  child.expect('hello\r\n')
+  print('OK.')
 
   # Applying a live patch to a process entails stopping all of its
   # threads, then stealing one of them to jack into the process and call
@@ -37,13 +42,19 @@ for attempt in range(32):
   # However, libulp calls dlopen, which is AS-Unsafe.
   try:
     ret = subprocess.run([trigger, str(child.pid),
-                          'libblocked_livepatch1.ulp'], timeout=1)
+                          'libblocked_livepatch1.ulp'], timeout=20)
     if ret.returncode:
       print('Failed to apply livepatch #1 for libblocked')
       errors = 1
   except subprocess.TimeoutExpired:
     print('Deadlock reached when appling livepatch')
     errors = 1
+  else:
+    # Check that the livepatch was applied correctly
+    print('Testing output after live patch... ', end='')
+    child.sendline('')
+    child.expect('hello_world\r\n')
+    print('OK.')
   finally:
     # Always kill the child process
     child.close(force=True)

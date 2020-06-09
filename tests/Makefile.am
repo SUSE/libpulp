@@ -134,6 +134,7 @@ blocked_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
 deadlock_SOURCES = deadlock.c
 deadlock_CFLAGS = -pthread $(AM_CFLAGS)
+deadlock_LDFLAGS = -ldl $(AM_LDFLAGS)
 deadlock_LDADD = libblocked.la
 deadlock_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
@@ -143,8 +144,6 @@ TESTS = \
   parameters.py \
   blocked.py \
   deadlock.py
-
-XFAIL_TESTS = deadlock.py
 
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON)

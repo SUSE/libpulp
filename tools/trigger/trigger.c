@@ -31,6 +31,7 @@
 #include <stddef.h>
 #include <fcntl.h>
 #include <sys/user.h>
+#include <unistd.h>
 
 #include "introspection.h"
 #include "../../include/ulp_common.h"
@@ -59,6 +60,7 @@ int main(int argc, char **argv)
     int pid;
     char *livepatch;
     int ret;
+    int retry;
 
     if (check_args(argc, argv)) return 2;
     pid = atoi(argv[1]);
@@ -81,14 +83,39 @@ int main(int argc, char **argv)
     if (check_patch_sanity(&target))
       return 5;
 
-    if (hijack_threads(&target)) return 6;
+    /* For RETRY Times, test if it would be safe to apply a live-patch,
+     * i.e. if glibc internal locks for calloc and dlopen are free,
+     * before actually applying it.
+     */
+    retry = 100;
+    while (retry) {
+      retry--;
 
-    if (apply_patch(&target, livepatch))
-      WARN("Apply patch to %d failed.", pid);
-    else
-      WARN("Patching %d succesful.", pid);
+      if (hijack_threads(&target)) return 6;
 
-    if (restore_threads(&target)) return 9;
+      /* Because apply_patch uses AS-Unsafe functions from the context
+       * of a signal-handler, first check, with testlocks, that doing so
+       * wouldn't cause a deadlock. If safe, call apply_patch,
+       * otherwise, loop around and try again after a short while.
+      */
+      ret = testlocks(&target);
+      if (ret) {
+        WARN("Locks are busy, try again later (%d).", ret);
+      }
+      else {
+        if (apply_patch(&target, livepatch))
+          WARN("Apply patch to %d failed.", pid);
+        else {
+          WARN("Patching %d succesful.", pid);
+          retry = 0;
+        }
+      }
 
+      if (restore_threads(&target)) return 9;
+      usleep (1000);
+    }
+
+    if (ret)
+      return 1;
     return 0;
 }
