@@ -6,7 +6,7 @@
 /* At least one thread is required to cause the deadlock, otherwise,
  * malloc/calloc refrain from acquiring a lock, at all.
  */
-#define THREADS 1
+#define THREADS 100
 
 /* A live-patchable library is required so that a live patch can be
  * applied, however, this test case only relies on the fact that
@@ -22,17 +22,22 @@
 void *
 worker (void *arg __attribute__ ((unused)))
 {
+  char *data;
+
   while (1) {
-    pause ();
+    data = calloc (100, sizeof(char));
+    free (data);
   }
 }
 
 int
 main (void)
 {
-  char *data;
   pthread_t thread[THREADS];
 
+  /* Create THREADS threads that try to allocate and free memory in an
+   * infinite loop.
+   */
   for (int iter = 0; iter < THREADS; iter++)
     pthread_create (&thread[iter], NULL, worker, NULL);
 
@@ -45,12 +50,8 @@ main (void)
   /* Signal readiness. */
   printf ("Waiting for signals.\n");
 
-  /* Use calloc on a tight loop, which increases the chance of hitting
-   * the deadlock.
-   */
   while (1) {
-    data = calloc (100, sizeof(char));
-    free (data);
+    pause ();
   }
 
   return 0;
