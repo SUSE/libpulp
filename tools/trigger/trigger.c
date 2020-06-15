@@ -36,7 +36,6 @@
 #include "../../include/ulp_common.h"
 
 struct ulp_process target;
-struct ulp_metadata ulp;
 
 int check_args(int argc, char *argv[])
 {
