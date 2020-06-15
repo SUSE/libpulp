@@ -6,7 +6,7 @@
 # define INFO(...)
 #endif
 
-#include <errno.h>
+#include <stdio.h>
 #include <strings.h>
 #include <sys/mman.h>
 #include <unistd.h>

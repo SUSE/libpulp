@@ -5,7 +5,9 @@ ULP_REVERSE = $(top_builddir)/tools/packer/ulp_reverse
 
 # Build and link requirements for live-patchable (target) libraries.
 ULP_NOP_LENGTH = @ULP_NOP_LENGTH@
-TARGET_CFLAGS = -fPIC -fpatchable-function-entry=$(ULP_NOP_LENGTH)
+TARGET_CFLAGS = -fPIC \
+                -fpatchable-function-entry=$(ULP_NOP_LENGTH) \
+                $(AM_CFLAGS)
 TARGET_LDFLAGS = --build-id
 TARGET_TRM_SOURCES = $(top_srcdir)/lib/trm.S
 

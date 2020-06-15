@@ -128,12 +128,12 @@ parameters_LDADD = libparameters.la
 parameters_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
 blocked_SOURCES = blocked.c
-blocked_CFLAGS = -pthread
+blocked_CFLAGS = -pthread $(AM_CFLAGS)
 blocked_LDADD = libblocked.la
 blocked_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
 deadlock_SOURCES = deadlock.c
-deadlock_CFLAGS = -pthread
+deadlock_CFLAGS = -pthread $(AM_CFLAGS)
 deadlock_LDADD = libblocked.la
 deadlock_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 

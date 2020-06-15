@@ -58,7 +58,8 @@ Not building the tools because of missing headers.]))
 AM_PATH_PYTHON([3])
 AX_PYTHON_MODULE([pexpect], [fatal])
 
-AC_SUBST(AM_CFLAGS, ["-Wall -Wextra -Werror"])
+# Add the following flags to the compilation of all files
+AC_SUBST([AM_CFLAGS], ["-Wall -Wextra -Werror"])
 
 AC_SUBST([ULP_NOP_LENGTH], [24,22])
 
