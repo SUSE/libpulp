@@ -42,12 +42,6 @@ main (void)
   long page_size = sysconf (_SC_PAGESIZE);
   struct sigaction act;
 
-  /* Acquire the locks on the arenas. */
-  if (ulp_arena_trylock ()) {
-    printf ("Unable to acquire the locks on the arenas.\n");
-    return 1;
-  }
-
   /* Allocate memory until capacity exhaustion. */
   capacity = 0;
   for (i = 0; ; i++) {

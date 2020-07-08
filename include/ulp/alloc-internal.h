@@ -1,5 +1,3 @@
-#include <semaphore.h>
-
 #define ULP_MAX_HEAPS 300
 
 struct ulp_heap {
@@ -11,8 +9,6 @@ struct ulp_arena {
   struct ulp_heap heaps[ULP_MAX_HEAPS];
   int available_heaps;
   long page_size;
-
-  sem_t semaphore;
 };
 
 void *
