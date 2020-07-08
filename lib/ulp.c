@@ -35,8 +35,6 @@
 #include <sys/mman.h>
 #include "../include/ulp.h"
 
-#include <ulp/alloc.h>
-
 /* ulp data structures */
 struct ulp_patching_state __ulp_state = {0, NULL};
 char __ulp_path_buffer[256] = "";
@@ -150,17 +148,29 @@ int __ulp_do_testlocks()
 /* libpulp functions */
 void free_metadata(struct ulp_metadata *ulp)
 {
+    struct ulp_unit *unit, *next_unit;
     struct ulp_object *obj;
 
     if (ulp) {
 	obj = ulp->objs;
         if (obj) {
+  	    unit = ulp->objs->units;
+	    while (unit) {
+                next_unit = unit->next;
+                free(unit->old_fname);
+                free(unit->new_fname);
+                free(unit);
+                unit = next_unit;
+	    }
+            free(obj->build_id);
             if (obj->dl_handler && dlclose(obj->dl_handler)) {
 	        WARN("Error closing handler for %s.", obj->name);
             }
+            free(obj->name);
+            free(obj);
         }
     }
-    ulp_scratch_clear();
+    free(ulp);
 }
 
 /* TODO: unloading needs further testing */
@@ -253,7 +263,7 @@ struct ulp_metadata *load_metadata()
 	return __ulp_metadata_ref;
     }
 
-    ulp = ulp_scratch_alloc(sizeof(struct ulp_metadata));
+    ulp = calloc(1, sizeof(struct ulp_metadata));
     if (!ulp) {
 	WARN("Unable to allocate memory for ulp metadata");
 	return 0;
@@ -307,14 +317,14 @@ int parse_metadata(struct ulp_metadata *ulp)
 
     /* read livepatch DSO filename */
     READ (fd, &c, 1 * sizeof(uint32_t));
-    ulp->so_filename = ulp_scratch_alloc((c + 1) * sizeof(char));
+    ulp->so_filename = calloc(c + 1, sizeof(char));
     if (!ulp->so_filename) {
 	WARN("Unable to allocate so filename buffer.");
 	return 0;
     }
     READ (fd, ulp->so_filename, c * sizeof(char));
 
-    obj = ulp_scratch_alloc(sizeof(struct ulp_object));
+    obj = calloc(1, sizeof(struct ulp_object));
     if (!obj) {
 	WARN("Unable to allocate memory for the patch objects.");
 	return 0;
@@ -326,7 +336,7 @@ int parse_metadata(struct ulp_metadata *ulp)
     obj->build_id_len = c;
 
     /* read the build-id of the target library */
-    obj->build_id = ulp_scratch_alloc(c * sizeof(char));
+    obj->build_id = calloc(c, sizeof(char));
     if (!obj->build_id) {
 	WARN("Unable to allocate build id buffer.");
 	return 0;
@@ -340,7 +350,7 @@ int parse_metadata(struct ulp_metadata *ulp)
     ulp->objs = obj;
 
     /* shared object: fill data + read patching units */
-    obj->name = ulp_scratch_alloc((c + 1) * sizeof(char));
+    obj->name = calloc(c + 1, sizeof(char));
     if (!obj->name) {
 	WARN("Unable to allocate object name buffer.");
 	return 0;
@@ -352,7 +362,7 @@ int parse_metadata(struct ulp_metadata *ulp)
 
     /* read all patching units for object */
     for (j = 0; j < obj->nunits; j++) {
-	unit = ulp_scratch_alloc(sizeof(struct ulp_unit));
+	unit = calloc(1, sizeof(struct ulp_unit));
 	if (!unit) {
 	    WARN("Unable to allocate memory for the patch units.");
 	    return 0;
@@ -360,7 +370,7 @@ int parse_metadata(struct ulp_metadata *ulp)
 
 	/* read the name of the old function in this unit */
 	READ (fd, &c, 1 * sizeof(uint32_t));
-	unit->old_fname = ulp_scratch_alloc((c + 1) * sizeof(char));
+	unit->old_fname = calloc(c + 1, sizeof(char));
 	if (!unit->old_fname) {
 	    WARN("Unable to allocate unit old function name buffer.");
 	    return 0;
@@ -369,7 +379,7 @@ int parse_metadata(struct ulp_metadata *ulp)
 
 	/* read the name of the new function in this unit */
 	READ (fd, &c, 1 * sizeof(uint32_t));
-	unit->new_fname = ulp_scratch_alloc((c + 1) * sizeof(char));
+	unit->new_fname = calloc(c + 1, sizeof(char));
 	if (!unit->new_fname) {
 	    WARN("Unable to allocate unit new function name buffer.");
 	    return 0;
@@ -393,7 +403,7 @@ int parse_metadata(struct ulp_metadata *ulp)
 
     /* read all dependencies */
     for (i = 0; i < c; i++) {
-	dep = ulp_scratch_alloc(sizeof(struct ulp_dependency));
+	dep = calloc(1, sizeof(struct ulp_dependency));
 	if (!dep) {
 	    WARN("Unable to allocate memory for dependency state.");
 	    return 0;
@@ -528,7 +538,7 @@ struct ulp_detour_root *push_new_root()
 {
     struct ulp_detour_root *root, *root_aux;
 
-    root = ulp_default_alloc(sizeof(struct ulp_detour_root));
+    root = calloc(1, sizeof(struct ulp_detour_root));
     if (!root) {
 	WARN("unable to allocate memory for ulp detour root");
 	return NULL;
@@ -599,7 +609,7 @@ struct ulp_applied_patch *ulp_state_update(struct ulp_metadata *ulp)
     struct ulp_unit *unit;
     struct ulp_dependency *dep, *a_dep;
 
-    a_patch = ulp_default_alloc(sizeof(struct ulp_applied_patch));
+    a_patch = calloc(1, sizeof(struct ulp_applied_patch));
     if (!a_patch) {
 	WARN("Unable to allocate memory to update ulp state.");
 	return 0;
@@ -607,7 +617,7 @@ struct ulp_applied_patch *ulp_state_update(struct ulp_metadata *ulp)
     memcpy(a_patch->patch_id, ulp->patch_id, 32);
 
     for (dep = ulp->deps; dep != NULL; dep = dep->next) {
-	a_dep = ulp_default_alloc(sizeof(struct ulp_dependency));
+	a_dep = calloc(1, sizeof(struct ulp_dependency));
 	if (!a_dep) {
 	    WARN("Unable to allocate memory to ulp state dependency.");
 	    return 0;
@@ -623,7 +633,7 @@ struct ulp_applied_patch *ulp_state_update(struct ulp_metadata *ulp)
 
     /* only shared objs have units, this loop never runs for main obj */
     while (unit != NULL) {
-	a_unit = ulp_default_alloc(sizeof(struct ulp_applied_unit));
+	a_unit = calloc(1, sizeof(struct ulp_applied_unit));
 	if (!a_unit) {
 	    WARN("Unable to allocate memory to update ulp state (unit).");
 	    return 0;
@@ -882,7 +892,7 @@ unsigned int push_new_detour(unsigned long universe, unsigned char *patch_id,
 {
     struct ulp_detour *detour, *detour_aux;
 
-    detour = ulp_default_alloc(sizeof(struct ulp_detour));
+    detour = calloc(1, sizeof(struct ulp_detour));
     if (!detour) {
         WARN("Unable to acllocate memory for ulp detour");
         return 0;
