@@ -69,9 +69,6 @@ __ulp_entry:
     // one movq instruction in place of the load, cmp, jne, movq sequence.
     // - the above should be properly benchmarked.
 
-    // Find the address of the thread-local (TLS) counter.
-    leaq    __ulp_thread_universe@tlsld(%rip), %rdi
-    call    __tls_get_addr@PLT
     // Check if the address of the global counter has been filled in the
     // GOT entry during initialization (only happens when libpulp.so has
     // been LD_PRELOAD'ed).  In case it has, read the contents.
@@ -81,6 +78,10 @@ __ulp_entry:
     jz      __ulp_thread_counter_update
     movq    (%rdi), %rdi
 __ulp_thread_counter_update:
+    // The "local dynamic TLS model" allows reusing the result of the
+    // previous call to __tls_get_addr (when the address of __ulp_ret
+    // was determined) to access other thread-specific variables in the
+    // same compilation unit (e.g. __ulp_thread_universe).
     movq    %rdi, __ulp_thread_universe@dtpoff(%rax)
 
    // call original function
