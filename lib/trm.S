@@ -63,26 +63,25 @@ __ulp_entry:
     call    __libpulp_tls_get_addr@PLT
 #endif
 
-    // If not library entrance, skip universe update code and call the
-    // target function right away.
+    // If not library entrance, skip universe update code and jump to
+    // the target function directly, as if this detour had not happened.
     cmp     $0x0, __ulp_ret@dtpoff(%rax)
     jnz     __ulp_entry_bypass
 
-    // Otherwise, update local universe, then call target function.
+    // Otherwise, move the return address to __ulp_ret, update the local
+    // universe, and call the target function. When it returns, restore
+    // __ulp_ret, and return to the call site. Notice that the original
+    // call becomes two calls in this situation.
+
+    // Save the address of the TLS block so it can be used further down
+    // to update __ulp_ret.
     movq    %rax, %r11
 
-    // Migrate to new universe:
-    // - always set __ulp_thread_universe = __ulp_global_universe.
-    // - comparing __ulp_thread_universe with __ulp_global_universe pior to
-    // setting it, would require loading the __ulp_thread_universe value, then
-    // cmp, then jne. Instead of that, we always update the value and end with
-    // one movq instruction in place of the load, cmp, jne, movq sequence.
-    // - the above should be properly benchmarked.
-
-    // Check if the address of the global counter has been filled in the
-    // GOT entry during initialization (only happens when libpulp.so has
-    // been LD_PRELOAD'ed).  In case it has, read the contents.
-    // Otherwise, the uninitialized value, zero, can be used directly.
+    // Update the local counter, but first make sure that the address of
+    // the global counter has been filled in the GOT entry during
+    // initialization (only happens when libulp.so has been loaded). In
+    // case it has, read the contents; otherwise, the uninitialized
+    // value, zero, can be used directly.
     movq    __ulp_global_universe@GOTPCREL(%rip), %rdi
     test    %rdi, %rdi
     jz      __ulp_thread_counter_update
@@ -94,8 +93,7 @@ __ulp_thread_counter_update:
     // same compilation unit (e.g. __ulp_thread_universe).
     movq    %rdi, __ulp_thread_universe@dtpoff(%rax)
 
-   // call original function
-__ulp_call_function:
+    // Call target function
     popq    %rax
     popq    %rdi
 #ifndef HAVE___LIBPULP_TLS_GET_ADDR
@@ -106,9 +104,15 @@ __ulp_call_function:
     popq    %r9
     popq    %r10
 #endif
+    // Save the original return address into __ulp_ret.
     push    8(%rsp)
     pop     __ulp_ret@dtpoff(%r11)
+    // The address of the target function has been pushed onto the stack
+    // by the trampoline in the .ulp section, so pop it.
     pop     %r11
+    // Remove the return address from the stack (it has been pushed by
+    // the original call into the target function and copied into
+    // __ulp_ret (above)), so parameters are in the right place.
     addq    $0x8, %rsp
     call    *%r11
 
