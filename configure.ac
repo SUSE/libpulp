@@ -11,7 +11,7 @@ AC_CONFIG_MACRO_DIRS([config])
 # only once, even though it is needed by all examples and tests).
 AM_INIT_AUTOMAKE([-Wall -Wno-portability foreign subdir-objects])
 
-# Initialize libtool with static libraries disabled, since libulp is
+# Initialize libtool with static libraries disabled, since libpulp is
 # supposed to be dynamically linked into applications.
 LT_INIT([shared disable-static])
 

@@ -346,8 +346,8 @@ int parse_main_dynobj(struct ulp_process *process)
 
 /* Iterates over all objects that have been dynamically loaded into
  * PROCESS, parsing and sorting them into appropriate lists (for
- * instance, libulp.so will be stored into PROCESS->dynobj_libulp.
- * Returns 0, on success. If libulp has not been found among the
+ * instance, libpulp.so will be stored into PROCESS->dynobj_libpulp.
+ * Returns 0, on success. If libpulp has not been found among the
  * dynamically loaded objects, returns 1.
  */
 int parse_libs_dynobj(struct ulp_process *process)
@@ -363,13 +363,13 @@ int parse_libs_dynobj(struct ulp_process *process)
     obj_link_map = aux_link_map->l_next;
   }
 
-  /* When libulp has been loaded (usually with LD_PRELOAD),
+  /* When libpulp has been loaded (usually with LD_PRELOAD),
    * parse_lib_dynobj will find the symbols it provides, such as
    * __ulp_loop, which are all required for userspace live-patching. If
-   * libulp has not been found, process->dynobj_libulp will be NULL and
+   * libpulp has not been found, process->dynobj_libpulp will be NULL and
    * this function returns an error.
    */
-  if (process->dynobj_libulp == NULL)
+  if (process->dynobj_libpulp == NULL)
     return 1;
 
   return 0;
@@ -444,16 +444,16 @@ struct link_map *parse_lib_dynobj(struct ulp_process *process,
     obj->local = get_loaded_symbol_addr(obj, "__ulp_get_local_universe");
     obj->testlocks = get_loaded_symbol_addr(obj, "__ulp_testlocks");
 
-    /* libulp must expose all these symbols. */
+    /* libpulp must expose all these symbols. */
     if (obj->loop && obj->trigger && obj->path_buffer && obj->check &&
 	obj->state && obj->global && obj->testlocks) {
 	obj->next = NULL;
-	process->dynobj_libulp = obj;
+	process->dynobj_libpulp = obj;
     }
     /* No other library should expose these symbols. */
     else if (obj->loop || obj->trigger || obj->path_buffer ||
 	     obj->check || obj->state || obj->global || obj->testlocks)
-	WARN("libulp symbol exposed by some other library.");
+	WARN("libpulp symbol exposed by some other library.");
     /* Live-patchable libraries expose the local universe. */
     else if (obj->local) {
 	obj->next = process->dynobj_targets;
@@ -463,7 +463,7 @@ struct link_map *parse_lib_dynobj(struct ulp_process *process,
     /* XXX: Searching for the '_livepatch' substring in the filename of
      * a dynamically loaded object is rather frail. Alternatives:
      *   A. Have live patch DSOs expose some predefined symbol.
-     *   B. Have libulp mmap a .ulp or .rev file into memory.
+     *   B. Have libpulp mmap a .ulp or .rev file into memory.
      */
     else if (strstr (obj->filename, "_livepatch")) {
 	obj->next = process->dynobj_patches;
@@ -500,10 +500,10 @@ int initialize_data_structures(struct ulp_process *process)
     if (parse_main_dynobj(process)) return 3;
     if (parse_libs_dynobj(process)) return 3;
 
-    /* Check if libulp constructor has already been executed.  */
+    /* Check if libpulp constructor has already been executed.  */
     struct ulp_patching_state ulp_state;
     if (read_memory((char *) &ulp_state, sizeof(ulp_state),
-                    process->pid, process->dynobj_libulp->state)
+                    process->pid, process->dynobj_libpulp->state)
         || ulp_state.load_state == 0) {
       return EAGAIN;
     }
@@ -523,7 +523,7 @@ int hijack_threads(struct ulp_process *process)
     struct ulp_thread *t;
     struct user_regs_struct context;
 
-    if (!process->dynobj_libulp->loop) {
+    if (!process->dynobj_libpulp->loop) {
 	WARN("error: loop not found.");
 	return 1;
     }
@@ -552,7 +552,7 @@ int hijack_threads(struct ulp_process *process)
 	};
 
 	context = t->context;
-	context.rip = process->dynobj_libulp->loop + 2;
+	context.rip = process->dynobj_libpulp->loop + 2;
 
 	if (set_regs(t->tid, &context))
 	{
@@ -578,7 +578,7 @@ int hijack_threads(struct ulp_process *process)
     return errors;
 }
 
-/* Jacks into PROCESS and writes PATCH_ID into libulp's
+/* Jacks into PROCESS and writes PATCH_ID into libpulp's
  * '__ulp_path_buffer'. This operation is a pre-condition to check if a
  * live patch is applied. On success, returns 0.
  *
@@ -594,10 +594,10 @@ int set_id_buffer(struct ulp_process *process, unsigned char *patch_id)
 
     thread = process->threads;
     context = thread->context;
-    context.rip = process->dynobj_libulp->path_buffer + 2;
+    context.rip = process->dynobj_libpulp->path_buffer + 2;
 
     if (run_and_redirect(thread->tid, &context,
-			 process->dynobj_libulp->loop))
+			 process->dynobj_libpulp->loop))
     {
 	WARN("set_id_buffer error 1.");
 	return 1;
@@ -618,7 +618,7 @@ int set_id_buffer(struct ulp_process *process, unsigned char *patch_id)
     return 0;
 }
 
-/* Jacks into PROCESS and writes PATH into libulp's '__ulp_path_buffer'.
+/* Jacks into PROCESS and writes PATH into libpulp's '__ulp_path_buffer'.
  * This operation is a pre-condition to apply a new live patch. On
  * success, returns 0.
  *
@@ -633,10 +633,10 @@ int set_path_buffer(struct ulp_process *process, char *path)
 
     thread = process->threads;
     context = thread->context;
-    context.rip = process->dynobj_libulp->path_buffer + 2;
+    context.rip = process->dynobj_libpulp->path_buffer + 2;
 
     if (run_and_redirect(thread->tid, &context,
-			 process->dynobj_libulp->loop))
+			 process->dynobj_libpulp->loop))
     {
 	WARN("set_path_buffer error 1.");
 	return 1;
@@ -682,10 +682,10 @@ int testlocks(struct ulp_process *process)
 
     thread = process->threads;
     context = thread->context;
-    context.rip = process->dynobj_libulp->testlocks + 2;
+    context.rip = process->dynobj_libpulp->testlocks + 2;
 
     if (run_and_redirect(thread->tid, &context,
-			 process->dynobj_libulp->loop))
+			 process->dynobj_libpulp->loop))
     {
 	WARN("error: unable to trig thread %d.", thread->tid);
 	return 2;
@@ -710,10 +710,10 @@ int patch_applied(struct ulp_process *process, unsigned char *patch_id)
 
     thread = process->threads;
     context = thread->context;
-    context.rip = process->dynobj_libulp->check + 2;
+    context.rip = process->dynobj_libpulp->check + 2;
 
     if (run_and_redirect(thread->tid, &context,
-			 process->dynobj_libulp->loop))
+			 process->dynobj_libpulp->loop))
     {
 	WARN("error: unable to trig thread %d.", thread->tid);
 	return 2;
@@ -737,10 +737,10 @@ int apply_patch(struct ulp_process *process, char *metadata)
 
     thread = process->threads;
     context = thread->context;
-    context.rip = process->dynobj_libulp->trigger + 2;
+    context.rip = process->dynobj_libpulp->trigger + 2;
 
     if (run_and_redirect(thread->tid, &context,
-			 process->dynobj_libulp->loop))
+			 process->dynobj_libpulp->loop))
     {
 	WARN("error: unable to trig thread %d.", thread->tid);
 	return 1;
@@ -765,10 +765,10 @@ int read_global_universe (struct ulp_process *process)
 
     thread = process->threads;
     context = thread->context;
-    context.rip = process->dynobj_libulp->global + 2;
+    context.rip = process->dynobj_libpulp->global + 2;
 
     if (run_and_redirect(thread->tid, &context,
-                         process->dynobj_libulp->loop))
+                         process->dynobj_libpulp->loop))
     {
         WARN("error: unable to read global universe from thread %d.",
              thread->tid);
@@ -793,7 +793,7 @@ unsigned long read_local_universe (struct ulp_process *process,
     context.rip = library->local + 2;
 
     if (run_and_redirect(thread->tid, &context,
-                         process->dynobj_libulp->loop))
+                         process->dynobj_libpulp->loop))
       WARN("error: unable to read local universe from thread %d.",
            thread->tid);
 
@@ -838,7 +838,7 @@ int restore_threads(struct ulp_process *process)
     int errors;
     struct ulp_thread *t;
 
-    if (!process->dynobj_libulp->loop) {
+    if (!process->dynobj_libpulp->loop) {
 	WARN("error: loop not found.");
 	return 1;
     }
@@ -1101,10 +1101,10 @@ int check_patch_sanity(struct ulp_process *process)
     struct ulp_object *obj;
     struct ulp_dynobj *d;
 
-    /* check if libulp, hence ulp functions, are loaded */
-    if (!(process->dynobj_libulp))
+    /* check if libpulp, hence ulp functions, are loaded */
+    if (!(process->dynobj_libpulp))
     {
-	WARN("libulp not loaded, thus ulp functions not available.");
+	WARN("libpulp not loaded, thus ulp functions not available.");
 	return 1;
     }
 

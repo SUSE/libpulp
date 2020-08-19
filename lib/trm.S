@@ -30,12 +30,12 @@
 // can reference it via GOT, however, there should be no definition,
 // hence no object, for it in this file.  Otherwise, when linking with
 // -Bsymbolic, the GOT reference becomes a reference to the local object
-// and the intended, external object in libulp.so will not be reachable.
+// and the intended, external object in libpulp.so will not be reachable.
 //
-// This works if libulp.so is LD_PRELOAD'ed, because the GOT entry will
+// This works if libpulp.so is LD_PRELOAD'ed, because the GOT entry will
 // be filled in during relocation, which makes the address of the global
 // counter (__ulp_global_universe) available to __ulp_entry.  As well as
-// it works if libulp isn't PRELOAD'ed, because then the GOT entry will
+// it works if libpulp isn't PRELOAD'ed, because then the GOT entry will
 // be left zeroed out, which __ulp_entry tests for, and regular
 // execution of the library happens.
 .weak   __ulp_global_universe
@@ -73,7 +73,7 @@ __ulp_entry:
     leaq    __ulp_thread_universe@tlsld(%rip), %rdi
     call    __tls_get_addr@PLT
     // Check if the address of the global counter has been filled in the
-    // GOT entry during initialization (only happens when libulp.so has
+    // GOT entry during initialization (only happens when libpulp.so has
     // been LD_PRELOAD'ed).  In case it has, read the contents.
     // Otherwise, the uninitialized value, zero, can be used directly.
     movq    __ulp_global_universe@GOTPCREL(%rip), %rdi

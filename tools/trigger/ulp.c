@@ -7,21 +7,21 @@
 
 #include "introspection.h"
 
-/* Returns 0 if libulp.so has been loaded by the process with memory map
+/* Returns 0 if libpulp.so has been loaded by the process with memory map
  * (/proc/<pid>/maps) opened in MAP. Otherwise, returns 1.
  */
 int
-libulp_loaded (FILE *map)
+libpulp_loaded (FILE *map)
 {
   int retcode = 0;
 
   char *line = NULL;
   size_t len = 0;
 
-  /* Read all lines of MAP and look for the 'libulp.so' substring. */
+  /* Read all lines of MAP and look for the 'libpulp.so' substring. */
   rewind (map);
   while (getline (&line, &len, map) != -1) {
-    if (strstr (line, "libulp.so")) {
+    if (strstr (line, "libpulp.so")) {
       retcode = 1;
       break;
     }
@@ -77,7 +77,7 @@ insert_target_process (int pid, struct ulp_process **list)
   }
 
   /* If the process identified by PID is live patchable, add to LIST. */
-  if (libulp_loaded (map)) {
+  if (libpulp_loaded (map)) {
     new = malloc (sizeof (struct ulp_process));
     memset (new, 0, sizeof (struct ulp_process));
 
@@ -108,7 +108,7 @@ build_process_list (void)
 
   struct ulp_process *list = NULL;
 
-  /* Build a list of all processes that have libulp.so loaded. */
+  /* Build a list of all processes that have libpulp.so loaded. */
   slashproc = opendir ("/proc");
   if (slashproc == NULL) {
     perror ("Is /proc mounted?");

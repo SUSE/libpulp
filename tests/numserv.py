@@ -9,7 +9,7 @@ import sys
 # ULP tools location
 builddir = os.getcwd()
 trigger = builddir + '/../tools/trigger/ulp_trigger'
-preload = {'LD_PRELOAD': builddir + '/../lib/.libs/libulp.so'}
+preload = {'LD_PRELOAD': builddir + '/../lib/.libs/libpulp.so'}
 
 # Test case name and live patch selection variable
 testname = os.path.splitext(sys.argv[0])

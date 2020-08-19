@@ -1,8 +1,8 @@
-lib_LTLIBRARIES = libulp.la
+lib_LTLIBRARIES = libpulp.la
 
-libulp_la_SOURCES = ulp.c ulp_prologue.S ulp_interface.S
-libulp_la_CFLAGS = -I$(top_srcdir)/include $(AM_CFLAGS)
-libulp_la_LDFLAGS = -ldl
+libpulp_la_SOURCES = ulp.c ulp_prologue.S ulp_interface.S
+libpulp_la_CFLAGS = -I$(top_srcdir)/include $(AM_CFLAGS)
+libpulp_la_LDFLAGS = -ldl
 
 EXTRA_DIST = trm.S
 

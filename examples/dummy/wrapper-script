@@ -33,7 +33,7 @@ fi
 #     from the name of the test program (defined in TESTS), which comes
 #     as the last argument.  Currently, AM_LOG_FLAGS only adds the path
 #     to the top-level build directory ($(abs_top_builddir)), which is
-#     enough to derive the names of the other files (libulp.so and
+#     enough to derive the names of the other files (libpulp.so and
 #     ulp_trigger) required to run the test cases.
 builddir=$1
 testcase=$2
@@ -43,7 +43,7 @@ testcase=$2
 #   2. use ulp_trigger, twice, to patch the program.
 
 # Start the program and save its pid.
-LD_PRELOAD=$builddir/lib/.libs/libulp.so $testcase &
+LD_PRELOAD=$builddir/lib/.libs/libpulp.so $testcase &
 testcase_pid=$!
 
 # Patch the program twice.

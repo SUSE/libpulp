@@ -10,7 +10,7 @@ import sys
 # ULP tools location
 builddir = os.getcwd()
 trigger = builddir + '/../tools/trigger/ulp_trigger'
-preload = {'LD_PRELOAD': builddir + '/../lib/.libs/libulp.so'}
+preload = {'LD_PRELOAD': builddir + '/../lib/.libs/libpulp.so'}
 
 # Test case name and live patch selection variable
 testname = os.path.splitext(sys.argv[0])
@@ -36,10 +36,10 @@ for attempt in range(32):
 
   # Applying a live patch to a process entails stopping all of its
   # threads, then stealing one of them to jack into the process and call
-  # libulp.so's routines that load and apply the live patch. These
+  # libpulp.so's routines that load and apply the live patch. These
   # routines are called from the context of a signal-handler, and, as
   # such, should not make calls to Asynchronous Signal Unsafe functions.
-  # However, libulp calls dlopen, which is AS-Unsafe.
+  # However, libpulp calls dlopen, which is AS-Unsafe.
   try:
     ret = subprocess.run([trigger, str(child.pid),
                           'libblocked_livepatch1.ulp'], timeout=20)

@@ -35,7 +35,7 @@ struct ulp_process
     struct ulp_thread *threads;
 
     struct ulp_dynobj *dynobj_main;
-    struct ulp_dynobj *dynobj_libulp;
+    struct ulp_dynobj *dynobj_libpulp;
     struct ulp_dynobj *dynobj_targets;
     struct ulp_dynobj *dynobj_patches;
     struct ulp_dynobj *dynobj_others;
