@@ -61,15 +61,15 @@ AX_PYTHON_MODULE([pexpect], [fatal])
 # Add the following flags to the compilation of all files
 AC_SUBST([AM_CFLAGS], ["-Wall -Wextra -Werror"])
 
-# Libpulp makes call to AS-Unsafe functions, calloc and dlopen, from a
+# Libpulp makes calls to AS-Unsafe functions, calloc and dlopen, from a
 # signal handler, even though that might lead to a deadlock. To get rid
 # of the deadlock while still sticking to calloc and dlopen, glibc could
 # expose functions that let a signal handler check that all related
 # locks are free, but that is not available upstream. This check tests
 # that a downstream/custom glibc provides these lock-state checking
-# functions: __libc_ulp_check and __libdl_ulp_check
-AC_CHECK_FUNCS(__libc_ulp_checks)
-AC_CHECK_FUNCS(__libdl_ulp_checks)
+# functions:
+AC_CHECK_FUNCS(__libpulp_malloc_checks)
+AC_CHECK_FUNCS(__libpulp_dlopen_checks)
 
 AC_SUBST([ULP_NOP_LENGTH], [24,22])
 

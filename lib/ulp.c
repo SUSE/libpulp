@@ -106,41 +106,41 @@ unsigned long __ulp_get_global_universe_value()
 
 /*
  * Checks that all locks in the implementation of malloc and dlopen are
- * free. In order to do so, it makes calls into __libc_ulp_checks and
- * __libdl_ulp_check, which are not part of upstream libc and libdl.
+ * free. In order to do so, it makes calls into __libpulp_malloc_checks
+ * and __libpulp_dlopen_check, which are not part of upstream glibc.
  *
  * A hijacked process uses this to determine if it can make calls to
  * calloc and dlopen (AS-Unsafe functions) from a signal handler. When
  * none of the locks are taken, the hijacked process may make calls to
  * calloc and dlopen without the risk to go into a deadlock.
  */
-int __libc_ulp_checks(void);
-int __libdl_ulp_checks(void);
+int __libpulp_malloc_checks(void);
+int __libpulp_dlopen_checks(void);
 int __ulp_do_testlocks()
 {
-    int libc_locks;
-    int libdl_locks;
+    int malloc_locks;
+    int dlopen_locks;
 
-    libc_locks = 0;
-    libdl_locks = 0;
+    malloc_locks = 0;
+    dlopen_locks = 0;
 
-#ifdef HAVE___LIBC_ULP_CHECKS
-    libc_locks = __libc_ulp_checks();
-    if (libc_locks != 0 && libc_locks != 1) {
-      WARN("FATAL: Invalid return from __libc_ulp_checks().");
+#ifdef HAVE___LIBPULP_MALLOC_CHECKS
+    malloc_locks = __libpulp_malloc_checks();
+    if (malloc_locks != 0 && malloc_locks != 1) {
+      WARN("FATAL: Invalid return from __libpulp_malloc_checks().");
       return -1;
     }
 #endif
 
-#ifdef HAVE___LIBDL_ULP_CHECKS
-    libdl_locks = __libdl_ulp_checks();
-    if (libdl_locks != 0 && libdl_locks != 1) {
-      WARN("FATAL: Invalid return from __libdl_ulp_checks().");
+#ifdef HAVE___LIBPULP_DLOPEN_CHECKS
+    dlopen_locks = __libpulp_dlopen_checks();
+    if (dlopen_locks != 0 && dlopen_locks != 1) {
+      WARN("FATAL: Invalid return from __libpulp_dlopen_checks().");
       return -1;
     }
 #endif
 
-    if (libc_locks || libdl_locks)
+    if (malloc_locks || dlopen_locks)
       return EAGAIN;
     return 0;
 }
