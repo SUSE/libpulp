@@ -1,0 +1,119 @@
+From 213173363bfebd10d14f5a9027582b938ad4b085 Mon Sep 17 00:00:00 2001
+From: "Gabriel F. T. Gomes" <gagomes@suse.de>
+Date: Fri, 24 Jul 2020 11:10:25 -0300
+Subject: [PATCH 2/2] Non ABI-compliant __tls_get_addr for libpulp
+
+Userspace live-patching enabled libraries track all calls into the
+library via the __ulp_entry function.  This tracking is per-thread, so
+it uses thread-local variables, which require calls into __tls_get_addr.
+On the hot-path, few registers are used, however, on the slow path, it
+calls a function in C, so the ABI must be strictly followed.
+
+This patch adds a new function, which can be called from __ulp_entry
+without saving caller-save registers. If the hot-path finds the address,
+it returns quickly. Otherwise, it saves the registers that __ulp_entry
+did not save, and calls the slow C function.
+---
+ elf/Versions                                 |  4 ++
+ sysdeps/unix/sysv/linux/x86_64/64/ld.abilist |  1 +
+ sysdeps/x86_64/tls_get_addr.S                | 63 ++++++++++++++++++++
+ 3 files changed, 68 insertions(+)
+
+diff --git a/elf/Versions b/elf/Versions
+index c0f59185e8..f075c579d8 100644
+--- a/elf/Versions
++++ b/elf/Versions
+@@ -77,5 +77,9 @@ ld {
+   GLIBC_LIBPULP1 {
+     # Libpulp checks to avoid deadlock in AS-Unsafe functions.
+     __libpulp_dlopen_checks;
++
++    # Non ABI-compliant version of __tls_get_addr to avoid the need of
++    # saving/restoring registers on the fast path.
++    __libpulp_tls_get_addr;
+   }
+ }
+diff --git a/sysdeps/unix/sysv/linux/x86_64/64/ld.abilist b/sysdeps/unix/sysv/linux/x86_64/64/ld.abilist
+index 861962ed19..08da57de8f 100644
+--- a/sysdeps/unix/sysv/linux/x86_64/64/ld.abilist
++++ b/sysdeps/unix/sysv/linux/x86_64/64/ld.abilist
+@@ -11,3 +11,4 @@ GLIBC_2.3 __tls_get_addr F
+ GLIBC_2.4 GLIBC_2.4 A
+ GLIBC_LIBPULP1 GLIBC_LIBPULP1 A
+ GLIBC_LIBPULP1 __libpulp_dlopen_checks F
++GLIBC_LIBPULP1 __libpulp_tls_get_addr F
+diff --git a/sysdeps/x86_64/tls_get_addr.S b/sysdeps/x86_64/tls_get_addr.S
+index 9d38fb3be5..09c69314de 100644
+--- a/sysdeps/x86_64/tls_get_addr.S
++++ b/sysdeps/x86_64/tls_get_addr.S
+@@ -58,4 +58,67 @@ ENTRY (__tls_get_addr)
+ 	cfi_def_cfa (%rsp, 8)
+ 	ret
+ END (__tls_get_addr)
++
++/* Userspace live-patching enabled libraries track all calls into the
++   library via the __ulp_entry function.  This tracking is per-thread,
++   so it uses thread-local variables, which require calls into
++   __tls_get_addr.  On the hot-path, few registers are used, however,
++   on the slow path, it calls a function in C, so the ABI must be
++   strictly followed.
++
++   This new function can be called from __ulp_entry without saving
++   caller-save registers. If the hot-path finds the address, it returns
++   quickly. Otherwise, it saves the registers that __ulp_entry did not
++   save, and calls the slow C function.  */
++ENTRY (__libpulp_tls_get_addr)
++	pushq	%rdx
++	mov	%fs:DTV_OFFSET, %RDX_LP
++	mov	GL_TLS_GENERATION_OFFSET+_rtld_local(%rip), %RAX_LP
++	/* GL(dl_tls_generation) == dtv[0].counter */
++	cmp	%RAX_LP, (%rdx)
++	jne	1f
++	mov	TI_MODULE_OFFSET(%rdi), %RAX_LP
++	/* dtv[ti->ti_module] */
++# ifdef __LP64__
++	salq	$4, %rax
++	movq	(%rdx,%rax), %rax
++# else
++	movl	(%rdx,%rax, 8), %eax
++# endif
++	cmp	$-1, %RAX_LP
++	je	1f
++	add	TI_OFFSET_OFFSET(%rdi), %RAX_LP
++	popq	%rdx
++	ret
++
++1:
++	/* Push everything that __ulp_entry had not.  */
++	pushq	%r10
++	pushq	%r9
++	pushq	%r8
++	pushq	%rsi
++	pushq	%rcx
++
++	/* On the slow path, align the stack.  */
++	pushq	%rbp
++	cfi_def_cfa_offset (16)
++	cfi_offset (%rbp, -16)
++	mov	%RSP_LP, %RBP_LP
++	cfi_def_cfa_register (%rbp)
++	and	$-16, %RSP_LP
++	call	__tls_get_addr_slow
++	mov	%RBP_LP, %RSP_LP
++	popq	%rbp
++	cfi_def_cfa (%rsp, 8)
++
++	/* Restore register before returning to __ulp_entry.  */
++	popq	%rcx
++	popq	%rsi
++	popq	%r8
++	popq	%r9
++	popq	%r10
++	popq	%rdx
++
++	ret
++END (__libpulp_tls_get_addr)
+ #endif /* SHARED */
+-- 
+2.28.0
+

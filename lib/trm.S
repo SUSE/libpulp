@@ -44,21 +44,31 @@
 .type	__ulp_entry,@function
 .align 8
 
+// Track library entrance
 __ulp_entry:
-    // check if this is library entrance
+#ifndef HAVE___LIBPULP_TLS_GET_ADDR
     pushq   %r10
     pushq   %r9
     pushq   %r8
     pushq   %rsi
     pushq   %rdx
     pushq   %rcx
+#endif
     pushq   %rdi
     pushq   %rax
     leaq    __ulp_ret@tlsld(%rip), %rdi
+#ifndef HAVE___LIBPULP_TLS_GET_ADDR
     call    __tls_get_addr@PLT
+#else
+    call    __libpulp_tls_get_addr@PLT
+#endif
+
+    // If not library entrance, skip universe update code and call the
+    // target function right away.
     cmp     $0x0, __ulp_ret@dtpoff(%rax)
     jnz     __ulp_entry_bypass
 
+    // Otherwise, update local universe, then call target function.
     movq    %rax, %r11
 
     // Migrate to new universe:
@@ -88,50 +98,62 @@ __ulp_thread_counter_update:
 __ulp_call_function:
     popq    %rax
     popq    %rdi
+#ifndef HAVE___LIBPULP_TLS_GET_ADDR
     popq    %rcx
     popq    %rdx
     popq    %rsi
     popq    %r8
     popq    %r9
     popq    %r10
+#endif
     push    8(%rsp)
     pop     __ulp_ret@dtpoff(%r11)
     pop     %r11
     addq    $0x8, %rsp
     call    *%r11
 
+#ifndef HAVE___LIBPULP_TLS_GET_ADDR
     pushq   %r10
     pushq   %r9
     pushq   %r8
     pushq   %rsi
     pushq   %rdx
     pushq   %rcx
+#endif
     pushq   %rdi
     pushq   %rax
     leaq    __ulp_ret@tlsld(%rip), %rdi
+#ifndef HAVE___LIBPULP_TLS_GET_ADDR
     call    __tls_get_addr@PLT
+#else
+    call    __libpulp_tls_get_addr@PLT
+#endif
     movq     __ulp_ret@dtpoff(%rax), %r11
     movq    $0x0, __ulp_ret@dtpoff(%rax)
     popq    %rax
     popq    %rdi
+#ifndef HAVE___LIBPULP_TLS_GET_ADDR
     popq    %rcx
     popq    %rdx
     popq    %rsi
     popq    %r8
     popq    %r9
     popq    %r10
+#endif
     pushq   %r11
     retq
 
 __ulp_entry_bypass:
     popq    %rax
     popq    %rdi
+#ifndef HAVE___LIBPULP_TLS_GET_ADDR
     popq    %rcx
     popq    %rdx
     popq    %rsi
     popq    %r8
     popq    %r9
     popq    %r10
+#endif
     pop     %r11
     jmp     *%r11
 

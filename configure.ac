@@ -71,6 +71,12 @@ AC_SUBST([AM_CFLAGS], ["-Wall -Wextra -Werror"])
 AC_CHECK_FUNCS(__libpulp_malloc_checks)
 AC_CHECK_FUNCS(__libpulp_dlopen_checks)
 
+# The following test checks that a downstream/custom glibc provides
+# __libpulp_tls_get_addr for optimized library entrance tracking.
+# When available, trm.S avoids most of the register save/restore
+# instructions.
+AC_CHECK_FUNCS(__libpulp_tls_get_addr)
+
 AC_SUBST([ULP_NOP_LENGTH], [24,22])
 
 AC_CONFIG_FILES([Makefile
