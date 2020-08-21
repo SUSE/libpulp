@@ -20,6 +20,7 @@
 #include <libblocked.h>
 
 /* Do not optimize, otherwise the calloc/free sequences go away. */
+#pragma GCC push_options
 #pragma GCC optimize ("O0")
 
 /* Calls many of the functions that acquire the locks that might cause
@@ -60,6 +61,9 @@ worker (void *arg __attribute__ ((unused)))
     usleep (1);
   }
 }
+
+/* Restore optimization level. */
+#pragma GCC pop_options
 
 int
 main (void)
