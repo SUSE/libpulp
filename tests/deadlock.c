@@ -1,4 +1,5 @@
 #include <dlfcn.h>
+#include <errno.h>
 #include <malloc.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -79,7 +80,14 @@ main (void)
    * different output before and after the live-patching.
    */
   while (1) {
-    fgets (buffer, 128, stdin);
+    if (fgets (buffer, sizeof(buffer), stdin) == NULL) {
+      if (errno) {
+        perror ("deadlock");
+        return 1;
+      }
+      printf ("Reached the end of file; quitting.\n");
+      return 0;
+    }
     hello ();
   }
 

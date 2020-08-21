@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -11,7 +12,14 @@ main (void)
 
   printf("Waiting for input.\n");
   while (1) {
-    scanf("%s", input);
+    if (scanf("%s", input) == EOF) {
+      if (errno) {
+        perror("numserv");
+        return 1;
+      }
+      printf("Reached the end of file; quitting.\n");
+      return 0;
+    }
     if (strncmp(input, "dozen", strlen("dozen")) == 0)
       printf("%d\n", dozen());
     if (strncmp(input, "hundred", strlen("hundred")) == 0)
