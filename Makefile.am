@@ -10,3 +10,5 @@ SUBDIRS =				\
 	$(MAYBE_TOOLS)			\
 	examples			\
 	tests
+
+EXTRA_DIST = LICENSE README
