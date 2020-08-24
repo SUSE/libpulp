@@ -282,6 +282,7 @@ struct ulp_metadata *load_metadata()
 int parse_metadata(struct ulp_metadata *ulp)
 {
     int fd;
+    size_t done;
     ssize_t ret;
     uint32_t c;
     uint32_t i, j;
@@ -298,12 +299,27 @@ int parse_metadata(struct ulp_metadata *ulp)
     ulp->objs = NULL;
 
 #define READ(from, to, count) \
-   ret = read(from, to, count); \
-   if (ret == -1) { \
-     WARN("Unable to read() to " #to); \
-     return 0; \
+   for (done = 0;;) { \
+     errno = 0; \
+     ret = read(from, to + done, count - done); \
+     if (ret == 0) \
+       break; /* EOF or read called with count set to zero. */ \
+     else if (ret > 0) { \
+       done += ret; \
+       if (done == count) \
+         break; /* Done. */\
+       else \
+         continue; /* More to read. */ \
+     } \
+     else if (errno == EINTR || errno == EAGAIN) { \
+       continue; /* Try again. */ \
+     } \
+     else { \
+       WARN("Error with read() to " #to); \
+       return 0; \
+     } \
    } \
-   if (ret < (ssize_t) (count)) { \
+   if (done != count) { \
      WARN("Not enough data to read() to " #to); \
      return 0; \
    }
