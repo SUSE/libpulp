@@ -277,11 +277,42 @@ struct ulp_metadata *load_metadata()
     return ulp;
 }
 
+int read_data(int from, void *to, size_t count)
+{
+  size_t done;
+  ssize_t ret;
+
+  for (done = 0;;) {
+    errno = 0;
+    ret = read(from, to + done, count - done);
+    if (ret == 0)
+      break; /* EOF or read called with count set to zero. */
+    else if (ret > 0) {
+      done += ret;
+      if (done == count)
+        break; /* Done. */\
+      else
+        continue; /* More to read. */
+    }
+    else if (errno == EINTR || errno == EAGAIN) {
+      continue; /* Try again. */
+    }
+    else {
+      WARN("Error in call to read()");
+      return 1;
+    }
+  }
+  if (done != count) {
+    WARN("Not enough data to read()");
+    return 1;
+  }
+
+  return 0;
+}
+
 int parse_metadata(struct ulp_metadata *ulp)
 {
     int fd;
-    size_t done;
-    ssize_t ret;
     uint32_t c;
     uint32_t i, j;
     struct ulp_object *obj;
@@ -297,30 +328,8 @@ int parse_metadata(struct ulp_metadata *ulp)
     ulp->objs = NULL;
 
 #define READ(from, to, count) \
-   for (done = 0;;) { \
-     errno = 0; \
-     ret = read(from, to + done, count - done); \
-     if (ret == 0) \
-       break; /* EOF or read called with count set to zero. */ \
-     else if (ret > 0) { \
-       done += ret; \
-       if (done == count) \
-         break; /* Done. */\
-       else \
-         continue; /* More to read. */ \
-     } \
-     else if (errno == EINTR || errno == EAGAIN) { \
-       continue; /* Try again. */ \
-     } \
-     else { \
-       WARN("Error with read() to " #to); \
-       return 0; \
-     } \
-   } \
-   if (done != count) { \
-     WARN("Not enough data to read() to " #to); \
-     return 0; \
-   }
+  if (read_data(from, to, count)) \
+    return 0;
 
     /* read metadata header information */
     READ (fd, &ulp->type, 1 * sizeof(uint8_t));
