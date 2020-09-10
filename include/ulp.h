@@ -49,6 +49,7 @@ struct ulp_detour_root {
     void *handler;
     struct ulp_detour_root *next;
     struct ulp_detour *detours;
+    unsigned long (*get_local_universe)();
 };
 
 struct ulp_detour {

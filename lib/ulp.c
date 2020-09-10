@@ -68,6 +68,11 @@ __attribute__ ((constructor)) void begin(void)
     fprintf(stderr, "libpulp loaded...\n");
 }
 
+static unsigned long return_zero()
+{
+    return 0;
+}
+
 /* libpulp interfaces for livepatch trigger */
 int __ulp_apply_patch()
 {
@@ -603,6 +608,10 @@ int ulp_apply_all_units(struct ulp_metadata *ulp)
             root->index = get_next_function_index();
             root->patched_addr = old_fun;
             root->handler = obj->dl_handler;
+            root->get_local_universe =
+                dlsym(root->handler, "__ulp_ret_local_universe");
+            if (!root->get_local_universe)
+                root->get_local_universe = return_zero;
         }
 
         if (!(push_new_detour(__ulp_global_universe, ulp->patch_id,
@@ -872,7 +881,6 @@ void __ulp_manage_universes(unsigned long idx)
     struct ulp_detour_root *root;
     struct ulp_detour *d;
     void *target;
-    void *aux_ptr;
 
     root = get_detour_root_by_index((unsigned int) idx);
     if (!root) {
@@ -880,13 +888,9 @@ void __ulp_manage_universes(unsigned long idx)
         exit(-1);
     }
 
-    // load the thread-local universe. if we can't, assume it zero.
-    aux_ptr = dlsym(root->handler, "__ulp_thread_universe");
-    if (aux_ptr) universe = * (unsigned long *) aux_ptr;
-    else universe = 0;
-
     target = NULL;
 
+    universe = root->get_local_universe();
     if (universe != 0) {
         // since universes are kept in order, this is a top-down search
         for (d = root->detours; d != NULL; d = d->next) {

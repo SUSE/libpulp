@@ -181,6 +181,21 @@ __ulp_get_local_universe_value:
     movq    __ulp_thread_universe@dtpoff(%rax), %rax
     int3
 
+// The __ulp_ret_local_universe function must be in the .text section,
+// otherwise, trying to find its address with dlsym (during live patch
+// application) fails silently (it returns a non-NULL value, but not the
+// address of __ulp_ret_local_universe).
+.section .text
+.align 8
+
+.global __ulp_ret_local_universe
+.type   __ulp_ret_local_universe,@function
+__ulp_ret_local_universe:
+    leaq    __ulp_thread_universe@tlsld(%rip), %rdi
+    call    __tls_get_addr@PLT
+    movq    __ulp_thread_universe@dtpoff(%rax), %rax
+    ret
+
 .section .tbss,"awT",@nobits
 .align  8
 

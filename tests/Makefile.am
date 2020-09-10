@@ -177,8 +177,6 @@ TESTS = \
   deadlock.py \
   asunsafe_conversion.py
 
-XFAIL_TESTS = asunsafe_conversion.py
-
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON)
 
