@@ -132,7 +132,13 @@ clean-local:
 	rm -f $(METADATA)
 
 # Test programs
-check_PROGRAMS = numserv numserv_bsymbolic parameters blocked deadlock
+check_PROGRAMS = \
+  numserv \
+  numserv_bsymbolic \
+  parameters \
+  blocked \
+  deadlock \
+  asunsafe_conversion
 
 numserv_SOURCES = numserv.c
 numserv_LDADD = libdozens.la libhundreds.la
@@ -157,12 +163,21 @@ deadlock_LDFLAGS = -ldl $(AM_LDFLAGS)
 deadlock_LDADD = libblocked.la
 deadlock_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
+asunsafe_conversion_SOURCES = asunsafe_conversion.c
+asunsafe_conversion_CFLAGS = -pthread $(AM_CFLAGS)
+asunsafe_conversion_LDFLAGS = -ldl $(AM_LDFLAGS)
+asunsafe_conversion_LDADD = libblocked.la
+asunsafe_conversion_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
+
 TESTS = \
   numserv.py \
   numserv_bsymbolic.py \
   parameters.py \
   blocked.py \
-  deadlock.py
+  deadlock.py \
+  asunsafe_conversion.py
+
+XFAIL_TESTS = asunsafe_conversion.py
 
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON)
