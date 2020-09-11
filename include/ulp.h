@@ -54,7 +54,7 @@ struct ulp_detour_root {
 
 struct ulp_detour {
     unsigned char patch_id[32];
-    unsigned int universe;
+    unsigned long universe;
     void *target_addr;
     char active;
     struct ulp_detour *next;

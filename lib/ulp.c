@@ -1087,7 +1087,7 @@ void dump_ulp_detours(void)
         for (d = r->detours; d != NULL; d = d->next)
         {
             fprintf(stderr, "  * DETOUR:\n");
-            fprintf(stderr, "  * Universe: %d\n", d->universe);
+            fprintf(stderr, "  * Universe: %ld\n", d->universe);
             fprintf(stderr, "  * Target addr: %p\n", d->target_addr);
             fprintf(stderr, "  * Active: ");
             if (d->active) fprintf(stderr, "yep\n");
