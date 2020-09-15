@@ -29,6 +29,7 @@ struct ulp_process
     int pid;
 
     Elf64_Addr load_bias;
+    Elf64_Addr dyn_addr;
 
     struct ulp_thread *threads;
 

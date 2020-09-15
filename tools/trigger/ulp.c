@@ -104,7 +104,7 @@ insert_target_process (int pid, struct ulp_process **list)
 
     new->pid = pid;
     if (get_process_universes (new)) {
-      printf ("Failed to parsed data for live-patchable proccess %d... "
+      printf ("Failed to parsed data for live-patchable process %d... "
               "Skipping.\n", pid);
     }
     else {

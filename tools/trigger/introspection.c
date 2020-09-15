@@ -110,26 +110,13 @@ int parse_file_symtab(struct ulp_dynobj *obj, char needed)
 int dig_main_link_map(struct ulp_process *process)
 {
     Elf64_Addr dyn_addr = 0, link_map, link_map_addr, r_debug = 0;
-    int nentries, i, r_map_offset;
+    int r_map_offset;
     ElfW(Dyn) dyn;
     asymbol **symtab;
 
     symtab = process->dynobj_main->symtab;
-    nentries = process->dynobj_main->symtab_len;
 
-    for (i = 0; i < nentries; i++) {
-	if (strcmp(bfd_asymbol_name(symtab[i]),"_DYNAMIC")==0) {
-	    dyn_addr = bfd_asymbol_value(symtab[i]);
-	    break;
-	}
-    }
-    /* fix for PIE executables */
-    dyn_addr = dyn_addr + process->load_bias;
-
-    if (i == nentries) {
-	WARN("error parsing _DYNAMIC.");
-	return 1;
-    };
+    dyn_addr = process->dyn_addr;
 
     while(1) {
 	if (read_memory((char *) &dyn, sizeof(ElfW(Dyn)), process->pid,
@@ -157,6 +144,7 @@ int dig_main_link_map(struct ulp_process *process)
 		    link_map_addr))
     {
 	WARN("error reading link_map address.");
+	free(symtab);
 	return 4;
     }
 
@@ -164,6 +152,7 @@ int dig_main_link_map(struct ulp_process *process)
 		    sizeof(struct link_map), process->pid, link_map))
     {
 	WARN("error reading link_map address.");
+	free(symtab);
 	return 5;
     }
 
@@ -259,7 +248,11 @@ int dig_load_bias(struct ulp_process *process)
     char *format_str, *filename;
     Elf64_auxv_t at;
     uint64_t addrof_entry = 0;
-    Elf64_Addr addrof_start = 0;
+    uint64_t at_phdr = 0;
+    uint64_t pt_phdr = 0;
+    uint64_t adyn = 0;
+    int phent = 0, phnum = 0;
+    Elf64_Phdr phdr;
     struct ulp_dynobj *obj;
 
     obj = process->dynobj_main;
@@ -289,26 +282,48 @@ int dig_load_bias(struct ulp_process *process)
 	}
 	if (at.a_type == AT_ENTRY) {
 	    addrof_entry = at.a_un.a_val;
-	    break;
+	} else if (at.a_type == AT_PHDR) {
+	    at_phdr = at.a_un.a_val;
+	} else if (at.a_type == AT_PHNUM) {
+	    phnum = at.a_un.a_val;
+	} else if (at.a_type == AT_PHENT) {
+	    phent = at.a_un.a_val;
 	}
     } while (at.a_type != AT_NULL);
     if (addrof_entry == 0) {
 	WARN("error: unable to find entry address for the executable");
 	return 3;
     }
-
-    for (i = 0; i < obj->symtab_len; i++) {
-	if (strcmp(bfd_asymbol_name(obj->symtab[i]),"_start")==0) {
-	    addrof_start = bfd_asymbol_value(obj->symtab[i]);
-	    break;
+    if (at_phdr == 0) {
+	WARN("error: unable to find program header of target process");
+	return 5;
+    }
+    if (phent != sizeof(phdr)) {
+	WARN("error: invalid PHDR size for target process (32 bit process?)");
+	return 6;
+    }
+    for (i = 0; i < phnum; i++) {
+	if (read_memory((char *) &phdr, phent, process->pid,
+			at_phdr + i * phent)) {
+	    WARN("error: unable to read PHDR entry");
+	    return 7;
+	}
+	//WARN("PHDR %2d %x %lx %lx", i, phdr.p_type, phdr.p_vaddr, phdr.p_memsz);
+	switch (phdr.p_type) {
+	    case PT_PHDR: pt_phdr = phdr.p_vaddr; break;
+	    case PT_DYNAMIC: adyn = phdr.p_vaddr; break;
 	}
     }
-    if (addrof_start == 0) {
-	WARN("error: unable to find address for _start");
-	return 4;
-    }
 
-    process->load_bias = addrof_entry - addrof_start;
+    process->load_bias = 0;
+    if (pt_phdr) {
+	adyn += at_phdr - pt_phdr;
+	process->load_bias = at_phdr - pt_phdr;
+    }
+    //WARN("load bias: %lx", process->load_bias);
+    //WARN(".dynamic : %lx", adyn);
+    process->dyn_addr = adyn;
+
     free(filename);
     return 0;
 }
