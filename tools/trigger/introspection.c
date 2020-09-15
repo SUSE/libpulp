@@ -112,9 +112,6 @@ int dig_main_link_map(struct ulp_process *process)
     Elf64_Addr dyn_addr = 0, link_map, link_map_addr, r_debug = 0;
     int r_map_offset;
     ElfW(Dyn) dyn;
-    asymbol **symtab;
-
-    symtab = process->dynobj_main->symtab;
 
     dyn_addr = process->dyn_addr;
 
@@ -123,12 +120,10 @@ int dig_main_link_map(struct ulp_process *process)
 			dyn_addr))
 	{
 	    WARN("error reading _DYNAMIC array.");
-	    free(symtab);
 	    return 2;
 	}
 	if (dyn.d_tag == DT_NULL) {
 	    WARN("error searching for r_debug.");
-	    free(symtab);
 	    return 3;
 	}
 	if (dyn.d_tag == DT_DEBUG) {
@@ -144,7 +139,6 @@ int dig_main_link_map(struct ulp_process *process)
 		    link_map_addr))
     {
 	WARN("error reading link_map address.");
-	free(symtab);
 	return 4;
     }
 
@@ -152,11 +146,9 @@ int dig_main_link_map(struct ulp_process *process)
 		    sizeof(struct link_map), process->pid, link_map))
     {
 	WARN("error reading link_map address.");
-	free(symtab);
 	return 5;
     }
 
-    free(symtab);
     return 0;
 }
 
@@ -253,15 +245,6 @@ int dig_load_bias(struct ulp_process *process)
     uint64_t adyn = 0;
     int phent = 0, phnum = 0;
     Elf64_Phdr phdr;
-    struct ulp_dynobj *obj;
-
-    obj = process->dynobj_main;
-
-    if (!obj->symtab)
-    {
-	WARN("error: initialize process first.");
-	return 1;
-    }
 
     format_str = "/proc/%d/auxv";
     filename = calloc(strlen(format_str) + 10, 1);
@@ -346,7 +329,6 @@ int parse_main_dynobj(struct ulp_process *process)
     obj->filename = malloc (PATH_MAX);
     snprintf (obj->filename, PATH_MAX, "/proc/%d/exe", process->pid);
 
-    if (parse_file_symtab(obj, 1)) return 2;
     obj->next = NULL;
 
     process->dynobj_main = obj;
