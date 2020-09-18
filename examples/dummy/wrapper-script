@@ -46,6 +46,17 @@ testcase=$2
 LD_PRELOAD=$builddir/lib/.libs/libpulp.so $testcase &
 testcase_pid=$!
 
+# Right after startup /proc/pid/exe points to /usr/bin/bash, rather than
+# to the test case binary, so wait for the link to be updated.
+while true
+do
+  link=`ls -l /proc/$testcase_pid/exe`
+  if ! (echo $link | grep bash &> /dev/null)
+  then
+    break
+  fi
+done
+
 # Patch the program twice.
 patching_errors=0
 for i in 1 2
