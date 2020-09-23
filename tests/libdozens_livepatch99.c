@@ -1,7 +1,7 @@
 /*
  *  libpulp - User-space Livepatching Library
  *
- *  Copyright (C) 2020-2021 SUSE Software Solutions GmbH
+ *  Copyright (C) 2021 SUSE Software Solutions GmbH
  *
  *  This file is part of libpulp.
  *
@@ -19,14 +19,8 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-static int
-hidden_dozen (void)
-{
-  return 12;
-}
-
 int
-dozen (void)
+hidden_baker_dozen (void)
 {
-  return hidden_dozen ();
+  return 13;
 }

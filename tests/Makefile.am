@@ -98,6 +98,7 @@ POST_PROCESS += .libs/libpagecross.post
 
 # Live patches
 check_LTLIBRARIES += libdozens_livepatch1.la \
+                     libdozens_livepatch99.la \
                      libhundreds_livepatch1.la \
                      libhundreds_livepatch2.la \
                      libdozens_bsymbolic_livepatch1.la \
@@ -109,6 +110,9 @@ check_LTLIBRARIES += libdozens_livepatch1.la \
 
 libdozens_livepatch1_la_SOURCES = libdozens_livepatch1.c
 libdozens_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
+
+libdozens_livepatch99_la_SOURCES = libdozens_livepatch99.c
+libdozens_livepatch99_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
 libhundreds_livepatch1_la_SOURCES = libhundreds_livepatch1.c
 libhundreds_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
@@ -138,6 +142,9 @@ METADATA = \
   libdozens_livepatch1.dsc \
   libdozens_livepatch1.ulp \
   libdozens_livepatch1.rev \
+  libdozens_livepatch99.dsc \
+  libdozens_livepatch99.ulp \
+  libdozens_livepatch99.rev \
   libhundreds_livepatch1.dsc \
   libhundreds_livepatch1.ulp \
   libhundreds_livepatch1.rev \
@@ -165,6 +172,7 @@ METADATA = \
 
 EXTRA_DIST = \
   libdozens_livepatch1.in \
+  libdozens_livepatch99.in \
   libhundreds_livepatch1.in \
   libhundreds_livepatch2.in \
   libdozens_bsymbolic_livepatch1.in \
@@ -259,7 +267,10 @@ TESTS = \
   pagecross.py \
   terminal.py \
   thread_restore.py \
-  syscall_restart.py
+  syscall_restart.py \
+  hidden.py
+
+XFAIL_TESTS = hidden.py
 
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON) -B
