@@ -28,47 +28,36 @@
 __ulp_testlocks:
     nop
     nop
-    push    %rsp
     and     $0xfffffffffffffff0, %rsp
     call    __ulp_do_testlocks@PLT
-    pop     %rsp
     int3
 
 __ulp_trigger:
     nop
     nop
-    push    %rsp
     and     $0xfffffffffffffff0, %rsp
     call    __ulp_apply_patch@PLT
-    pop     %rsp
     int3
 
-/* this can be optimized to return the address directly */
 __ulp_get_path_buffer:
     nop
     nop
-    push    %rsp
     and     $0xfffffffffffffff0, %rsp
     call    __ulp_get_path_buffer_addr@PLT
-    pop     %rsp
     int3
 
 __ulp_check_patched:
     nop
     nop
-    push   %rsp
     and    $0xfffffffffffffff0, %rsp
     call   __ulp_check_applied_patch@PLT
-    pop    %rsp
     int3
 
 __ulp_get_global_universe:
     nop
     nop
-    push   %rsp
     and    $0xfffffffffffffff0, %rsp
     call   __ulp_get_global_universe_value@PLT
-    pop    %rsp
     int3
 
 __ulp_loop:
