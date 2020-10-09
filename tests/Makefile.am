@@ -183,8 +183,6 @@ TESTS = \
   asunsafe_conversion.py \
   redzone.py
 
-XFAIL_TESTS = redzone.py
-
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON)
 

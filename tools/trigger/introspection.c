@@ -548,6 +548,7 @@ int hijack_threads(struct ulp_process *process)
 
 	context = t->context;
 	context.rip = process->dynobj_libpulp->loop + 2;
+	context.rsp -= RED_ZONE_LEN;
 
 	if (set_regs(t->tid, &context))
 	{
@@ -590,6 +591,7 @@ int set_id_buffer(struct ulp_process *process, unsigned char *patch_id)
     thread = process->threads;
     context = thread->context;
     context.rip = process->dynobj_libpulp->path_buffer + 2;
+    context.rsp -= RED_ZONE_LEN;
 
     if (run_and_redirect(thread->tid, &context,
 			 process->dynobj_libpulp->loop))
@@ -629,6 +631,7 @@ int set_path_buffer(struct ulp_process *process, char *path)
     thread = process->threads;
     context = thread->context;
     context.rip = process->dynobj_libpulp->path_buffer + 2;
+    context.rsp -= RED_ZONE_LEN;
 
     if (run_and_redirect(thread->tid, &context,
 			 process->dynobj_libpulp->loop))
@@ -678,6 +681,7 @@ int testlocks(struct ulp_process *process)
     thread = process->threads;
     context = thread->context;
     context.rip = process->dynobj_libpulp->testlocks + 2;
+    context.rsp -= RED_ZONE_LEN;
 
     if (run_and_redirect(thread->tid, &context,
 			 process->dynobj_libpulp->loop))
@@ -706,6 +710,7 @@ int patch_applied(struct ulp_process *process, unsigned char *patch_id)
     thread = process->threads;
     context = thread->context;
     context.rip = process->dynobj_libpulp->check + 2;
+    context.rsp -= RED_ZONE_LEN;
 
     if (run_and_redirect(thread->tid, &context,
 			 process->dynobj_libpulp->loop))
@@ -733,6 +738,7 @@ int apply_patch(struct ulp_process *process, char *metadata)
     thread = process->threads;
     context = thread->context;
     context.rip = process->dynobj_libpulp->trigger + 2;
+    context.rsp -= RED_ZONE_LEN;
 
     if (run_and_redirect(thread->tid, &context,
 			 process->dynobj_libpulp->loop))
@@ -761,6 +767,7 @@ int read_global_universe (struct ulp_process *process)
     thread = process->threads;
     context = thread->context;
     context.rip = process->dynobj_libpulp->global + 2;
+    context.rsp -= RED_ZONE_LEN;
 
     if (run_and_redirect(thread->tid, &context,
                          process->dynobj_libpulp->loop))
@@ -786,6 +793,7 @@ unsigned long read_local_universe (struct ulp_process *process,
 
     context = thread->context;
     context.rip = library->local + 2;
+    context.rsp -= RED_ZONE_LEN;
 
     if (run_and_redirect(thread->tid, &context,
                          process->dynobj_libpulp->loop))
