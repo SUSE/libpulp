@@ -138,7 +138,8 @@ check_PROGRAMS = \
   parameters \
   blocked \
   deadlock \
-  asunsafe_conversion
+  asunsafe_conversion \
+  redzone
 
 numserv_SOURCES = numserv.c
 numserv_LDADD = libdozens.la libhundreds.la
@@ -169,13 +170,20 @@ asunsafe_conversion_LDFLAGS = -ldl $(AM_LDFLAGS)
 asunsafe_conversion_LDADD = libblocked.la
 asunsafe_conversion_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
+redzone_SOURCES = redzone.c
+redzone_LDADD = libblocked.la
+redzone_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
+
 TESTS = \
   numserv.py \
   numserv_bsymbolic.py \
   parameters.py \
   blocked.py \
   deadlock.py \
-  asunsafe_conversion.py
+  asunsafe_conversion.py \
+  redzone.py
+
+XFAIL_TESTS = redzone.py
 
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON)
