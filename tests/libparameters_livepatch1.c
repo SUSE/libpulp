@@ -19,8 +19,10 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-int
-new_parameters (int a, int b, int c, int d)
+#include <stdio.h>
+
+void
+new_int_params (int a, int b, int c, int d, int e, int f, int g, int h)
 {
-  return a * b * c * d;
+  printf ("%d-%d-%d-%d-%d-%d-%d-%d\n", h, g, f, e, d, c, b, a);
 }

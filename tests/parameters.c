@@ -21,39 +21,26 @@
 
 #include <errno.h>
 #include <stdio.h>
-#include <signal.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
 #include <libparameters.h>
-
-void
-handler (int sig,
-         siginfo_t *info __attribute__ ((unused)),
-         void *ucontext __attribute__ ((unused)))
-{
-  if (sig == SIGHUP)
-    printf("%d\n", parameters(1, 2, 3, 4));
-}
 
 int
 main (void)
 {
-  struct sigaction act;
+  char buffer[128];
 
-  memset(&act, 0, sizeof(act));
-  act.sa_sigaction = handler;
-  act.sa_flags = SA_SIGINFO;
-  errno = 0;
-  if (sigaction(SIGHUP, &act, NULL)) {
-    perror("sigaction:");
-    return errno;
-  }
-
-  printf("Waiting for signals.\n");
+  /* Loop waiting for any input. */
+  printf("Waiting for input.\n");
   while (1) {
-    pause();
+    if (fgets (buffer, sizeof(buffer), stdin) == NULL) {
+      if (errno) {
+        perror ("parameters");
+        return 1;
+      }
+      printf ("Reached the end of file; quitting.\n");
+      return 0;
+    }
+    int_params (1, 2, 3, 4, 5, 6, 7, 8);
   }
 
   return 1;

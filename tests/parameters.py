@@ -40,11 +40,11 @@ child = pexpect.spawn('./' + testname, timeout=1, env=preload,
                       encoding='utf-8')
 child.logfile = sys.stdout
 
-child.expect('Waiting for signals.')
+child.expect('Waiting for input.')
 print('Greeting... ok.')
 
-child.kill(signal.SIGHUP)
-child.expect('10\r\n');
+child.sendline('')
+child.expect('1-2-3-4-5-6-7-8\r\n');
 print('First call to libparameters... ok.')
 
 # Apply live patch and check for new behavior
@@ -54,8 +54,8 @@ if ret.returncode:
   print('Failed to apply livepatch #1 for libparameters')
   exit(1)
 
-child.kill(signal.SIGHUP)
-child.expect('24\r\n');
+child.sendline('')
+child.expect('8-7-6-5-4-3-2-1\r\n');
 print('Second call to libparameters... ok.')
 
 # Kill the child process and exit

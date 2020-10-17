@@ -19,11 +19,25 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* TODO: Extend the functions and parameters to cover more parameter
+/*
+ * TODO: Extend the functions and parameters to cover more parameter
  * passing conventions of target platform ABIs.
  */
-int
-parameters (int a, int b, int c, int d)
+
+#include <stdio.h>
+
+/*
+ * According to the ABI for x86_64, the first to sixth parameters of the
+ * POINTER or INTEGER classes are passed on registers, whereas the
+ * seventh and subsequent parameters of the same class are passed on the
+ * stack. This function has eight int parameters, which cover this
+ * aspect of the ABI.
+ *
+ * NOTE: Once other platforms get supported by libpulp, this should be
+ * reviewed and extended accordingly.
+ */
+void
+int_params (int a, int b, int c, int d, int e, int f, int g, int h)
 {
-  return a + b + c + d;
+  printf ("%d-%d-%d-%d-%d-%d-%d-%d\n", a, b, c, d, e, f, g, h);
 }

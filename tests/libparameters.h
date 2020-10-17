@@ -19,4 +19,5 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-int parameters (int a, int b, int c, int d);
+void
+int_params (int a, int b, int c, int d, int e, int f, int g, int h);
