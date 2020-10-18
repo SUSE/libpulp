@@ -26,3 +26,11 @@ new_int_params (int a, int b, int c, int d, int e, int f, int g, int h)
 {
   printf ("%d-%d-%d-%d-%d-%d-%d-%d\n", h, g, f, e, d, c, b, a);
 }
+
+void
+new_float_params (float a, float b, float c, float d, float e,
+                  float f, float g, float h, float i, float j)
+{
+  printf ("%.1f-%.1f-%.1f-%.1f-%.1f-%.1f-%.1f-%.1f-%.1f-%.1f\n",
+          j, i, h, g, f, e, d, c, b, a);
+}

@@ -45,6 +45,7 @@ print('Greeting... ok.')
 
 child.sendline('')
 child.expect('1-2-3-4-5-6-7-8\r\n');
+child.expect('1.0-2.0-3.0-4.0-5.0-6.0-7.0-8.0-9.0-10.0\r\n');
 print('First call to libparameters... ok.')
 
 # Apply live patch and check for new behavior
@@ -56,6 +57,7 @@ if ret.returncode:
 
 child.sendline('')
 child.expect('8-7-6-5-4-3-2-1\r\n');
+child.expect('10.0-9.0-8.0-7.0-6.0-5.0-4.0-3.0-2.0-1.0\r\n');
 print('Second call to libparameters... ok.')
 
 # Kill the child process and exit

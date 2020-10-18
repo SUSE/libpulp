@@ -41,3 +41,21 @@ int_params (int a, int b, int c, int d, int e, int f, int g, int h)
 {
   printf ("%d-%d-%d-%d-%d-%d-%d-%d\n", a, b, c, d, e, f, g, h);
 }
+
+/*
+ * According to the ABI for x86_64, the first to eigth parameters of the
+ * SSE class are passed on vector registers (%xmm0 to %xmm7). Likewise,
+ * parameters that fall into the SSEUP class use the same set of
+ * registers. This function has ten float parameters, which cover this
+ * aspect of the ABI.
+ *
+ * NOTE: Once other platforms get supported by libpulp, this should be
+ * reviewed and extended accordingly.
+ */
+void
+float_params (float a, float b, float c, float d, float e,
+              float f, float g, float h, float i, float j)
+{
+  printf ("%.1f-%.1f-%.1f-%.1f-%.1f-%.1f-%.1f-%.1f-%.1f-%.1f\n",
+          a, b, c, d, e, f, g, h, i, j);
+}
