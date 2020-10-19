@@ -77,6 +77,7 @@ POST_PROCESS += .libs/libblocked.post
 # Live patches
 check_LTLIBRARIES += libdozens_livepatch1.la \
                      libhundreds_livepatch1.la \
+                     libhundreds_livepatch2.la \
                      libdozens_bsymbolic_livepatch1.la \
                      libhundreds_bsymbolic_livepatch1.la \
                      libparameters_livepatch1.la \
@@ -87,6 +88,9 @@ libdozens_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
 libhundreds_livepatch1_la_SOURCES = libhundreds_livepatch1.c
 libhundreds_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
+
+libhundreds_livepatch2_la_SOURCES = libhundreds_livepatch2.c
+libhundreds_livepatch2_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
 libdozens_bsymbolic_livepatch1_la_SOURCES = libdozens_livepatch1.c
 libdozens_bsymbolic_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
@@ -107,6 +111,9 @@ METADATA = \
   libhundreds_livepatch1.dsc \
   libhundreds_livepatch1.ulp \
   libhundreds_livepatch1.rev \
+  libhundreds_livepatch2.dsc \
+  libhundreds_livepatch2.ulp \
+  libhundreds_livepatch2.rev \
   libdozens_bsymbolic_livepatch1.dsc \
   libdozens_bsymbolic_livepatch1.ulp \
   libdozens_bsymbolic_livepatch1.rev \
@@ -123,6 +130,7 @@ METADATA = \
 EXTRA_DIST = \
   libdozens_livepatch1.in \
   libhundreds_livepatch1.in \
+  libhundreds_livepatch2.in \
   libdozens_bsymbolic_livepatch1.in \
   libhundreds_bsymbolic_livepatch1.in \
   libparameters_livepatch1.in \
@@ -181,7 +189,8 @@ TESTS = \
   blocked.py \
   deadlock.py \
   asunsafe_conversion.py \
-  redzone.py
+  redzone.py \
+  revert.py
 
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON)

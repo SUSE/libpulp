@@ -988,7 +988,13 @@ int load_patch_info(char *livepatch)
 	return 13;
     }
 
-    if (ulp.type == 2) return 1;
+    if (ulp.type == 2) {
+	/*
+	 * Reverse patches do not have patching units nor dependencies,
+	 * so return right away.
+	 */
+	return 0;
+    }
 
     if (fread(&obj->nunits, sizeof(uint32_t), 1, file) < 1)
     {
