@@ -74,6 +74,18 @@ libblocked_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
 POST_PROCESS += .libs/libblocked.post
 
+# Target libraries to test page boundary conditions
+check_LTLIBRARIES += libpagecross.la
+
+libpagecross_la_SOURCES = libpagecross_padding.S \
+                          libpagecross.c \
+                          $(TARGET_TRM_SOURCES)
+libpagecross_la_CFLAGS = $(TARGET_CFLAGS)
+libpagecross_la_CCASFLAGS = -DPAGE_SIZE=$(PAGE_SIZE)
+libpagecross_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
+
+POST_PROCESS += .libs/libpagecross.post
+
 # Live patches
 check_LTLIBRARIES += libdozens_livepatch1.la \
                      libhundreds_livepatch1.la \
@@ -81,7 +93,8 @@ check_LTLIBRARIES += libdozens_livepatch1.la \
                      libdozens_bsymbolic_livepatch1.la \
                      libhundreds_bsymbolic_livepatch1.la \
                      libparameters_livepatch1.la \
-                     libblocked_livepatch1.la
+                     libblocked_livepatch1.la \
+                     libpagecross_livepatch1.la
 
 libdozens_livepatch1_la_SOURCES = libdozens_livepatch1.c
 libdozens_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
@@ -104,6 +117,9 @@ libparameters_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 libblocked_livepatch1_la_SOURCES = libblocked_livepatch1.c
 libblocked_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
+libpagecross_livepatch1_la_SOURCES = libpagecross_livepatch1.c
+libpagecross_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
+
 METADATA = \
   libdozens_livepatch1.dsc \
   libdozens_livepatch1.ulp \
@@ -125,7 +141,10 @@ METADATA = \
   libparameters_livepatch1.rev \
   libblocked_livepatch1.dsc \
   libblocked_livepatch1.ulp \
-  libblocked_livepatch1.rev
+  libblocked_livepatch1.rev \
+  libpagecross_livepatch1.dsc \
+  libpagecross_livepatch1.ulp \
+  libpagecross_livepatch1.rev
 
 EXTRA_DIST = \
   libdozens_livepatch1.in \
@@ -134,7 +153,8 @@ EXTRA_DIST = \
   libdozens_bsymbolic_livepatch1.in \
   libhundreds_bsymbolic_livepatch1.in \
   libparameters_livepatch1.in \
-  libblocked_livepatch1.in
+  libblocked_livepatch1.in \
+  libpagecross_livepatch1.in
 
 clean-local:
 	rm -f $(METADATA)
@@ -147,7 +167,8 @@ check_PROGRAMS = \
   blocked \
   deadlock \
   asunsafe_conversion \
-  redzone
+  redzone \
+  pagecross
 
 numserv_SOURCES = numserv.c
 numserv_LDADD = libdozens.la libhundreds.la
@@ -182,6 +203,10 @@ redzone_SOURCES = redzone.c
 redzone_LDADD = libblocked.la
 redzone_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
+pagecross_SOURCES = pagecross.c
+pagecross_LDADD = libpagecross.la
+pagecross_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
+
 TESTS = \
   numserv.py \
   numserv_bsymbolic.py \
@@ -190,7 +215,10 @@ TESTS = \
   deadlock.py \
   asunsafe_conversion.py \
   redzone.py \
-  revert.py
+  revert.py \
+  pagecross.py
+
+XFAIL_TESTS= pagecross.py
 
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON)

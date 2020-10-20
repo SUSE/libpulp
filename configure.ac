@@ -96,6 +96,20 @@ AC_CHECK_FUNCS(__libpulp_dlopen_checks)
 # instructions.
 AC_CHECK_FUNCS(__libpulp_tls_get_addr)
 
+# The test suite covers patching of functions near page boundaries, so
+# try to detect the size of a page in the system, using getconf. If
+# getconf is not available, set the page size to a large power of two,
+# in the hope that it will work on multiple architectures and system
+# configurations.
+AC_CHECK_PROGS([GETCONF], [getconf])
+AS_IF([test -z "$GETCONF"],
+AC_SUBST([PAGE_SIZE], [1048576]),
+AC_SUBST([PAGE_SIZE], [$($GETCONF PAGE_SIZE)]))
+
+# Libpulp uses -fpatchable-function-entry to add 24 padding nops to the
+# prologue of all functions (22 nops before the function address and 2
+# right after it). These nops get replaced with other instructions when
+# a live patch is applied.
 AC_SUBST([ULP_NOP_LENGTH], [24,22])
 
 AC_CONFIG_FILES([Makefile

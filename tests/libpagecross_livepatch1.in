@@ -1,0 +1,3 @@
+__ABS_BUILDDIR__/.libs/libpagecross_livepatch1.so
+@__ABS_BUILDDIR__/.libs/libpagecross.so.0
+function:new_function
