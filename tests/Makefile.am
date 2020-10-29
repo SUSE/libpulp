@@ -230,7 +230,7 @@ TESTS = \
   pagecross.py \
   terminal.py
 
-XFAIL_TESTS= pagecross.py terminal.py
+XFAIL_TESTS= pagecross.py
 
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON)

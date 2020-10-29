@@ -54,8 +54,7 @@ for i in range(32):
   ret = subprocess.run([check, pid, 'libblocked_livepatch1.ulp'])
   if ret.returncode:
     print('Failed to check livepatch #1 for libblocked')
-    print('(error not related to SIGSTOP/SIGCONT detection)')
-    errors = 77
+    errors = 99
     break
   else:
     print('Check OK')

@@ -32,6 +32,7 @@ struct ulp_process
     Elf64_Addr dyn_addr;
 
     struct ulp_thread *threads;
+    struct ulp_thread *main_thread;
 
     struct ulp_dynobj *dynobj_main;
     struct ulp_dynobj *dynobj_libpulp;
@@ -95,8 +96,6 @@ struct ulp_addresses
 int parse_file_symtab(struct ulp_dynobj *obj, char needed);
 
 int dig_main_link_map(struct ulp_process *process);
-
-int parse_threads(struct ulp_process *process);
 
 Elf64_Addr get_loaded_symbol_addr(struct ulp_dynobj *obj, char *sym);
 

@@ -152,64 +152,6 @@ int dig_main_link_map(struct ulp_process *process)
     return 0;
 }
 
-/* Builds a list of the threads of PROCESS, which must have been
- * initialized with the pid of the desired process in PROCESS->pid.
- */
-int parse_threads(struct ulp_process *process)
-{
-    struct ulp_thread *t, *prev_t;
-    char *format_str, *dirname;
-    DIR *tasks_dir;
-    struct dirent *dir;
-    int tid;
-
-    format_str = "/proc/%d/task/";
-    dirname = calloc(strlen(format_str) + 10, 1);
-    sprintf(dirname, format_str, process->pid);
-
-    prev_t = NULL;
-
-    tasks_dir = opendir(dirname);
-    if (tasks_dir) {
-	dir = readdir(tasks_dir);
-	while (dir != NULL) {
-	    tid = atoi(dir->d_name);
-	    /* add main thread in front, after this loop */
-	    if (!tid || tid == process->pid)
-	    {
-		dir = readdir(tasks_dir);
-		continue;
-	    }
-
-	    t = calloc(sizeof(struct ulp_thread), 1);
-	    if (!t)
-	    {
-		WARN("Unable to allocate thread structure.");
-		return 1;
-	    }
-	    t->tid = tid;
-	    t->next = prev_t;
-	    t->consistent = 0;
-	    prev_t = t;
-
-	    dir = readdir(tasks_dir);
-	}
-    }
-
-    t = calloc(sizeof(struct ulp_thread), 1);
-    if (!t)
-    {
-	WARN("Unable to allocate main thread structure.");
-	return 1;
-    }
-    t->tid = process->pid;
-    t->next = prev_t;
-    t->consistent = 0;
-    process->threads = t;
-
-    return 0;
-}
-
 /* Looks for a symbol named SYM in OBJ. If the symbols gets found,
  * returns its address. Otherwise, returns 0.
  */
@@ -490,8 +432,6 @@ int initialize_data_structures(struct ulp_process *process)
 
     bfd_init();
 
-    if (parse_threads(process)) return 2;
-
     if (parse_main_dynobj(process)) return 3;
     if (parse_libs_dynobj(process)) return 3;
 
@@ -506,72 +446,192 @@ int initialize_data_structures(struct ulp_process *process)
     return 0;
 }
 
-/* Puts the threads in PROCESS into an infinite loop, so that other
- * introspection routines, e.g. set_id_buffer() and set_path_buffer(),
- * can be used. On success, returns 0.
+/*
+ * Searches for a thread structure with TID in a LIST of threads.
+ * Returns a pointer to the thread, if found; NULL otherwise.
+ */
+struct ulp_thread *search_thread(struct ulp_thread* list, int tid)
+{
+    while (list) {
+	if (list->tid == tid)
+	    return list;
+	list = list->next;
+   }
+   return NULL;
+}
+
+/*
+ * Attaches to all child threads in PROCESS, which causes them to stop,
+ * as well as puts the main thread into an infinite loop. After that,
+ * other introspection routines, such as set_id_buffer() and
+ * set_path_buffer(), can be used. On success, returns 0. If anything
+ * goes wrong during hijacking, try to restore the original state of the
+ * program; if that succeeds, return 1, and -1 otherwise.
  *
  * NOTE: this function marks the beginning of the critical section.
  */
 int hijack_threads(struct ulp_process *process)
 {
-    int errors;
+    char taskname[PATH_MAX];
+    int fatal;
+    int loop;
+    int pid;
+    int tid;
+    DIR *taskdir;
+    struct dirent *dirent;
     struct ulp_thread *t;
     struct user_regs_struct context;
 
+    /* Check that the address of the loop routine is known */
     if (!process->dynobj_libpulp->loop) {
 	WARN("error: loop not found.");
 	return 1;
     }
 
-    if (stop(process->pid)) {
-	WARN("Hijack prologue failed (stop).");
+    /* Open /proc/<pid>/task. */
+    pid = process->pid;
+    snprintf(taskname, PATH_MAX, "/proc/%d/task", pid);
+    taskdir = opendir(taskname);
+    if (taskdir == NULL) {
+	WARN("Error opening %s.", taskname);
 	return 1;
     }
 
-    errors = 0;
-    for (t = process->threads; t != NULL; t = t->next)
-    {
-	if (attach(t->tid))
-	{
-	    WARN("Hijack %d failed (attach).", t->tid);
-	    errors = 1;
-	    break;
-	};
+    fatal = 0;
 
-	if (get_regs(t->tid, &t->context))
-	{
-	    WARN("Hijack %d failed (get_regs).", t->tid);
-	    detach(t->tid);
-	    errors = 1;
-	    break;
-	};
+    /*
+     * Iterate over the threads in /proc/<pid>/task, attaching to each
+     * of them. Perform this operation in loop until no new entries are
+     * found to guarantee that threads created during iterations of the
+     * inner loop are taken into account.
+     */
+    do {
+        loop = 0;
 
-	context = t->context;
-	context.rip = process->dynobj_libpulp->loop + 2;
-	context.rsp -= RED_ZONE_LEN;
+        /* Start from updated directory listing. */
+        rewinddir(taskdir);
 
-	if (set_regs(t->tid, &context))
-	{
-	    WARN("Hijack %d failed (set_regs).", t->tid);
-	    detach (t->tid);
-	    errors = 1;
-	    break;
-	};
+        errno = 0;
+        while ((dirent = readdir(taskdir)) != NULL) {
 
-	if (detach(t->tid))
-	{
-	    WARN("Hijack %d failed (detach).", t->tid);
-	    errors = 1;
-	    break;
-	};
+            /* Thread number */
+            tid = atoi(dirent->d_name);
+            if (tid == 0)
+                continue;
+
+            /* Check that the thread has not already been dealt with. */
+            t = search_thread(process->threads, tid);
+
+            if (t == NULL) {
+                /* New thread detected, so set outer loop re-run. */
+                loop = 1;
+
+                /*
+                 * For each new thread:
+                 *   Allocate memory for a new entry in the list;
+                 *   Attach with ptrace, which stops the thread;
+                 *   Save all registers;
+                 *   Update the list.
+                 */
+                t = calloc(sizeof(struct ulp_thread), 1);
+                if (!t) {
+                    WARN("Unable to allocate thread structure.");
+                    goto child_alloc_error;
+                }
+                if (attach(tid)) {
+                    WARN("Hijack %d failed (attach).", tid);
+                    goto child_attach_error;
+                }
+                if (get_regs(tid, &t->context))
+                {
+                    WARN("Hijack %d failed (get_regs).", tid);
+                    goto child_getregs_error;
+                };
+                t->tid = tid;
+                t->next = process->threads;
+                process->threads = t;
+
+                /* Save an extra pointer to the main thread. */
+                if (!tid || tid == pid)
+                    process->main_thread = t;
+
+                errno = 0;
+                continue;
+
+                /* Error paths for the hijacking of a child thread */
+child_getregs_error:
+                detach(tid);
+child_attach_error:
+                free(t);
+child_alloc_error:
+                goto children_restore;
+            }
+        }
+
+        /*
+         * The inner loop is over when readdir returns NULL. On error,
+         * errno is set accordingly, otherwise it is left untouched.
+         */
+        if (errno) {
+            WARN("Error reading from the task directory (%s): %s",
+                 taskname, strerror(errno));
+            goto children_restore;
+        }
+
+    } while (loop);
+
+    /*
+     * Complete the hijacking of the main thread, putting it into an
+     * infinity loop, then detaching so it can be reattached later.
+    */
+    context = process->main_thread->context;
+    context.rip = process->dynobj_libpulp->loop + 2;
+    context.rsp -= RED_ZONE_LEN;
+    if (set_regs(pid, &context)) {
+        WARN("Hijacking main thread %d failed (set_regs).", pid);
+        goto parent_setregs_error;
+    };
+    if (detach(pid)) {
+        WARN("Hijacking main thread %d failed (detach).", pid);
+        goto parent_detach_error;
+    };
+
+    /* Release resources and return successfully */
+    if (closedir(taskdir))
+        WARN("Closing %s failed: %s", taskname, strerror(errno));
+    return 0;
+
+    /* Error paths for the hijacking of the main thread */
+parent_detach_error:
+parent_setregs_error:
+    if (set_regs(pid, &process->main_thread->context)) {
+        WARN("WARNING: restoring context of main thread %d failed.\n"
+             "         Program state might be inconsistent.", pid);
+        fatal = 1;
     }
 
-    if (restart(process->pid)) {
-	WARN("Hijack epilogue failed (restart).");
-	return 1;
+    /*
+     * If hijacking any of the threads fails, revert all changes, detach
+     * from all, release resources, and return with error.
+     */
+children_restore:
+    while (process->threads) {
+        if (detach(process->threads->tid)) {
+            WARN("WARNING: detaching from thread %d failed.",
+                 process->threads->tid);
+            fatal = 1;
+        }
+        t = process->threads;
+        process->threads = process->threads->next;
+        free (t);
     }
 
-    return errors;
+    if (closedir(taskdir))
+        WARN("Closing %s failed: %s", taskname, strerror(errno));
+
+    if (fatal)
+      return -1;
+    return 1;
 }
 
 /* Jacks into PROCESS and writes PATCH_ID into libpulp's
@@ -588,7 +648,7 @@ int set_id_buffer(struct ulp_process *process, unsigned char *patch_id)
     Elf64_Addr path_addr;
     int i;
 
-    thread = process->threads;
+    thread = process->main_thread;
     context = thread->context;
     context.rip = process->dynobj_libpulp->path_buffer + 2;
     context.rsp -= RED_ZONE_LEN;
@@ -628,7 +688,7 @@ int set_path_buffer(struct ulp_process *process, char *path)
     struct user_regs_struct context;
     Elf64_Addr path_addr;
 
-    thread = process->threads;
+    thread = process->main_thread;
     context = thread->context;
     context.rip = process->dynobj_libpulp->path_buffer + 2;
     context.rsp -= RED_ZONE_LEN;
@@ -678,7 +738,7 @@ int testlocks(struct ulp_process *process)
     struct ulp_thread *thread;
     struct user_regs_struct context;
 
-    thread = process->threads;
+    thread = process->main_thread;
     context = thread->context;
     context.rip = process->dynobj_libpulp->testlocks + 2;
     context.rsp -= RED_ZONE_LEN;
@@ -707,7 +767,7 @@ int patch_applied(struct ulp_process *process, unsigned char *patch_id)
 
     if (set_id_buffer(process, patch_id)) return 2;
 
-    thread = process->threads;
+    thread = process->main_thread;
     context = thread->context;
     context.rip = process->dynobj_libpulp->check + 2;
     context.rsp -= RED_ZONE_LEN;
@@ -735,7 +795,7 @@ int apply_patch(struct ulp_process *process, char *metadata)
 
     if (set_path_buffer(process, metadata)) return 1;
 
-    thread = process->threads;
+    thread = process->main_thread;
     context = thread->context;
     context.rip = process->dynobj_libpulp->trigger + 2;
     context.rsp -= RED_ZONE_LEN;
@@ -764,7 +824,7 @@ int read_global_universe (struct ulp_process *process)
     struct ulp_thread *thread;
     struct user_regs_struct context;
 
-    thread = process->threads;
+    thread = process->main_thread;
     context = thread->context;
     context.rip = process->dynobj_libpulp->global + 2;
     context.rsp -= RED_ZONE_LEN;
@@ -841,42 +901,29 @@ int restore_threads(struct ulp_process *process)
     int errors;
     struct ulp_thread *t;
 
-    if (!process->dynobj_libpulp->loop) {
-	WARN("error: loop not found.");
-	return 1;
-    }
-
-    if (stop(process->pid)) {
-	WARN("Hijack prologue failed (stop).");
-	return 1;
-    }
-
     errors = 0;
-    for (t = process->threads; t != NULL; t = t->next)
-    {
-	if (attach(t->tid))
-	{
-	    WARN("Restore threads error (can't attach).");
-	    errors = 1;
-            break;
-	};
-	if (set_regs(t->tid, &t->context))
-	{
-	    WARN("Restore threads error (can't set regs).");
-	    errors = 1;
-            break;
-	};
-	if (detach(t->tid))
-	{
-	    WARN("Restore threads error (can't detatch).");
-	    errors = 1;
-            break;
-	};
+
+    /* Restore the context of the main thread */
+    t = process->main_thread;
+    if (attach(t->tid)) {
+        WARN("Restoring main thread failed (attach).");
+        errors = 1;
+    }
+    else if (set_regs(t->tid, &t->context)) {
+        WARN("Restoring main thread failed (set_regs).");
+        errors = 1;
     }
 
-    if (restart(process->pid)) {
-	WARN("Hijack epilogue failed (restart).");
-	return 1;
+    /* Detach from all threads, including the main one */
+    while (process->threads) {
+        if (detach(process->threads->tid)) {
+            WARN("WARNING: detaching from thread %d failed.",
+                 process->threads->tid);
+            errors = 1;
+        }
+        t = process->threads;
+        process->threads = process->threads->next;
+        free (t);
     }
 
     return errors;
