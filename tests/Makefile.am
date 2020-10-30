@@ -168,7 +168,9 @@ check_PROGRAMS = \
   deadlock \
   asunsafe_conversion \
   redzone \
-  pagecross
+  pagecross \
+  loop \
+  terminal
 
 numserv_SOURCES = numserv.c
 numserv_LDADD = libdozens.la libhundreds.la
@@ -207,6 +209,15 @@ pagecross_SOURCES = pagecross.c
 pagecross_LDADD = libpagecross.la
 pagecross_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
+loop_SOURCES = loop.c
+loop_LDADD = libblocked.la $(top_builddir)/lib/libpulp.la
+loop_LDFLAGS = -Wl,--no-as-needed
+loop_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
+
+terminal_SOURCES = terminal.c
+terminal_CFLAGS = -pthread $(AM_CFLAGS)
+terminal_DEPENDENCIES = $(POST_PROCESS) $(METADATA) loop
+
 TESTS = \
   numserv.py \
   numserv_bsymbolic.py \
@@ -216,9 +227,10 @@ TESTS = \
   asunsafe_conversion.py \
   redzone.py \
   revert.py \
-  pagecross.py
+  pagecross.py \
+  terminal.py
 
-XFAIL_TESTS= pagecross.py
+XFAIL_TESTS= pagecross.py terminal.py
 
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON)
