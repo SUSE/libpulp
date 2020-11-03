@@ -699,6 +699,12 @@ struct ulp_applied_patch *ulp_state_update(struct ulp_metadata *ulp)
     return a_patch;
 }
 
+/*
+ * Assumes that TGT_ADDR points to the start of the nop padding area of
+ * live patchable functions, then sets the memory protection bits of the
+ * pages containing that area to allow writes to them. The nop padding
+ * area may span multiple pages.
+ */
 int set_write_tgt(void *tgt_addr)
 {
     unsigned long page_size, page_offset;
@@ -708,22 +714,28 @@ int set_write_tgt(void *tgt_addr)
     page_offset = (unsigned long) tgt_addr % page_size;
     page_start = tgt_addr - page_offset;
 
-    if (mprotect(page_start, page_size, PROT_WRITE | PROT_EXEC)) {
+    /*
+     * From the start of the page containing the starting address of the
+     * nop padding area, up to the last byte of the padding area, allow
+     * writes to the pages containing the range.
+     *
+     * NOTE: mprotect implicitly handles page crosses.
+     */
+    if (mprotect(page_start, page_offset+ULP_NOPS_LEN,
+		 PROT_WRITE | PROT_EXEC)) {
 	WARN("Memory protection set +w error");
 	return 0;
-    }
-
-    if (page_offset - page_size < 5) {
-	page_start = page_start + page_size;
-	if (mprotect(page_start, page_size, PROT_WRITE | PROT_EXEC)) {
-	    WARN("Memory protection set +w error (second page)");
-	    return 0;
-	}
     }
 
     return 1;
 }
 
+/*
+ * Assumes that TGT_ADDR points to the start of the nop padding area of
+ * live patchable functions, then sets the memory protection bits of the
+ * pages containing that area to allow execution of instruction in them.
+ * The nop padding area may span multiple pages.
+ */
 int set_exec_tgt(void *tgt_addr)
 {
     unsigned long page_size, page_offset;
@@ -733,17 +745,17 @@ int set_exec_tgt(void *tgt_addr)
     page_offset = (unsigned long) tgt_addr % page_size;
     page_start = tgt_addr - page_offset;
 
-    if (mprotect(page_start, page_size, PROT_READ | PROT_EXEC)) {
+    /*
+     * From the start of the page containing the starting address of the
+     * nop padding area, up to the last byte of the padding area, allow
+     * execution of instructions in the pages containing the range.
+     *
+     * NOTE: mprotect implicitly handles page crosses.
+     */
+    if (mprotect(page_start, page_offset+ULP_NOPS_LEN,
+		 PROT_READ | PROT_EXEC)) {
 	WARN("Memory protection set +x error");
 	return 0;
-    }
-
-    if (page_offset - page_size < 5) {
-	page_start = page_start + page_size;
-	if (mprotect(page_start, page_size, PROT_READ | PROT_EXEC)) {
-	    WARN("Memory protection set +x error (second page)");
-	    return 0;
-	}
     }
 
     return 1;
@@ -948,12 +960,12 @@ int ulp_patch_addr(void *old_faddr, unsigned int index)
 
     manage = &__ulp_prologue;
 
-    if (!set_write_tgt(old_faddr)) return 0;
+    if (!set_write_tgt(old_fentry)) return 0;
 
     ulp_patch_prologue_layout(old_fentry, index);
     ulp_patch_addr_absolute(old_fentry, manage);
 
-    if (!set_exec_tgt(old_faddr)) return 0;
+    if (!set_exec_tgt(old_fentry)) return 0;
 
     return 1;
 }
