@@ -14,44 +14,44 @@ Libpulp is a library (and a framework) that enables live patching of other user
 space libraries. Most of its tools rely on ptrace to attach and modify functions
 in libraries which are used by running applications. To be suitable for live
 patching, these target libraries are required to be compiled through a modified
-toolchain, which is also provided within the Libpulp package.
+toolchain (the modifications are provided by Libpulp as patches).
 
-Libpulp is available under GPLv3, at https://github.com/suse/libpulp
+Libpulp is free software; you can redistribute it and/or modify it under the
+terms of the GNU Lesser General Public License as published by the Free Software
+Foundation; either version 2.1 of the License, or (at your option) any later
+version.
 
 -------------------------------------------------------------------------------
 * 2 * Consistency
 
-To ensure correct program semantics, it is important to keep atomicity while
-applying a live patch. This means that, after the moment of patching, all the
-functions which are part of the live patch set are migrated into their newer
-versions simultaneously, never again being executed in their older versions.
+To ensure correct program semantics, it is important to keep atomicity during
+the execution of live patchable functions. This means that, for each thread in
+the affected process, all the functions which are part of a live patch set are
+migrated to their newer versions simultaneously.
 
-To achieve atomicity while applying a patch, it is important to verify a
-property named consistency. Briefly, before modifying an application's function
-during runtime, it is necessary to ensure that the function is not currently
-active -- it is not being executed, nor will be returned to from a function
-currently active. This way, if a function A calls a function B, and the program
-is stopped during the execution of B for patching, neither A nor B can be
-patched.
+To achieve this, all replacement functions loaded by a live patch become
+associated with a single and unique number, so that they are all perceived as
+belonging to the same universe (snapshot) of the program. Apart from that, each
+thread in the process has a thread-local counter, which is compared against
+those unique numbers to select between original and replacement functions.
 
-To enable consistency verification, Libpulp uses special instrumentation of
-the library's entry points in a way that the library itself flags whenever
-control-flow enters or leaves its scope. From that, it is possible to assume
-that if the library was not entered, none of the functions belonging to the
-library is currently executing and, thus, all of them can be patched.
+Whenever a thread is within a library, its thread-local counter does not change,
+so it uses functions from the same universe. Then, when the thread crosses the
+application-library boundary, the thread-local counter gets update and new
+library calls use new functions all at once, even if there are intra-library
+calls (notice that intra-library calls do not update the thread-local counter).
 
 -------------------------------------------------------------------------------
 * 3 * The patching process
 
 A live patch is built on top of existing libraries. The Libpulp framework
 provides the tools to create the patches. Once the patch is created, it is
-applied through a ptrace-based tool, that will attach to the target process,
-check if it is compliant with live patching, verify that the target library
-is properly loaded into its address space, verify the process' consistency as
-mentioned above and then, through control-flow redirection, use routines from
-Libpulp to make the process load the new version of the functions to its
-address space and then, through adding detours to the old function prologues,
-ensure that only the new version of the functions are invoked.
+applied through a ptrace-based tool, that will: attach to the target process;
+check if it is compliant with live patching; verify that the target library
+is properly loaded into its address space; through control-flow redirection, use
+routines from Libpulp to make the process load the new version of the functions
+to its address space; then, through adding detours to the old function
+prologues, ensure that only the new version of the functions are invoked.
 
 The detours are not patched directly on top of previously existing instructions.
 Instead, the function must be emitted by gcc with an area of padding nops which
@@ -75,9 +75,11 @@ Contains the Libpulp library (which has the routines used by the live patching
 procedures).
 
 The library objects are:
+
 - trm.S: This is an object that must be linked into libraries which will later
 be live patching-enabled. It contains the routines used to track the library's
-entry points and routines used to later verify the consistency of given threads.
+entry points and routines to retrieve the value of the thread-local counter.
+
 - libpulp.c: This object will later be compiled into the libpulp.so, which can
 be preloaded by any process. It contains the routines which will later be
 redirected to through ptrace and will make the actual patching happen.
@@ -87,6 +89,7 @@ redirected to through ptrace and will make the actual patching happen.
 Contains the tools used to trigger, check and build live patches.
 
 The tools are:
+
 - dynsym_gate: This tool is used to modify the library entry points to the
 special instrumentation used by Libpulp to track consistency. It modifies the
 values of the targets in the dynamic symbol table to, instead of pointing to
@@ -108,10 +111,9 @@ loaded. If the argument "patch" is supplied, it invokes the trigger tool for
 every process in the list. If the argument "check" is supplied, it only verifies
 if the given process was previously patched.
 
--- examples
+-- tests
 
-Contains example libraries, applications and live patches, used to test and
-verify that Libpulp works properly.
+Contains the test suite, which can be execute with 'make check'.
 
 -------------------------------------------------------------------------------
 * 5 * Description file syntax
