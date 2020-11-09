@@ -23,11 +23,6 @@ if BUILD_ULP_TOOLS
   MAYBE_TOOLS = tools
 endif
 
-SUBDIRS =				\
-	include			\
-	lib				\
-	$(MAYBE_TOOLS)			\
-	examples			\
-	tests
+SUBDIRS = include lib $(MAYBE_TOOLS) tests
 
 EXTRA_DIST = LICENSE README

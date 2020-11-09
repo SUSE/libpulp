@@ -119,8 +119,6 @@ AC_CONFIG_FILES([Makefile
 		 tools/Makefile
 		 tools/dynsym_gate/Makefile
 		 tools/packer/Makefile
-		 tools/trigger/Makefile
-		 examples/Makefile
-		 examples/dummy/Makefile])
+		 tools/trigger/Makefile])
 
 AC_OUTPUT
