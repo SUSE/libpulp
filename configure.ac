@@ -121,7 +121,6 @@ AC_CONFIG_FILES([Makefile
 		 tools/packer/Makefile
 		 tools/trigger/Makefile
 		 examples/Makefile
-		 examples/dummy/Makefile
-		 examples/fibo/Makefile])
+		 examples/dummy/Makefile])
 
 AC_OUTPUT

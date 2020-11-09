@@ -1,0 +1,3 @@
+__ABS_BUILDDIR__/.libs/librecursion_livepatch1.so
+@__ABS_BUILDDIR__/.libs/librecursion.so.0
+recursion:new_recursion

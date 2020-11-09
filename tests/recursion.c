@@ -19,32 +19,35 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
-#include <unistd.h>
 
-int fibo(int n);
+#include <librecursion.h>
 
-int main(int argc, char *argv[])
+int main(void)
 {
-    int r, i, j;
-    clock_t t;
-    double time;
+  char buffer[128];
+  int input;
 
-    if (argc < 2) return -1;
-
-    fprintf(stderr, "sleeping for: %d secs\n", atoi(argv[1]));
-    sleep(atoi(argv[1]));
-
-    for (i = 0; i < 46; i++) {
-        for (j = 0; j < 10; j++) {
-            t = clock();
-            r = fibo(i);
-            t = clock() - t;
-            time = ((double) t) / CLOCKS_PER_SEC;
-            fprintf(stderr, "fibo(%d), %d, %f\n", i, r, time);
-         }
+  /* Loop waiting for a numerical input. */
+  printf("Waiting for input.\n");
+  while (1) {
+    if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
+      if (errno) {
+        perror("recursive");
+        return 1;
+      }
+      printf("Reached the end of file; quitting.\n");
+      return 0;
     }
-    return 0;
+    input = atoi(buffer);
+    if (input <= 0) {
+      printf("Input must be greater than zero.\n");
+      continue;
+    }
+    printf("%lld\n", recursion(input));
+  }
+
+  return 1;
 }

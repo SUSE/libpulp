@@ -64,6 +64,16 @@ libparameters_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
 POST_PROCESS += .libs/libparameters.post
 
+# Target libraries to test recursion
+check_LTLIBRARIES += librecursion.la
+noinst_HEADERS += librecursion.h
+
+librecursion_la_SOURCES = librecursion.c $(TARGET_TRM_SOURCES)
+librecursion_la_CFLAGS = $(TARGET_CFLAGS)
+librecursion_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
+
+POST_PROCESS += .libs/librecursion.post
+
 # Target libraries to test live patches blocked in threads
 check_LTLIBRARIES += libblocked.la
 noinst_HEADERS += libblocked.h
@@ -93,6 +103,7 @@ check_LTLIBRARIES += libdozens_livepatch1.la \
                      libdozens_bsymbolic_livepatch1.la \
                      libhundreds_bsymbolic_livepatch1.la \
                      libparameters_livepatch1.la \
+                     librecursion_livepatch1.la \
                      libblocked_livepatch1.la \
                      libpagecross_livepatch1.la
 
@@ -113,6 +124,9 @@ libhundreds_bsymbolic_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
 libparameters_livepatch1_la_SOURCES = libparameters_livepatch1.c
 libparameters_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
+
+librecursion_livepatch1_la_SOURCES = librecursion_livepatch1.c
+librecursion_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
 libblocked_livepatch1_la_SOURCES = libblocked_livepatch1.c
 libblocked_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
@@ -139,6 +153,9 @@ METADATA = \
   libparameters_livepatch1.dsc \
   libparameters_livepatch1.ulp \
   libparameters_livepatch1.rev \
+  librecursion_livepatch1.dsc \
+  librecursion_livepatch1.ulp \
+  librecursion_livepatch1.rev \
   libblocked_livepatch1.dsc \
   libblocked_livepatch1.ulp \
   libblocked_livepatch1.rev \
@@ -153,6 +170,7 @@ EXTRA_DIST = \
   libdozens_bsymbolic_livepatch1.in \
   libhundreds_bsymbolic_livepatch1.in \
   libparameters_livepatch1.in \
+  librecursion_livepatch1.in \
   libblocked_livepatch1.in \
   libpagecross_livepatch1.in
 
@@ -164,6 +182,7 @@ check_PROGRAMS = \
   numserv \
   numserv_bsymbolic \
   parameters \
+  recursion \
   blocked \
   deadlock \
   asunsafe_conversion \
@@ -183,6 +202,10 @@ numserv_bsymbolic_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 parameters_SOURCES = parameters.c
 parameters_LDADD = libparameters.la
 parameters_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
+
+recursion_SOURCES = recursion.c
+recursion_LDADD = librecursion.la
+recursion_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
 blocked_SOURCES = blocked.c
 blocked_CFLAGS = -pthread $(AM_CFLAGS)
@@ -222,6 +245,7 @@ TESTS = \
   numserv.py \
   numserv_bsymbolic.py \
   parameters.py \
+  recursion.py \
   blocked.py \
   deadlock.py \
   asunsafe_conversion.py \

@@ -19,10 +19,27 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdio.h>
+#include <librecursion.h>
 
-int fibo(int n)
+long long int fibonacci(long long int n)
 {
-    if (n < 2) return n;
-    else return fibo(n - 1) + fibo(n - 2);
+  if (n < 2)
+    return n;
+
+  return fibonacci(n-1) + fibonacci(n-2);
+}
+
+long long int lucas(long long int n)
+{
+  if (n == 0)
+    return 2;
+  if (n == 1)
+    return 1;
+
+  return lucas(n-1) + lucas(n-2);
+}
+
+long long int recursion(long long int n)
+{
+  return fibonacci(n);
 }
