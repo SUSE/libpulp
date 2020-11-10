@@ -17,4 +17,7 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-SUBDIRS = dynsym_gate packer trigger dump
+bin_PROGRAMS = ulp_dump
+
+ulp_dump_SOURCES = dump.c
+ulp_dump_LDADD = ../trigger/libcommon.la

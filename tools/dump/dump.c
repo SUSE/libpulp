@@ -22,18 +22,34 @@
 #define _GNU_SOURCE
 #include <stdio.h>
 #include "../../include/ulp.h"
+#include "../trigger/introspection.h"
+
+extern struct ulp_metadata ulp;
+
+void id2str(char *str, char *id, int idlen)
+{
+    int i;
+    char item[4];
+
+    for (i = 0; i < idlen; i++) {
+	snprintf(item, 4, "%02x ", (unsigned int) (*(id+i)&0x0FF));
+	str = stpcpy(str, item);
+    }
+}
 
 void dump_metadata(struct ulp_metadata *ulp)
 {
+    char buffer[128];
     struct ulp_object *obj;
     struct ulp_unit *unit;
     if (ulp) {
-	fprintf(stderr, "patch id: %s\n", ulp->patch_id);
+	id2str(buffer, (char *) ulp->patch_id, 32);
+	fprintf(stderr, "patch id: %s\n", buffer);
 	fprintf(stderr, "so filename: %s\n", ulp->so_filename);
-	fprintf(stderr, "Objects: %d\n", ulp->nobjs);
 	obj = ulp->objs;
-	while (obj) {
-	    fprintf(stderr, "\n* build id: %s\n", obj->build_id);
+	if (obj) {
+	    id2str(buffer, obj->build_id, obj->build_id_len);
+	    fprintf(stderr, "\n* build id: %s\n", buffer);
 	    if (obj->name) {
 		fprintf(stderr, "* name: %s\n", obj->name);
 	    } else {
@@ -47,14 +63,14 @@ void dump_metadata(struct ulp_metadata *ulp)
 		fprintf(stderr, "** old_faddr: %p\n", unit->old_faddr);
 		unit = unit->next;
 	    }
-	    obj = obj->next;
 	}
     }
 }
 
-int main() {
-    struct ulp_metadata ulp;
-    load_metadata(&ulp);
+int main(int argc, char **argv) {
+    if (argc != 2)
+      return 1;
+    load_patch_info(argv[1]);
     dump_metadata(&ulp);
     return 0;
 }

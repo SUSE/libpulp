@@ -117,6 +117,7 @@ AC_CONFIG_FILES([Makefile
 		 lib/Makefile
 		 tests/Makefile
 		 tools/Makefile
+		 tools/dump/Makefile
 		 tools/dynsym_gate/Makefile
 		 tools/packer/Makefile
 		 tools/trigger/Makefile])

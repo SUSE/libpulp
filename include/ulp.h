@@ -19,6 +19,7 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <link.h>
 #include <stdio.h>
 #include <signal.h>
 #include <stddef.h>
