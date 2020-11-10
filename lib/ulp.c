@@ -31,7 +31,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/mman.h>
-#include "../include/ulp.h"
+
+#include "ulp.h"
 
 /* ulp data structures */
 struct ulp_patching_state __ulp_state = {0, NULL};

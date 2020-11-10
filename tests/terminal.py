@@ -29,7 +29,7 @@ import time
 
 # ULP tools location
 builddir = os.getcwd()
-check = builddir + '/../tools/trigger/ulp_check'
+check = builddir + '/../tools/ulp_check'
 
 # Start the test program
 parent = pexpect.spawn('./terminal ./loop', timeout=10, encoding='utf-8')

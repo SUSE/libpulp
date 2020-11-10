@@ -17,4 +17,53 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-SUBDIRS = dynsym_gate packer trigger dump
+bin_PROGRAMS = \
+  ulp_dynsym_gate \
+  ulp_packer \
+  ulp_reverse \
+  ulp_dump \
+  ulp_trigger \
+  ulp_check \
+  ulp
+
+noinst_HEADERS = introspection.h ptrace.h packer.h
+
+# Static library shared among the tools.
+
+noinst_LTLIBRARIES = libcommon.la
+
+libcommon_la_SOURCES = introspection.c ptrace.c
+libcommon_la_LIBADD = -lbfd -lz -liberty -ldl
+
+# The dynsym_gate tool fills in the trampoline slots in the .ulp section
+# of live patchable libraries.
+
+ulp_dynsym_gate_SOURCES = dynsym_gate.c
+ulp_dynsym_gate_LDADD = -lelf
+
+# The packer and reverse tools create metadata files for live patches,
+# whereas the dump tool dumps their content in human-readable format.
+
+ulp_packer_SOURCES = packer.c
+ulp_packer_LDADD = -lelf
+
+ulp_reverse_SOURCES = revert.c
+
+ulp_dump_SOURCES = dump.c
+ulp_dump_LDADD = libcommon.la
+
+# The trigger and check tools attach to live patchable processes to
+# apply or check live patches, respectively. The ulp tool searches the
+# whole system for live patchable processes and report their state.
+
+ulp_trigger_SOURCES = trigger.c
+ulp_trigger_LDADD = libcommon.la
+
+ulp_check_SOURCES = check.c
+ulp_check_LDADD = libcommon.la
+
+ulp_SOURCES = ulp.c
+ulp_LDADD = libcommon.la
+
+# Ensure access to the include directory
+AM_CFLAGS = -I$(abs_top_srcdir)/include

@@ -26,7 +26,8 @@
 #include <sys/ptrace.h>
 #include <sys/wait.h>
 #include <sys/user.h>
-#include "../../include/ulp_common.h"
+
+#include "ulp_common.h"
 
 /* Memory read/write helper functions */
 int write_byte(char byte, int pid, Elf64_Addr addr);

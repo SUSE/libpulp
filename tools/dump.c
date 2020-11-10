@@ -19,10 +19,9 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#define _GNU_SOURCE
 #include <stdio.h>
-#include "../../include/ulp.h"
-#include "../trigger/introspection.h"
+
+#include "introspection.h"
 
 extern struct ulp_metadata ulp;
 

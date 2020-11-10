@@ -28,7 +28,8 @@
 #include <string.h>
 #include <stdbool.h>
 #include <err.h>
-#include "../../include/ulp_common.h"
+
+#include "ulp_common.h"
 
 #define TRM_LEN 16
 #define ENTRY_LEN 8

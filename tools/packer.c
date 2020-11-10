@@ -27,7 +27,8 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../../include/packer.h"
+
+#include "packer.h"
 
 void usage(char *name)
 {

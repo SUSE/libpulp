@@ -61,8 +61,8 @@
 #include <sys/user.h>
 #include <unistd.h>
 
+#include "ulp_common.h"
 #include "introspection.h"
-#include "../../include/ulp_common.h"
 
 struct ulp_metadata ulp;
 

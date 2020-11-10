@@ -28,7 +28,7 @@ import sys
 
 # ULP tools location
 builddir = os.getcwd()
-trigger = builddir + '/../tools/trigger/ulp_trigger'
+trigger = builddir + '/../tools/ulp_trigger'
 preload = {'LD_PRELOAD': builddir + '/../lib/.libs/libpulp.so'}
 
 # Test case name

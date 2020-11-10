@@ -27,7 +27,8 @@
 #include <sys/wait.h>
 #include <sys/user.h>
 #include <unistd.h>
-#include "../../include/ulp_common.h"
+
+#include "ulp_common.h"
 #include "introspection.h"
 #include "ptrace.h"
 
