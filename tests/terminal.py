@@ -19,17 +19,7 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
-import pexpect
-import re
-import signal
-import subprocess
-import sys
-import time
-
-# ULP tools location
-builddir = os.getcwd()
-check = builddir + '/../tools/ulp_check'
+from tests import *
 
 # Start the test program
 parent = pexpect.spawn('./terminal ./loop', timeout=10, encoding='utf-8')

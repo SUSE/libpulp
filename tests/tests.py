@@ -19,35 +19,23 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-from tests import *
+# Common modules used in the test cases
+import os
+import pexpect
+import re
+import signal
+import subprocess
+import sys
+import time
 
-# Start the test program
-child = pexpect.spawn('./' + testname, timeout=10, env=preload,
-                      encoding='utf-8')
-child.logfile = sys.stdout
+# Common variables used in the test cases
 
-child.expect('Waiting for input.')
-print('Greeting... ok.')
+# ULP tools location
+builddir = os.getcwd()
+trigger = builddir + '/../tools/ulp_trigger'
+check = builddir + '/../tools/ulp_check'
+preload = {'LD_PRELOAD': builddir + '/../lib/.libs/libpulp.so'}
 
-# Apply live patch, which should not touch the redzone
-ret = subprocess.run([trigger, str(child.pid),
-                     'libblocked_livepatch1.ulp'])
-if ret.returncode:
-  print('Failed to apply livepatch #1 for libblocked')
-  exit(1)
-
-# Check live patch, which should not touch the redzone
-ret = subprocess.run([check, str(child.pid),
-                     'libblocked_livepatch1.ulp'])
-if ret.returncode:
-  print('Failed to check livepatch status')
-  exit(1)
-
-# Read error output, if any
-child.readline()
-child.readline()
-
-ret = child.wait()
-if ret:
-  exit(1)
-exit(0)
+# Test case name
+testname = os.path.splitext(sys.argv[0])
+testname = os.path.basename(testname[0])

@@ -255,6 +255,9 @@ TESTS = \
   terminal.py
 
 TEST_EXTENSIONS = .py
-PY_LOG_COMPILER = $(PYTHON)
+PY_LOG_COMPILER = $(PYTHON) -B
 
 EXTRA_DIST += $(TESTS)
+
+# Common definitions and imports for all test cases
+EXTRA_DIST += tests.py

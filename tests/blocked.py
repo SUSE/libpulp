@@ -19,21 +19,7 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
-import pexpect
-import re
-import signal
-import subprocess
-import sys
-
-# ULP tools location
-builddir = os.getcwd()
-trigger = builddir + '/../tools/ulp_trigger'
-preload = {'LD_PRELOAD': builddir + '/../lib/.libs/libpulp.so'}
-
-# Test case name and live patch selection variable
-testname = os.path.splitext(sys.argv[0])
-testname = os.path.basename(testname[0])
+from tests import *
 
 # Start the test program and check default behavior
 child = pexpect.spawn('./' + testname, timeout=1, env=preload,
