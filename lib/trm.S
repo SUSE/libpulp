@@ -92,7 +92,7 @@ __ulp_entry:
     // If not library entrance, skip universe update code and jump to
     // the target function directly, as if this detour had not happened.
     .cfi_remember_state
-    cmp     $0x0, __ulp_ret@dtpoff(%rax)
+    cmpq    $0x0, __ulp_ret@dtpoff(%rax)
     jnz     .Lentry_bypass
 
     // Otherwise, move the return address to __ulp_ret, update the local
@@ -242,7 +242,7 @@ __ulp_get_local_universe:
     // special code (all digits zeroed).
     leaq    __ulp_ret@tlsld(%rip), %rdi
     call    __tls_get_addr@PLT
-    cmp     $0x0, __ulp_ret@dtpoff(%rax)
+    cmpq    $0x0, __ulp_ret@dtpoff(%rax)
     jnz     __ulp_get_local_universe_value
     mov     $-1, %rax
     int3
