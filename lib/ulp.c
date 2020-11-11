@@ -32,6 +32,7 @@
 #include <unistd.h>
 #include <sys/mman.h>
 
+#include "config.h"
 #include "ulp.h"
 
 /* ulp data structures */

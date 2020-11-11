@@ -19,6 +19,8 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
+
 /* Prevent the stack from being needlessly set to executable.  */
 .section .note.GNU-stack,"",%progbits
 

@@ -29,6 +29,7 @@
 #include <stdbool.h>
 #include <err.h>
 
+#include "config.h"
 #include "ulp_common.h"
 
 #define TRM_LEN 16
