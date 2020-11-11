@@ -107,11 +107,16 @@ AS_IF([test -z "$GETCONF"],
 AC_SUBST([PAGE_SIZE], [1048576]),
 AC_SUBST([PAGE_SIZE], [$($GETCONF PAGE_SIZE)]))
 
-# Libpulp uses -fpatchable-function-entry to add 24 padding nops to the
-# prologue of all functions (22 nops before the function address and 2
-# right after it). These nops get replaced with other instructions when
-# a live patch is applied.
-AC_SUBST([ULP_NOP_LENGTH], [24,22])
+# Libpulp uses -fpatchable-function-entry to add a total of ULP_NOPS_LEN
+# padding nops to the prologue of all functions: PRE_NOPS_LEN nops
+# before the entry point, and the remaining nops after it. These nops
+# get replaced with other instructions when a live patch is applied.
+AC_SUBST([ULP_NOPS_LEN], [24])
+AC_SUBST([PRE_NOPS_LEN], [22])
+AC_DEFINE_UNQUOTED([ULP_NOPS_LEN], [$ULP_NOPS_LEN],
+[Total number of padding nops])
+AC_DEFINE_UNQUOTED([PRE_NOPS_LEN], [$PRE_NOPS_LEN],
+[Padding nops before the entry point of functions])
 
 AC_CONFIG_FILES([Makefile
 		 include/Makefile

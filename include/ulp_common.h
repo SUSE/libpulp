@@ -31,8 +31,6 @@
 	fprintf(stderr, "ulp: " format "\n", ##__VA_ARGS__)
 
 #define ULP_PATH_LEN 256
-#define PRE_NOPS_LEN 22
-#define ULP_NOPS_LEN 24
 #define RED_ZONE_LEN 128
 
 extern __thread int __ulp_pending;
