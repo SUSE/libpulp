@@ -89,16 +89,27 @@ __ulp_entry:
     call    __libpulp_tls_get_addr@PLT
 #endif
 
-    // If not library entrance, skip universe update code and jump to
-    // the target function directly, as if this detour had not happened.
+    // The thread-local variable, __ulp_ret, controls whether a thread
+    // is already within the live patchable library, or if its running
+    // code from outside of it (be it application code or code from
+    // other libraries). When outside, __ulp_ret is zero; otherwise,
+    // __ulp_ret holds the return address of the external calling site.
+    //
+    // When a library call is made from the outside, the compare-branch
+    // pair below falls through to .Lentry_track, which saves the return
+    // address into __ulp_ret; whereas intra-library calls branch to
+    // .Lentry_bypass, which ignores the tracking code and jumps to the
+    // target function, as if the detour had not happened.
     .cfi_remember_state
     cmpq    $0x0, __ulp_ret@dtpoff(%rax)
     jnz     .Lentry_bypass
 
-    // Otherwise, move the return address to __ulp_ret, update the local
+    // External library call:
+    //
+    // Move the address of the call site to __ulp_ret, update the local
     // universe, and call the target function. When it returns, restore
-    // __ulp_ret, and return to the call site. Notice that the original
-    // call becomes two calls in this situation.
+    // __ulp_ret to zero, and return to the call site.
+.Lentry_track:
 
     // Save the address of the TLS block so it can be used further down
     // to update __ulp_ret.
@@ -182,7 +193,10 @@ __ulp_entry:
 #else
     call    __libpulp_tls_get_addr@PLT
 #endif
+    // Load the return address of the external calling site into %r11,
+    // which will be pushed on the stack, then used to return.
     movq     __ulp_ret@dtpoff(%rax), %r11
+    // Zero out __ulp_ret, to signal that the thread left the library.
     movq    $0x0, __ulp_ret@dtpoff(%rax)
     popq    %rax
     .cfi_adjust_cfa_offset -8
@@ -206,6 +220,10 @@ __ulp_entry:
     .cfi_adjust_cfa_offset -8
     retq
 
+    // Internal library call
+    //
+    // Simply restore used registers, then jump to the target function
+    // as if this detour had never happened.
 .Lentry_bypass:
     .cfi_restore_state
     popq    %rax
