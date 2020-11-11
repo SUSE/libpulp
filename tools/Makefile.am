@@ -66,4 +66,4 @@ ulp_SOURCES = ulp.c
 ulp_LDADD = libcommon.la
 
 # Ensure access to the include directory
-AM_CFLAGS = -I$(abs_top_srcdir)/include
+AM_CFLAGS += -I$(abs_top_srcdir)/include

@@ -91,7 +91,7 @@ libpagecross_la_SOURCES = libpagecross_padding.S \
                           libpagecross.c \
                           $(TARGET_TRM_SOURCES)
 libpagecross_la_CFLAGS = $(TARGET_CFLAGS)
-libpagecross_la_CCASFLAGS = -DPAGE_SIZE=$(PAGE_SIZE)
+libpagecross_la_CCASFLAGS = -DPAGE_SIZE=$(PAGE_SIZE) $(AM_CCASFLAGS)
 libpagecross_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
 POST_PROCESS += .libs/libpagecross.post
@@ -234,7 +234,7 @@ pagecross_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
 loop_SOURCES = loop.c
 loop_LDADD = libblocked.la $(top_builddir)/lib/libpulp.la
-loop_LDFLAGS = -Wl,--no-as-needed
+loop_LDFLAGS = -Wl,--no-as-needed $(AM_LDFLAGS)
 loop_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
 terminal_SOURCES = terminal.c

@@ -27,14 +27,14 @@ ULP_NOP_LENGTH = @ULP_NOP_LENGTH@
 TARGET_CFLAGS = -fPIC \
                 -fpatchable-function-entry=$(ULP_NOP_LENGTH) \
                 $(AM_CFLAGS)
-TARGET_LDFLAGS = --build-id
+TARGET_LDFLAGS = --build-id $(AM_LDFLAGS)
 TARGET_TRM_SOURCES = $(top_srcdir)/lib/trm.S
 
 # In libtool, convenience libraries are not installed, so they do not
 # need -rpath, which causes them to be statically linked.  However,
 # libpulp can only live patch dynamically linked libraries, so pass
 # -rpath to libtool, which causes the linking to become dynamic.
-CONVENIENCE_LDFLAGS = -rpath $(libdir)
+CONVENIENCE_LDFLAGS = -rpath $(libdir) $(AM_LDFLAGS)
 
 # The following custom rules are triggered by <testname>_DEPENDENCIES:
 

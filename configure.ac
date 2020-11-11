@@ -79,6 +79,7 @@ AX_PYTHON_MODULE([pexpect], [fatal])
 
 # Add the following flags to the compilation of all files
 AC_SUBST([AM_CFLAGS], ["-Wall -Wextra -Werror"])
+AC_SUBST([AM_CCASFLAGS], ["-Wa,--fatal-warnings"])
 
 # Libpulp makes calls to AS-Unsafe functions, calloc and dlopen, from a
 # signal handler, even though that might lead to a deadlock. To get rid
