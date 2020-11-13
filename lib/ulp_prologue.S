@@ -27,16 +27,42 @@
 .global __ulp_prologue
 .type	__ulp_prologue,@function
 __ulp_prologue:
+
+    // When a function gets live patched, the padding area before its
+    // entry point gets updated with a trampoline that: 1. saves the
+    // contents of %rdi on the stack; 2. writes a hardcoded value (an
+    // index for the universe handling routine); 3. then jumps here.
+    // Since it used the stack, call frame information is broken, which
+    // leads to unreliable backtracing in gdb, so update the cfi:
+    .cfi_startproc
+    .cfi_adjust_cfa_offset 8
+
+    // Save registers, then call __ulp_manage_universes
     pushq  %rsi
+    .cfi_adjust_cfa_offset 8
     pushq  %rdx
+    .cfi_adjust_cfa_offset 8
     pushq  %rcx
+    .cfi_adjust_cfa_offset 8
     pushq  %r8
+    .cfi_adjust_cfa_offset 8
     pushq  %r9
+    .cfi_adjust_cfa_offset 8
     call   *__ulp_manage_universes@GOTPCREL(%rip)
     popq   %r9
+    .cfi_adjust_cfa_offset -8
     popq   %r8
+    .cfi_adjust_cfa_offset -8
     popq   %rcx
+    .cfi_adjust_cfa_offset -8
     popq   %rdx
+    .cfi_adjust_cfa_offset -8
     popq   %rsi
+    .cfi_adjust_cfa_offset -8
     popq   %rdi
+    .cfi_adjust_cfa_offset -8
+
+    // __ulp_manage_universes saves the address of the target function
+    // in %r11, before returning.
     jmp    *%r11
+    .cfi_endproc
