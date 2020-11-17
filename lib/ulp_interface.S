@@ -28,35 +28,30 @@
 __ulp_testlocks:
     nop
     nop
-    and     $0xfffffffffffffff0, %rsp
     call    __ulp_do_testlocks@PLT
     int3
 
 __ulp_trigger:
     nop
     nop
-    and     $0xfffffffffffffff0, %rsp
     call    __ulp_apply_patch@PLT
     int3
 
 __ulp_get_path_buffer:
     nop
     nop
-    and     $0xfffffffffffffff0, %rsp
     call    __ulp_get_path_buffer_addr@PLT
     int3
 
 __ulp_check_patched:
     nop
     nop
-    and    $0xfffffffffffffff0, %rsp
     call   __ulp_check_applied_patch@PLT
     int3
 
 __ulp_get_global_universe:
     nop
     nop
-    and    $0xfffffffffffffff0, %rsp
     call   __ulp_get_global_universe_value@PLT
     int3
 
