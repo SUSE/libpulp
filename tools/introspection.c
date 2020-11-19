@@ -374,7 +374,7 @@ struct link_map *parse_lib_dynobj(struct ulp_process *process,
     obj->link_map = *link_map;
     obj->trigger = get_loaded_symbol_addr(obj, "__ulp_trigger");
     obj->loop = get_loaded_symbol_addr(obj, "__ulp_loop");
-    obj->path_buffer = get_loaded_symbol_addr(obj, "__ulp_get_path_buffer");
+    obj->path_buffer = get_loaded_symbol_addr(obj, "__ulp_path_buffer");
     obj->check = get_loaded_symbol_addr(obj, "__ulp_check_patched");
     obj->state = get_loaded_symbol_addr(obj, "__ulp_state");
     obj->global = get_loaded_symbol_addr(obj, "__ulp_get_global_universe");
@@ -458,6 +458,53 @@ struct ulp_thread *search_thread(struct ulp_thread* list, int tid)
 	list = list->next;
    }
    return NULL;
+}
+
+/*
+ * Writes PATCH_ID into libpulp's '__ulp_path_buffer'. This operation is
+ * a pre-condition to check if a live patch is applied. On success,
+ * returns 0.
+ */
+int set_id_buffer(struct ulp_process *process, unsigned char *patch_id)
+{
+    struct ulp_thread *thread;
+    Elf64_Addr path_addr;
+    int i;
+
+    thread = process->main_thread;
+    path_addr = process->dynobj_libpulp->path_buffer;
+
+    for (i = 0; i < 32; i++)
+    {
+      if (write_byte(patch_id[i], thread->tid, path_addr + i))
+      {
+        WARN("Unable to write id byte %d.", i);
+        return 1;
+      }
+    }
+
+    return 0;
+}
+
+/*
+ * Writes PATH into libpulp's '__ulp_path_buffer'. This operation is a
+ * pre-condition to apply a new live patch. On success, returns 0.
+ */
+int set_path_buffer(struct ulp_process *process, char *path)
+{
+    struct ulp_thread *thread;
+    Elf64_Addr path_addr;
+
+    thread = process->main_thread;
+    path_addr = process->dynobj_libpulp->path_buffer;
+
+    if (write_string(path, thread->tid, path_addr))
+    {
+	WARN("Unable to write path buffer.");
+	return 1;
+    }
+
+    return 0;
 }
 
 /*
@@ -633,85 +680,6 @@ children_restore:
     if (fatal)
       return -1;
     return 1;
-}
-
-/* Jacks into PROCESS and writes PATCH_ID into libpulp's
- * '__ulp_path_buffer'. This operation is a pre-condition to check if a
- * live patch is applied. On success, returns 0.
- *
- * WARNING: this function is in the critical section, so it can only be
- * called after successful thread hijacking.
- */
-int set_id_buffer(struct ulp_process *process, unsigned char *patch_id)
-{
-    struct ulp_thread *thread;
-    struct user_regs_struct context;
-    Elf64_Addr path_addr;
-    int i;
-
-    thread = process->main_thread;
-    context = thread->context;
-    context.rip = process->dynobj_libpulp->path_buffer + 2;
-    context.rsp -= RED_ZONE_LEN;
-    context.rsp &= 0xFFFFFFFFFFFFFFF0;
-
-    if (run_and_redirect(thread->tid, &context,
-			 process->dynobj_libpulp->loop))
-    {
-	WARN("set_id_buffer error 1.");
-	return 1;
-    };
-
-    path_addr = context.rax;
-    // ADD CHECK HERE (ALSO FOR SET_PATH_BUFFER) TODO
-
-    for (i = 0; i < 32; i++)
-    {
-      if (write_byte(patch_id[i], thread->tid, path_addr + i))
-      {
-        WARN("Unable to write id byte %d.", i);
-        return 2;
-      }
-    }
-
-    return 0;
-}
-
-/* Jacks into PROCESS and writes PATH into libpulp's '__ulp_path_buffer'.
- * This operation is a pre-condition to apply a new live patch. On
- * success, returns 0.
- *
- * WARNING: this function is in the critical section, so it can only be
- * called after successful thread hijacking.
- */
-int set_path_buffer(struct ulp_process *process, char *path)
-{
-    struct ulp_thread *thread;
-    struct user_regs_struct context;
-    Elf64_Addr path_addr;
-
-    thread = process->main_thread;
-    context = thread->context;
-    context.rip = process->dynobj_libpulp->path_buffer + 2;
-    context.rsp -= RED_ZONE_LEN;
-    context.rsp &= 0xFFFFFFFFFFFFFFF0;
-
-    if (run_and_redirect(thread->tid, &context,
-			 process->dynobj_libpulp->loop))
-    {
-	WARN("set_path_buffer error 1.");
-	return 1;
-    };
-
-    path_addr = context.rax;
-
-    if (write_string(path, thread->tid, path_addr))
-    {
-	WARN("set_path_buffer error 2.");
-	return 2;
-    }
-
-    return 0;
 }
 
 /* Jacks into PROCESS and checks the conditions that are necessary to

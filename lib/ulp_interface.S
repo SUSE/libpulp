@@ -37,12 +37,6 @@ __ulp_trigger:
     call    __ulp_apply_patch@PLT
     int3
 
-__ulp_get_path_buffer:
-    nop
-    nop
-    call    __ulp_get_path_buffer_addr@PLT
-    int3
-
 __ulp_check_patched:
     nop
     nop
