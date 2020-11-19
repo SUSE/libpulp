@@ -1,0 +1,7 @@
+{
+  global:
+    /* Accessed from from live-patchable libraries (see trm.S) */
+    __ulp_global_universe;
+  local:
+    *;
+};

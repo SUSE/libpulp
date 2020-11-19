@@ -20,11 +20,14 @@
 lib_LTLIBRARIES = libpulp.la
 
 libpulp_la_SOURCES = ulp.c ulp_prologue.S ulp_interface.S
-libpulp_la_LDFLAGS = -ldl $(AM_LDFLAGS)
+libpulp_la_LDFLAGS = \
+  -ldl \
+  -Wl,--version-script=$(srcdir)/libpulp.versions \
+  $(AM_LDFLAGS)
 
 AM_CFLAGS += -I$(top_srcdir)/include
 
-EXTRA_DIST = trm.S
+EXTRA_DIST = trm.S libpulp.versions
 
 all-local: trm.o
 
