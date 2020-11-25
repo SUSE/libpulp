@@ -68,7 +68,6 @@ struct ulp_dynobj
     asymbol **symtab;
     int symtab_len;
 
-    Elf64_Addr loop;
     Elf64_Addr trigger;
     Elf64_Addr check;
     Elf64_Addr path_buffer;
@@ -84,7 +83,6 @@ struct ulp_dynobj
 
 struct ulp_addresses
 {
-    Elf64_Addr loop;
     Elf64_Addr trigger;
     Elf64_Addr path_buffer;
     Elf64_Addr check;
@@ -126,8 +124,7 @@ int restore_threads(struct ulp_process *process);
 
 int read_global_universe (struct ulp_process *process);
 
-unsigned long read_local_universe (struct ulp_process *process,
-                                   struct ulp_dynobj *library,
+unsigned long read_local_universe (struct ulp_dynobj *library,
                                    struct ulp_thread *thread);
 
 int read_local_universes (struct ulp_process *process);

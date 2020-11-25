@@ -60,8 +60,3 @@ __ulp_get_global_universe:
     nop
     call   __ulp_get_global_universe_value@PLT
     int3
-
-__ulp_loop:
-    nop
-    nop
-    jmp	    __ulp_loop

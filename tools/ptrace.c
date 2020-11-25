@@ -37,12 +37,6 @@ int write_byte(char byte, int pid, Elf64_Addr addr)
 {
     Elf64_Addr value;
 
-    if (attach(pid))
-    {
-	WARN("Unable to attach to %d.\n", pid);
-	return 1;
-    };
-
     value = ptrace(PTRACE_PEEKDATA, pid, addr, 0);
     if (errno) {
 	WARN("Unable to read byte (write).\n");
@@ -54,12 +48,6 @@ int write_byte(char byte, int pid, Elf64_Addr addr)
 	WARN("Unable to write byte.\n");
 	return 3;
     }
-
-    if (detach(pid))
-    {
-	WARN("Unable to detach from %d.\n", pid);
-	return 4;
-    };
 
     return 0;
 }
@@ -214,15 +202,9 @@ int set_regs(int pid, struct user_regs_struct *regs)
     return 0;
 }
 
-int run_and_redirect(int pid, struct user_regs_struct *regs, Elf64_Addr addr)
+int run_and_redirect(int pid, struct user_regs_struct *regs)
 {
     int status;
-
-    if (attach(pid))
-    {
-	WARN("Unable to attach to %d.\n", pid);
-	return 1;
-    };
 
     if (ptrace(PTRACE_SETREGS, pid, NULL, regs))
     {
@@ -255,25 +237,12 @@ int run_and_redirect(int pid, struct user_regs_struct *regs, Elf64_Addr addr)
 	return 6;
     }
 
+    /* Read the full context to learn about return values. */
     if (ptrace(PTRACE_GETREGS, pid, NULL, regs))
     {
 	WARN("PTRACE_GETREGS error (pid %d).\n", pid);
 	return 7;
     }
-
-    regs->rip = addr;
-
-    if (ptrace(PTRACE_SETREGS, pid, NULL, regs))
-    {
-	WARN("PTRACE_GETREGS error (pid %d).\n", pid);
-	return 8;
-    }
-
-    if (detach(pid))
-    {
-	WARN("Unable to detach from %d.\n", pid);
-	return 9;
-    };
 
     return 0;
 }

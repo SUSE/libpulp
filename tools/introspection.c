@@ -302,9 +302,9 @@ int parse_libs_dynobj(struct ulp_process *process)
 
   /* When libpulp has been loaded (usually with LD_PRELOAD),
    * parse_lib_dynobj will find the symbols it provides, such as
-   * __ulp_loop, which are all required for userspace live-patching. If
-   * libpulp has not been found, process->dynobj_libpulp will be NULL and
-   * this function returns an error.
+   * __ulp_trigger, which are all required for userspace live-patching.
+   * If libpulp has not been found, process->dynobj_libpulp will be NULL
+   * and this function returns an error.
    */
   if (process->dynobj_libpulp == NULL)
     return 1;
@@ -373,7 +373,6 @@ struct link_map *parse_lib_dynobj(struct ulp_process *process,
 
     obj->link_map = *link_map;
     obj->trigger = get_loaded_symbol_addr(obj, "__ulp_trigger");
-    obj->loop = get_loaded_symbol_addr(obj, "__ulp_loop");
     obj->path_buffer = get_loaded_symbol_addr(obj, "__ulp_path_buffer");
     obj->check = get_loaded_symbol_addr(obj, "__ulp_check_patched");
     obj->state = get_loaded_symbol_addr(obj, "__ulp_state");
@@ -382,14 +381,14 @@ struct link_map *parse_lib_dynobj(struct ulp_process *process,
     obj->testlocks = get_loaded_symbol_addr(obj, "__ulp_testlocks");
 
     /* libpulp must expose all these symbols. */
-    if (obj->loop && obj->trigger && obj->path_buffer && obj->check &&
-	obj->state && obj->global && obj->testlocks) {
+    if (obj->trigger && obj->path_buffer && obj->check && obj->state &&
+	obj->global && obj->testlocks) {
 	obj->next = NULL;
 	process->dynobj_libpulp = obj;
     }
     /* No other library should expose these symbols. */
-    else if (obj->loop || obj->trigger || obj->path_buffer ||
-	     obj->check || obj->state || obj->global || obj->testlocks)
+    else if (obj->trigger || obj->path_buffer || obj->check ||
+             obj->state || obj->global || obj->testlocks)
 	WARN("libpulp symbol exposed by some other library.");
     /* Live-patchable libraries expose the local universe. */
     else if (obj->local) {
@@ -508,9 +507,8 @@ int set_path_buffer(struct ulp_process *process, char *path)
 }
 
 /*
- * Attaches to all child threads in PROCESS, which causes them to stop,
- * as well as puts the main thread into an infinite loop. After that,
- * other introspection routines, such as set_id_buffer() and
+ * Attaches to all threads in PROCESS, which causes them to stop. After
+ * that, other introspection routines, such as set_id_buffer() and
  * set_path_buffer(), can be used. On success, returns 0. If anything
  * goes wrong during hijacking, try to restore the original state of the
  * program; if that succeeds, return 1, and -1 otherwise.
@@ -527,13 +525,6 @@ int hijack_threads(struct ulp_process *process)
     DIR *taskdir;
     struct dirent *dirent;
     struct ulp_thread *t;
-    struct user_regs_struct context;
-
-    /* Check that the address of the loop routine is known */
-    if (!process->dynobj_libpulp->loop) {
-	WARN("error: loop not found.");
-	return 1;
-    }
 
     /* Open /proc/<pid>/task. */
     pid = process->pid;
@@ -627,40 +618,14 @@ child_alloc_error:
 
     } while (loop);
 
-    /*
-     * Complete the hijacking of the main thread, putting it into an
-     * infinity loop, then detaching so it can be reattached later.
-    */
-    context = process->main_thread->context;
-    context.rip = process->dynobj_libpulp->loop + 2;
-    context.rsp -= RED_ZONE_LEN;
-    context.rsp &= 0xFFFFFFFFFFFFFFF0;
-    if (set_regs(pid, &context)) {
-        WARN("Hijacking main thread %d failed (set_regs).", pid);
-        goto parent_setregs_error;
-    };
-    if (detach(pid)) {
-        WARN("Hijacking main thread %d failed (detach).", pid);
-        goto parent_detach_error;
-    };
-
     /* Release resources and return successfully */
     if (closedir(taskdir))
         WARN("Closing %s failed: %s", taskname, strerror(errno));
     return 0;
 
-    /* Error paths for the hijacking of the main thread */
-parent_detach_error:
-parent_setregs_error:
-    if (set_regs(pid, &process->main_thread->context)) {
-        WARN("WARNING: restoring context of main thread %d failed.\n"
-             "         Program state might be inconsistent.", pid);
-        fatal = 1;
-    }
-
     /*
-     * If hijacking any of the threads fails, revert all changes, detach
-     * from all, release resources, and return with error.
+     * If hijacking any of the threads fails, detach from all, release
+     * resources, and return with error.
      */
 children_restore:
     while (process->threads) {
@@ -715,8 +680,7 @@ int testlocks(struct ulp_process *process)
     context.rsp -= RED_ZONE_LEN;
     context.rsp &= 0xFFFFFFFFFFFFFFF0;
 
-    if (run_and_redirect(thread->tid, &context,
-			 process->dynobj_libpulp->loop))
+    if (run_and_redirect(thread->tid, &context))
     {
 	WARN("error: unable to trig thread %d.", thread->tid);
 	return 2;
@@ -745,8 +709,7 @@ int patch_applied(struct ulp_process *process, unsigned char *patch_id)
     context.rsp -= RED_ZONE_LEN;
     context.rsp &= 0xFFFFFFFFFFFFFFF0;
 
-    if (run_and_redirect(thread->tid, &context,
-			 process->dynobj_libpulp->loop))
+    if (run_and_redirect(thread->tid, &context))
     {
 	WARN("error: unable to trig thread %d.", thread->tid);
 	return 2;
@@ -774,8 +737,7 @@ int apply_patch(struct ulp_process *process, char *metadata)
     context.rsp -= RED_ZONE_LEN;
     context.rsp &= 0xFFFFFFFFFFFFFFF0;
 
-    if (run_and_redirect(thread->tid, &context,
-			 process->dynobj_libpulp->loop))
+    if (run_and_redirect(thread->tid, &context))
     {
 	WARN("error: unable to trig thread %d.", thread->tid);
 	return 1;
@@ -804,8 +766,7 @@ int read_global_universe (struct ulp_process *process)
     context.rsp -= RED_ZONE_LEN;
     context.rsp &= 0xFFFFFFFFFFFFFFF0;
 
-    if (run_and_redirect(thread->tid, &context,
-                         process->dynobj_libpulp->loop))
+    if (run_and_redirect(thread->tid, &context))
     {
         WARN("error: unable to read global universe from thread %d.",
              thread->tid);
@@ -820,8 +781,7 @@ int read_global_universe (struct ulp_process *process)
  * PROCESS. The return value does not distinguish between successfull
  * and erroneous reads, although an error messages gets printed.
  */
-unsigned long read_local_universe (struct ulp_process *process,
-                                   struct ulp_dynobj *library,
+unsigned long read_local_universe (struct ulp_dynobj *library,
                                    struct ulp_thread *thread)
 {
     struct user_regs_struct context;
@@ -831,8 +791,7 @@ unsigned long read_local_universe (struct ulp_process *process,
     context.rsp -= RED_ZONE_LEN;
     context.rsp &= 0xFFFFFFFFFFFFFFF0;
 
-    if (run_and_redirect(thread->tid, &context,
-                         process->dynobj_libpulp->loop))
+    if (run_and_redirect(thread->tid, &context))
       WARN("error: unable to read local universe from thread %d.",
            thread->tid);
 
@@ -856,7 +815,7 @@ int read_local_universes (struct ulp_process *process)
     while (thread) {
       state = malloc (sizeof (struct thread_state));
       state->tid = thread->tid;
-      state->universe = read_local_universe (process, library, thread);
+      state->universe = read_local_universe (library, thread);
       state->next = library->thread_states;
       library->thread_states = state;
       thread = thread->next;
@@ -866,9 +825,10 @@ int read_local_universes (struct ulp_process *process)
   return 0;
 }
 
-/* Restores the threads in PROCESS to their normal state, i.e. removes
- * them from the infinite loop, into which they have been put by a
- * previous call to hijack_threads(). On success, returns 0.
+/*
+ * Restores the threads in PROCESS to their normal state, i.e. restores
+ * the context of the main thread, then detaches from all. On success,
+ * returns 0.
  *
  * NOTE: this function marks the end of the critical section.
  */
@@ -879,13 +839,12 @@ int restore_threads(struct ulp_process *process)
 
     errors = 0;
 
-    /* Restore the context of the main thread */
+    /*
+     * Restore the context of the main thread, which might have been
+     * used to run routines from libpulp.
+     */
     t = process->main_thread;
-    if (attach(t->tid)) {
-        WARN("Restoring main thread failed (attach).");
-        errors = 1;
-    }
-    else if (set_regs(t->tid, &t->context)) {
+    if (set_regs(t->tid, &t->context)) {
         WARN("Restoring main thread failed (set_regs).");
         errors = 1;
     }
