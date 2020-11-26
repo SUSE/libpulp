@@ -54,4 +54,5 @@ int get_regs(int pid, struct user_regs_struct *regs);
 
 int set_regs(int pid, struct user_regs_struct *regs);
 
-int run_and_redirect(int pid, struct user_regs_struct *regs);
+int run_and_redirect(int pid, struct user_regs_struct *regs,
+                     ElfW(Addr) routine);

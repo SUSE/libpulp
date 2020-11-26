@@ -32,6 +32,12 @@
 #include "introspection.h"
 #include "ptrace.h"
 
+/*
+ * Number of bytes that the kernel subtracts from the program counter,
+ * when an ongoing syscall gets interrupted and must be restarted.
+ */
+#define RESTART_SYSCALL_SIZE 2
+
 /* Memory read/write helper functions */
 int write_byte(char byte, int pid, Elf64_Addr addr)
 {
@@ -202,9 +208,62 @@ int set_regs(int pid, struct user_regs_struct *regs)
     return 0;
 }
 
-int run_and_redirect(int pid, struct user_regs_struct *regs)
+int run_and_redirect(int pid, struct user_regs_struct *regs,
+		     ElfW(Addr) routine)
 {
     int status;
+
+    /*
+     * After an ongoing syscall gets interrupted (for instance by
+     * PTRACE_ATTACH), but before returning control to userspace (with
+     * PTRACE_CONT), the kernel subtracts some bytes from the program
+     * counter, so that the syscall instruction gets re-executed.
+     *
+     * Libpulp itself does not make syscalls, still it might be affected
+     * by this syscall restarting mechanism, because it modifies
+     * (between PTRACE_ATTACH and PTRACE_CONT) the program counter of
+     * selected threads so that they perform live patching operations.
+     *
+     * Thus, live patching routines from libpulp (see ulp_interface.S),
+     * must work when executed from their normal start address, as well
+     * as from a few bytes before it. As such, they start with a few
+     * nops, which are skipped below.
+     */
+    regs->rip = routine + RESTART_SYSCALL_SIZE;
+
+    /*
+     * Even though libpulp does not register signal handlers with the
+     * kernel, it uses ptrace to hijack all threads in a process, then
+     * diverts the execution of one of these threads to apply live
+     * patches and check patching status. Thus, live patching happens
+     * from a context similar to that of signal handlers, therefore, it
+     * must follow the rules of the ABI related to signal handlers, more
+     * specifically, it cannot touch the red zone.
+     *
+     * With regular signal handlers, the Linux kernel adjusts the stack
+     * pointer before transferring control to registered handlers. Since
+     * libpulp uses ptrace and thread hijacking, instead of regular
+     * handler registering, it cannot rely on this kernel feature, so it
+     * must adjust the stack on its own.
+     */
+    regs->rsp -= RED_ZONE_LEN;
+
+    /*
+     * The ABI for AMD64 requires that the stack pointer be aligned on a
+     * 16, 32, or 64 byte boundary before function calls. In its words:
+     *
+     *   The end of the input argument area shall be aligned on a 16 (32
+     *   or 64, if __m256 or __m512 is passed on stack) byte boundary.
+     *   In other words, the value (%rsp + 8) is always a multiple of 16
+     *   (32 or 64) when control is transferred to the function entry
+     *   point. The stack pointer, %rsp, always points to the end of the
+     *   latest allocated stack frame.
+     *
+     * Taking a conservative approach, libpulp always aligns on the
+     * highest boundary, before transfering control to the live patching
+     * routines in ulp_interface.S.
+     */
+    regs->rsp &= 0xFFFFFFFFFFFFFFC0;
 
     if (ptrace(PTRACE_SETREGS, pid, NULL, regs))
     {

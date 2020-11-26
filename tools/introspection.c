@@ -673,14 +673,13 @@ int testlocks(struct ulp_process *process)
 {
     struct ulp_thread *thread;
     struct user_regs_struct context;
+    ElfW(Addr) routine;
 
     thread = process->main_thread;
     context = thread->context;
-    context.rip = process->dynobj_libpulp->testlocks + 2;
-    context.rsp -= RED_ZONE_LEN;
-    context.rsp &= 0xFFFFFFFFFFFFFFF0;
+    routine = process->dynobj_libpulp->testlocks;
 
-    if (run_and_redirect(thread->tid, &context))
+    if (run_and_redirect(thread->tid, &context, routine))
     {
 	WARN("error: unable to trig thread %d.", thread->tid);
 	return 2;
@@ -700,16 +699,15 @@ int patch_applied(struct ulp_process *process, unsigned char *patch_id)
 {
     struct ulp_thread *thread;
     struct user_regs_struct context;
+    ElfW(Addr) routine;
 
     if (set_id_buffer(process, patch_id)) return 2;
 
     thread = process->main_thread;
     context = thread->context;
-    context.rip = process->dynobj_libpulp->check + 2;
-    context.rsp -= RED_ZONE_LEN;
-    context.rsp &= 0xFFFFFFFFFFFFFFF0;
+    routine = process->dynobj_libpulp->check;
 
-    if (run_and_redirect(thread->tid, &context))
+    if (run_and_redirect(thread->tid, &context, routine))
     {
 	WARN("error: unable to trig thread %d.", thread->tid);
 	return 2;
@@ -728,16 +726,15 @@ int apply_patch(struct ulp_process *process, char *metadata)
 {
     struct ulp_thread *thread;
     struct user_regs_struct context;
+    ElfW(Addr) routine;
 
     if (set_path_buffer(process, metadata)) return 1;
 
     thread = process->main_thread;
     context = thread->context;
-    context.rip = process->dynobj_libpulp->trigger + 2;
-    context.rsp -= RED_ZONE_LEN;
-    context.rsp &= 0xFFFFFFFFFFFFFFF0;
+    routine = process->dynobj_libpulp->trigger;
 
-    if (run_and_redirect(thread->tid, &context))
+    if (run_and_redirect(thread->tid, &context, routine))
     {
 	WARN("error: unable to trig thread %d.", thread->tid);
 	return 1;
@@ -759,14 +756,13 @@ int read_global_universe (struct ulp_process *process)
 {
     struct ulp_thread *thread;
     struct user_regs_struct context;
+    ElfW(Addr) routine;
 
     thread = process->main_thread;
     context = thread->context;
-    context.rip = process->dynobj_libpulp->global + 2;
-    context.rsp -= RED_ZONE_LEN;
-    context.rsp &= 0xFFFFFFFFFFFFFFF0;
+    routine = process->dynobj_libpulp->global;
 
-    if (run_and_redirect(thread->tid, &context))
+    if (run_and_redirect(thread->tid, &context, routine))
     {
         WARN("error: unable to read global universe from thread %d.",
              thread->tid);
@@ -785,13 +781,12 @@ unsigned long read_local_universe (struct ulp_dynobj *library,
                                    struct ulp_thread *thread)
 {
     struct user_regs_struct context;
+    ElfW(Addr) routine;
 
     context = thread->context;
-    context.rip = library->local + 2;
-    context.rsp -= RED_ZONE_LEN;
-    context.rsp &= 0xFFFFFFFFFFFFFFF0;
+    routine = library->local;
 
-    if (run_and_redirect(thread->tid, &context))
+    if (run_and_redirect(thread->tid, &context, routine))
       WARN("error: unable to read local universe from thread %d.",
            thread->tid);
 
