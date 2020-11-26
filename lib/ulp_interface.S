@@ -24,7 +24,19 @@
 
 .section .text,"ax",@progbits
 
-.align  8
+/*
+ * The functions below are the entry points into libpulp, which are
+ * accessed from libpulp's tools, such as the trigger tool. After
+ * ptracing into all threads, the tools modify the program counter so
+ * that it points to the third instruction in each of the functions
+ * below, i.e. right after the sequence of two nops. These two nops are
+ * skipped not because they must not be executed, but to account for
+ * syscall restarting by the kernel (which subtracts two from the
+ * program counter, so that, on regular syscalls, the syscall
+ * instructions gets executed again; in libpulp's case, the two nops get
+ * executed, without side-effects).
+ */
+
 __ulp_testlocks:
     nop
     nop
