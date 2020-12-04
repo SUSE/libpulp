@@ -23,7 +23,6 @@ ULP_PACKER = $(top_builddir)/tools/ulp_packer
 ULP_REVERSE = $(top_builddir)/tools/ulp_reverse
 
 # Build and link requirements for live-patchable (target) libraries.
-ULP_NOP_LENGTH = @ULP_NOP_LENGTH@
 TARGET_CFLAGS = \
   -fPIC \
   -fpatchable-function-entry=$(ULP_NOPS_LEN),$(PRE_NOPS_LEN) \
