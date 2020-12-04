@@ -19,6 +19,7 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <argp.h>
 #include <dirent.h>
 #include <errno.h>
 #include <stdio.h>
@@ -26,6 +27,7 @@
 #include <string.h>
 #include <sys/types.h>
 
+#include "config.h"
 #include "introspection.h"
 
 /* Returns 0 if libpulp.so has been loaded by the process with memory map
@@ -198,12 +200,60 @@ print_process_list (struct ulp_process *process_list)
   }
 }
 
-int
-main(void)
+const char *argp_program_version = PACKAGE_STRING;
+
+struct arguments
 {
+  pid_t pid;
+};
+
+static error_t
+parser (int key, char *arg, struct argp_state *state)
+{
+  struct arguments *arguments;
+
+  arguments = state->input;
+
+  switch (key) {
+    case 'p':
+      arguments->pid = atoi (arg);
+      break;
+    default:
+      return ARGP_ERR_UNKNOWN;
+  }
+
+  return 0;
+}
+
+int
+main (int argc, char **argv)
+{
+  static struct argp_option options[] = {
+    {"pid", 'p', "PID", 0,
+     "Only gather status from process with id == PID"
+     "\t(when not provided, checks all processes)", 0},
+    { 0 }
+  };
+  static struct argp argp = { options, parser,
+                              NULL, NULL, NULL, NULL, NULL};
+
+  struct arguments arguments;
   struct ulp_process *process_list;
 
-  process_list = build_process_list ();
+  arguments.pid = 0;
+  argp_parse (&argp, argc, argv, 0, 0, &arguments);
+
+  /*
+   * If the PID argument has not been provided, check all live patchable
+   * processes; otherwise, just the request process.
+   */
+  if (arguments.pid == 0)
+    process_list = build_process_list ();
+  else {
+    process_list = NULL;
+    insert_target_process (arguments.pid, &process_list);
+  }
+
   print_process_list (process_list);
 
   return 0;
