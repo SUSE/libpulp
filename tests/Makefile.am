@@ -255,8 +255,6 @@ TESTS = \
   terminal.py \
   thread_restore.py
 
-XFAIL_TESTS = thread_restore.py
-
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON) -B
 

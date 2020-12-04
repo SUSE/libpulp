@@ -822,7 +822,7 @@ int read_local_universes (struct ulp_process *process)
 
 /*
  * Restores the threads in PROCESS to their normal state, i.e. restores
- * the context of the main thread, then detaches from all. On success,
+ * their context (registers), then detaches from them. On success,
  * returns 0.
  *
  * NOTE: this function marks the end of the critical section.
@@ -830,30 +830,26 @@ int read_local_universes (struct ulp_process *process)
 int restore_threads(struct ulp_process *process)
 {
     int errors;
-    struct ulp_thread *t;
-
-    errors = 0;
+    struct ulp_thread *thread;
 
     /*
-     * Restore the context of the main thread, which might have been
-     * used to run routines from libpulp.
+     * Restore the context of all threads, which might have been used to
+     * run routines from libpulp, and detach from them.
      */
-    t = process->main_thread;
-    if (set_regs(t->tid, &t->context)) {
-        WARN("Restoring main thread failed (set_regs).");
-        errors = 1;
-    }
-
-    /* Detach from all threads, including the main one */
+    errors = 0;
     while (process->threads) {
-        if (detach(process->threads->tid)) {
+        thread = process->threads;
+        if (set_regs(thread->tid, &thread->context)) {
+            WARN("Restoring thread failed (set_regs).");
+            errors = 1;
+        }
+        if (detach(thread->tid)) {
             WARN("WARNING: detaching from thread %d failed.",
                  process->threads->tid);
             errors = 1;
         }
-        t = process->threads;
         process->threads = process->threads->next;
-        free (t);
+        free (thread);
     }
 
     return errors;
