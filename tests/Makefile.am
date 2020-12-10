@@ -189,7 +189,8 @@ check_PROGRAMS = \
   redzone \
   pagecross \
   loop \
-  terminal
+  terminal \
+  syscall_restart
 
 numserv_SOURCES = numserv.c
 numserv_LDADD = libdozens.la libhundreds.la
@@ -202,6 +203,10 @@ numserv_bsymbolic_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 parameters_SOURCES = parameters.c
 parameters_LDADD = libparameters.la
 parameters_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
+
+syscall_restart_SOURCES = syscall_restart.c
+syscall_restart_LDADD = libparameters.la
+syscall_restart_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
 recursion_SOURCES = recursion.c
 recursion_LDADD = librecursion.la
@@ -253,7 +258,8 @@ TESTS = \
   revert.py \
   pagecross.py \
   terminal.py \
-  thread_restore.py
+  thread_restore.py \
+  syscall_restart.py
 
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON) -B
