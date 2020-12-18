@@ -23,6 +23,18 @@ AC_INIT([libpulp], [0.1], [noreply@suse.com])
 AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_MACRO_DIRS([config])
 
+# Check for the availability of macros from autoconf-archive.
+AC_MSG_CHECKING([autoconf-archive availability])
+m4_ifndef([AX_CHECK_COMPILE_FLAG], [ax_available="no"])
+m4_ifndef([AX_GCC_VAR_ATTRIBUTE], [ax_available="no"])
+m4_ifndef([AX_PYTHON_MODULE], [ax_available="no"])
+AS_IF([test "x$ax_available" == "xno"],
+AC_MSG_RESULT([no]), AC_MSG_RESULT([yes]))
+AS_IF([test "x$ax_available" == "xno"],
+AC_MSG_ERROR(
+[Libpulp needs the autoconf-archive package.
+Make sure it is installed and re-run autoconf (or ./bootstrap)]))
+
 # Use a config header instead of passing -D options to the compiler.
 AC_CONFIG_HEADERS([include/config.h])
 
