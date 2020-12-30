@@ -83,12 +83,10 @@ fi
 ],[AC_MSG_ERROR([Unexpected configure error.])])
 
 # The following headers are required to build libpulp's tools.
-AC_CHECK_HEADERS([bfd.h gelf.h],
-[build_ulp_tools=yes],
-[build_ulp_tools=no; break])
-AM_CONDITIONAL([BUILD_ULP_TOOLS], [test "$build_ulp_tools" = "yes"])
-AS_IF([test "$build_ulp_tools" = "no"], AC_MSG_WARN([\
-Not building the tools because of missing headers.]))
+AC_CHECK_HEADER([bfd.h],,
+AC_MSG_ERROR([Binutils development files are missing.]))
+AC_CHECK_HEADER([gelf.h],,
+AC_MSG_ERROR([Libelf development files are missing.]))
 
 # Python and python's pexpect are required to run the tests.
 AM_PATH_PYTHON([3])
