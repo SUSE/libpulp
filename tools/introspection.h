@@ -20,7 +20,6 @@
  */
 
 #include <link.h>
-#include <bfd.h>
 
 #include "ptrace.h"
 
@@ -65,8 +64,6 @@ struct ulp_dynobj
 {
     char *filename;
     struct link_map link_map;
-    asymbol **symtab;
-    int symtab_len;
 
     Elf64_Addr trigger;
     Elf64_Addr check;
@@ -90,8 +87,6 @@ struct ulp_addresses
     Elf64_Addr global;
     Elf64_Addr local;
 };
-
-int parse_file_symtab(struct ulp_dynobj *obj, char needed);
 
 int dig_main_link_map(struct ulp_process *process);
 

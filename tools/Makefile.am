@@ -33,7 +33,7 @@ noinst_HEADERS = introspection.h ptrace.h packer.h
 noinst_LTLIBRARIES = libcommon.la
 
 libcommon_la_SOURCES = introspection.c ptrace.c
-libcommon_la_LIBADD = -lbfd -lz -liberty -ldl
+libcommon_la_LIBADD = -lelf -ldl
 
 # The dynsym_gate tool fills in the trampoline slots in the .ulp section
 # of live patchable libraries.

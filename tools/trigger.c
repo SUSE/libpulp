@@ -25,7 +25,6 @@
 #include <string.h>
 #include <link.h>
 #include <dirent.h>
-#include <bfd.h>
 #include <stddef.h>
 #include <fcntl.h>
 #include <sys/user.h>

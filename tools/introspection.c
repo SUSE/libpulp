@@ -55,53 +55,16 @@
 #include <link.h>
 #include <limits.h>
 #include <dirent.h>
-#include <bfd.h>
 #include <stddef.h>
 #include <fcntl.h>
 #include <sys/user.h>
 #include <unistd.h>
+#include <gelf.h>
 
 #include "ulp_common.h"
 #include "introspection.h"
 
 struct ulp_metadata ulp;
-
-/* Opens the file from which OBJ has been dynamically loaded and parses
- * its symtab (the parsed information gets stored in OBJ itself)
- * */
-int parse_file_symtab(struct ulp_dynobj *obj, char needed)
-{
-    bfd *file;
-    int symtab_len;
-
-    file = bfd_openr(obj->filename, NULL);
-    if (!file)
-    {
-        if (needed) {
-            WARN("bfd_openr error: %s.", obj->filename);
-            return 1;
-        }
-        else return 0;
-    }
-    bfd_check_format(file, bfd_object);
-
-    symtab_len = bfd_get_symtab_upper_bound(file);
-    if (!symtab_len)
-    {
-	WARN("bfd_get_symtab_upper_bound error.");
-	return 2;
-    }
-
-    obj->symtab = (asymbol **) malloc(symtab_len);
-    if (!obj->symtab)
-    {
-	WARN("symtab malloc error.");
-	return 3;
-    }
-
-    obj->symtab_len = bfd_canonicalize_symtab(file, obj->symtab);
-    return 0;
-}
 
 /* Parses the _DYNAMIC section of PROCESS, finds the DT_DEBUG entry,
  * from which the address of the chain of dynamically loaded objects
@@ -157,19 +120,78 @@ int dig_main_link_map(struct ulp_process *process)
  */
 Elf64_Addr get_loaded_symbol_addr(struct ulp_dynobj *obj, char *sym)
 {
+    char *str;
     int i;
-    Elf64_Addr sym_addr, ptr = 0;
+    int fd;
+    int len;
+    size_t shstrndx;
+    Elf *elf;
+    Elf_Scn *scn;
+    Elf_Data *data;
+    GElf_Shdr *shdr;
+    ElfW(Sym) *symbol;
+    ElfW(Addr) sym_addr;
+    ElfW(Addr) ptr;
 
-    for (i = 0; i < obj->symtab_len; i++) {
-	if (strcmp(bfd_asymbol_name(obj->symtab[i]), sym)==0) {
-	    ptr = bfd_asymbol_value(obj->symtab[i]);
-	}
+    /*
+     * Open the file for reading. Failing is not necessarily critical,
+     * because this function is called for every loaded DSO in the
+     * process and libraries unrelated to the live-patch might have been
+     * uninstalled. If a required library is missing, for instance
+     * libpulp.so, checks elsewhere should detect the problem.
+     */
+    fd = open(obj->filename, O_RDONLY);
+    if (fd == -1) {
+        return 0;
     }
 
-    if (ptr == 0) return 0;
+    /* Parse the file with libelf. */
+    elf_version(EV_CURRENT);
+    elf = elf_begin(fd, ELF_C_READ, NULL);
+    if (elf == NULL) {
+        WARN("elf_begin error (%s).", obj->filename);
+        return 0;
+    }
 
+    /* Find the string table. */
+    if (elf_getshdrstrndx(elf, &shstrndx)) {
+        WARN("elf_getshdrstrndx error (%s).", obj->filename);
+        return 0;
+    }
+
+    /* Iterate over the sections until .symtab is found. */
+    scn = NULL;
+    shdr = (GElf_Shdr *) malloc(sizeof(GElf_Shdr));
+    while ((scn = elf_nextscn(elf, scn))) {
+        if (gelf_getshdr(scn, shdr) == NULL) {
+            WARN("elf_getshdr error (%s).", obj->filename);
+            return 0;
+        }
+        str = elf_strptr(elf, shstrndx, shdr->sh_name);
+        if (strcmp(str, ".symtab") == 0)
+            break;
+    }
+
+    /* Iterate over the data in the .symtab until SYMBOL is found. */
+    len = shdr->sh_size / sizeof(ElfW(Sym));
+    ptr = 0;
+    for (i = 0; i < len; i++) {
+        data = elf_getdata(scn, NULL);
+        symbol = (ElfW(Sym) *) (data->d_buf + (i * sizeof(ElfW(Sym))));
+        str = elf_strptr(elf, shdr->sh_link, symbol->st_name);
+        if (strcmp(sym, str) == 0) {
+            ptr = symbol->st_value;
+            break;
+        }
+    }
     sym_addr = ptr + obj->link_map.l_addr;
 
+    /* Release resources. */
+    elf_end(elf);
+    close(fd);
+
+    if (ptr == 0)
+        return 0;
     return sym_addr;
 }
 
@@ -331,7 +353,6 @@ struct link_map *parse_lib_dynobj(struct ulp_process *process,
 {
     struct ulp_dynobj *obj;
     struct link_map *link_map;
-    char needed = 0;
     char *libname;
 
     /* calloc initializes all to zero */
@@ -360,17 +381,11 @@ struct link_map *parse_lib_dynobj(struct ulp_process *process,
     /* ensure that PIE was verified */
     if (!process->dynobj_main) return NULL;
 
-    // We always need to parse the main object, the to-be-patched object and the
-    // libpulp object. The first two can be found easily, but not the latter,
-    // because paths can change.
-    // We can't enforce all to be parsed, because some files may be moved, as
-    // when we have a livepatch object loaded and the uninstalled. The "needed"
-    // workaround enforces the first two to be patched, while allowing some
-    // loaded objects to be bypassed. If libpulp is not this tool will cry later
-    // about absence of a trigger reference. So, no big harm.
-    if (ulp.objs && strcmp(ulp.objs->name, obj->filename)==0) needed = 1;
-    if (parse_file_symtab(obj, needed)) return NULL;
-
+    /*
+     * While parsing a DSO, see if it exports the symbols required by
+     * live-patching. Most symbols will be provided by libpulp.so, and
+     * some by the target library.
+     */
     obj->link_map = *link_map;
     obj->trigger = get_loaded_symbol_addr(obj, "__ulp_trigger");
     obj->path_buffer = get_loaded_symbol_addr(obj, "__ulp_path_buffer");
@@ -428,8 +443,6 @@ int initialize_data_structures(struct ulp_process *process)
 {
     if (!process)
       return 1;
-
-    bfd_init();
 
     if (parse_main_dynobj(process)) return 3;
     if (parse_libs_dynobj(process)) return 3;

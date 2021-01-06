@@ -83,8 +83,6 @@ fi
 ],[AC_MSG_ERROR([Unexpected configure error.])])
 
 # The following headers are required to build libpulp's tools.
-AC_CHECK_HEADER([bfd.h],,
-AC_MSG_ERROR([Binutils development files are missing.]))
 AC_CHECK_HEADER([gelf.h],,
 AC_MSG_ERROR([Libelf development files are missing.]))
 
