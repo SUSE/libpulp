@@ -295,8 +295,7 @@ TESTS = \
   memory_protection.py
 
 XFAIL_TESTS = \
-  hidden.py \
-  memory_protection.py
+  hidden.py
 
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON) -B

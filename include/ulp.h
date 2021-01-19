@@ -104,10 +104,6 @@ int ulp_apply_all_units(struct ulp_metadata *ulp);
 
 struct ulp_applied_patch *ulp_state_update(struct ulp_metadata *ulp);
 
-int set_write_tgt(void *tgt_addr);
-
-int set_exec_tgt(void *tgt_addr);
-
 int check_patch_sanity(struct ulp_metadata *ulp);
 
 int check_patch_dependencies(struct ulp_metadata *ulp);

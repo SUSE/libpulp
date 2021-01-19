@@ -24,6 +24,7 @@
 #include <elf.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <link.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -324,6 +325,48 @@ read_data(int from, void *to, size_t count)
   }
 
   return 0;
+}
+
+/*
+ * Read one line from FD into BUF, which must be pre-allocated and large
+ * enough to hold LEN characteres. The offset into FD is advanced by the
+ * amount of bytes read.
+ *
+ * Returns -1 on error, 0 on End-of-file, or the amount of bytes read.
+ */
+int
+read_line(int fd, char *buf, size_t len)
+{
+  char *ptr;
+  int retcode;
+  size_t offset;
+
+  /* Read one byte at a time, until a newline is found. */
+  offset = 0;
+  while (offset < len) {
+    ptr = buf + offset;
+
+    /* Read one byte. */
+    retcode = read(fd, ptr, 1);
+
+    /* Error with read syscall. */
+    if (retcode == -1) {
+      if (errno == EINTR || errno == EAGAIN)
+        continue;
+      else
+        return -1;
+    }
+
+    /* Stop at EOF or EOL. */
+    if (retcode == 0 || *ptr == '\n') {
+      return offset;
+    }
+
+    offset++; /* Reading one byte at a time. */
+  }
+
+  /* EOL not found. */
+  return -1;
 }
 
 int
@@ -735,67 +778,57 @@ ulp_state_update(struct ulp_metadata *ulp)
 }
 
 /*
- * Assumes that TGT_ADDR points to the start of the nop padding area of
- * live patchable functions, then sets the memory protection bits of the
- * pages containing that area to allow writes to them. The nop padding
- * area may span multiple pages.
+ * Retrieves the memory protection bits of the page containing ADDR and
+ * returns it. If errors ocurred, return -1.
  */
 int
-set_write_tgt(void *tgt_addr)
+memory_protection_get(uintptr_t addr)
 {
-  unsigned long page_size, page_offset;
-  void *page_start;
+  char line[LINE_MAX];
+  char *str;
+  char *end;
+  int fd;
+  int result;
+  int retcode;
+  uintptr_t addr1;
+  uintptr_t addr2;
 
-  page_size = getpagesize();
-  page_offset = (unsigned long)tgt_addr % page_size;
-  page_start = tgt_addr - page_offset;
+  fd = open("/proc/self/maps", O_RDONLY);
+  if (fd == -1)
+    return -1;
 
-  /*
-   * From the start of the page containing the starting address of the
-   * nop padding area, up to the last byte of the padding area, allow
-   * writes to the pages containing the range.
-   *
-   * NOTE: mprotect implicitly handles page crosses.
-   */
-  if (mprotect(page_start, page_offset + ULP_NOPS_LEN,
-               PROT_WRITE | PROT_EXEC)) {
-    WARN("Memory protection set +w error");
-    return 0;
+  /* Iterate over /proc/self/maps lines. */
+  result = -1;
+  for (;;) {
+
+    /* Read one line. */
+    retcode = read_line(fd, line, LINE_MAX);
+    if (retcode <= 0)
+      break;
+
+    /* Parse the address range in the current line. */
+    str = line;
+    addr1 = strtoul(str, &end, 16);
+    str = end + 1; /* Skip the dash used in the range output. */
+    addr2 = strtoul(str, &end, 16);
+
+    /* Skip line if target address not within range. */
+    if (addr < addr1 || addr >= addr2)
+      continue;
+
+    /* Otherwise, parse the memory protection bits. */
+    result = 0;
+    if (*(end + 1) == 'r')
+      result |= PROT_READ;
+    if (*(end + 2) == 'w')
+      result |= PROT_WRITE;
+    if (*(end + 3) == 'x')
+      result |= PROT_EXEC;
+    break;
   }
 
-  return 1;
-}
-
-/*
- * Assumes that TGT_ADDR points to the start of the nop padding area of
- * live patchable functions, then sets the memory protection bits of the
- * pages containing that area to allow execution of instruction in them.
- * The nop padding area may span multiple pages.
- */
-int
-set_exec_tgt(void *tgt_addr)
-{
-  unsigned long page_size, page_offset;
-  void *page_start;
-
-  page_size = getpagesize();
-  page_offset = (unsigned long)tgt_addr % page_size;
-  page_start = tgt_addr - page_offset;
-
-  /*
-   * From the start of the page containing the starting address of the
-   * nop padding area, up to the last byte of the padding area, allow
-   * execution of instructions in the pages containing the range.
-   *
-   * NOTE: mprotect implicitly handles page crosses.
-   */
-  if (mprotect(page_start, page_offset + ULP_NOPS_LEN,
-               PROT_READ | PROT_EXEC)) {
-    WARN("Memory protection set +x error");
-    return 0;
-  }
-
-  return 1;
+  close(fd);
+  return result;
 }
 
 int
@@ -1012,19 +1045,66 @@ ulp_patch_addr_absolute(void *old_fentry, void *manager)
 int
 ulp_patch_addr(void *old_faddr, unsigned int index)
 {
-  void *old_fentry = old_faddr - (PRE_NOPS_LEN - TRM_NOPS_LEN);
-  void *manage;
+  void *addr;
+  unsigned long page_size;
+  uintptr_t page_mask;
+  uintptr_t page1;
+  uintptr_t page2;
+  int prot1;
+  int prot2;
 
-  manage = &__ulp_prologue;
-
-  if (!set_write_tgt(old_fentry))
+  /*
+   * The size of the nop padding area is supposed to be a lot smaller
+   * than the typical size of a memory page. Even so, when the entry
+   * point to the target function is at an address close to a page
+   * boundary, the padding area may span two pages. This function is
+   * able to handle at most one page cross.
+   */
+  page_size = getpagesize();
+  page_mask = ~(page_size - 1);
+  if (ULP_NOPS_LEN - TRM_NOPS_LEN > page_size) {
+    WARN("Nop padding area unexpectedly large.");
     return 0;
+  }
 
-  ulp_patch_prologue_layout(old_fentry, index);
-  ulp_patch_addr_absolute(old_fentry, manage);
+  /* Find the starting address of the pages containing the nops. */
+  addr = old_faddr - (PRE_NOPS_LEN - TRM_NOPS_LEN);
+  page1 = (uintptr_t)addr;
+  page2 = (uintptr_t)(addr + ULP_NOPS_LEN - TRM_NOPS_LEN - 1);
+  page1 = page1 & page_mask;
+  page2 = page2 & page_mask;
 
-  if (!set_exec_tgt(old_fentry))
+  /* Retrieve the current set of protection bits. */
+  prot1 = memory_protection_get(page1);
+  prot2 = memory_protection_get(page2);
+  if (prot1 == -1 || prot2 == -1) {
+    WARN("Memory protection read error");
     return 0;
+  }
+
+  /* Set the writable bit on affected pages. */
+  if (mprotect((void *)page1, page_size, prot1 | PROT_WRITE)) {
+    WARN("Memory protection set error (1st page)");
+    return 0;
+  }
+  if (mprotect((void *)page2, page_size, prot2 | PROT_WRITE)) {
+    WARN("Memory protection set error (2nd page)");
+    return 0;
+  }
+
+  /* Actually patch the prologue. */
+  ulp_patch_prologue_layout(addr, index);
+  ulp_patch_addr_absolute(addr, &__ulp_prologue);
+
+  /* Restore the previous access protection. */
+  if (mprotect((void *)page1, page_size, prot1)) {
+    WARN("Memory protection restore error (1st page)");
+    return 0;
+  }
+  if (mprotect((void *)page2, page_size, prot2)) {
+    WARN("Memory protection restore error (2nd page)");
+    return 0;
+  }
 
   return 1;
 }
