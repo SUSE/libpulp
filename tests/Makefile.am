@@ -96,6 +96,16 @@ libpagecross_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
 POST_PROCESS += .libs/libpagecross.post
 
+# Target libraries to test memory access protections
+check_LTLIBRARIES += libaddress.la
+noinst_HEADERS += libaddress.h
+
+libaddress_la_SOURCES = libaddress.c $(TARGET_TRM_SOURCES)
+libaddress_la_CFLAGS = $(TARGET_CFLAGS)
+libaddress_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
+
+POST_PROCESS += .libs/libaddress.post
+
 # Live patches
 check_LTLIBRARIES += libdozens_livepatch1.la \
                      libdozens_livepatch99.la \
@@ -106,7 +116,8 @@ check_LTLIBRARIES += libdozens_livepatch1.la \
                      libparameters_livepatch1.la \
                      librecursion_livepatch1.la \
                      libblocked_livepatch1.la \
-                     libpagecross_livepatch1.la
+                     libpagecross_livepatch1.la \
+                     libaddress_livepatch1.la
 
 libdozens_livepatch1_la_SOURCES = libdozens_livepatch1.c
 libdozens_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
@@ -138,6 +149,9 @@ libblocked_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 libpagecross_livepatch1_la_SOURCES = libpagecross_livepatch1.c
 libpagecross_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
+libaddress_livepatch1_la_SOURCES = libaddress_livepatch1.c
+libaddress_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
+
 METADATA = \
   libdozens_livepatch1.dsc \
   libdozens_livepatch1.ulp \
@@ -168,7 +182,10 @@ METADATA = \
   libblocked_livepatch1.rev \
   libpagecross_livepatch1.dsc \
   libpagecross_livepatch1.ulp \
-  libpagecross_livepatch1.rev
+  libpagecross_livepatch1.rev \
+  libaddress_livepatch1.dsc \
+  libaddress_livepatch1.ulp \
+  libaddress_livepatch1.rev
 
 EXTRA_DIST = \
   libdozens_livepatch1.in \
@@ -180,7 +197,8 @@ EXTRA_DIST = \
   libparameters_livepatch1.in \
   librecursion_livepatch1.in \
   libblocked_livepatch1.in \
-  libpagecross_livepatch1.in
+  libpagecross_livepatch1.in \
+  libaddress_livepatch1.in
 
 clean-local:
 	rm -f $(METADATA)
@@ -198,7 +216,8 @@ check_PROGRAMS = \
   pagecross \
   loop \
   terminal \
-  syscall_restart
+  syscall_restart \
+  memory_protection
 
 numserv_SOURCES = numserv.c
 numserv_LDADD = libdozens.la libhundreds.la
@@ -254,6 +273,10 @@ terminal_SOURCES = terminal.c
 terminal_CFLAGS = -pthread $(AM_CFLAGS)
 terminal_DEPENDENCIES = $(POST_PROCESS) $(METADATA) loop
 
+memory_protection_SOURCES = memory_protection.c
+memory_protection_LDADD = libaddress.la
+memory_protection_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
+
 TESTS = \
   numserv.py \
   numserv_bsymbolic.py \
@@ -268,9 +291,12 @@ TESTS = \
   terminal.py \
   thread_restore.py \
   syscall_restart.py \
-  hidden.py
+  hidden.py \
+  memory_protection.py
 
-XFAIL_TESTS = hidden.py
+XFAIL_TESTS = \
+  hidden.py \
+  memory_protection.py
 
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON) -B

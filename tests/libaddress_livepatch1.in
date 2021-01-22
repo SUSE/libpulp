@@ -1,0 +1,3 @@
+__ABS_BUILDDIR__/.libs/libaddress_livepatch1.so
+@__ABS_BUILDDIR__/.libs/libaddress.so.0
+get_address:new_get_address
