@@ -64,24 +64,6 @@ AX_GCC_VAR_ATTRIBUTE(weak)
 AS_IF([test "$ax_cv_have_var_attribute_weak" != "yes"], AC_MSG_ERROR([\
 The .weak assembler directive is required in trm.S]))
 
-# Check if the linker emits the .ulp section required to hold the live
-# patching trampolines.
-AC_MSG_CHECKING([whether the linker emits .ulp sections])
-AC_LINK_IFELSE([AC_LANG_SOURCE([
-asm (".pushsection .ulp.track");
-asm (".popsection");
-int main(void) {return 0;}
-])],[
-if readelf -S conftest$EXEEXT | grep -E "\.ulp " > /dev/null; then
-AC_MSG_RESULT([yes])
-else
-AC_MSG_RESULT([no])
-AC_MSG_ERROR([
-Libpulp requires an assembler that emits the .ulp section when linking \
-objects that contain a .ulp-track section])
-fi
-],[AC_MSG_ERROR([Unexpected configure error.])])
-
 # The following headers are required to build libpulp's tools.
 AC_CHECK_HEADER([gelf.h],,
 AC_MSG_ERROR([Libelf development files are missing.]))
@@ -123,13 +105,21 @@ AC_SUBST([PAGE_SIZE], [$($GETCONF PAGE_SIZE)]))
 # Libpulp uses -fpatchable-function-entry to add a total of ULP_NOPS_LEN
 # padding nops to the prologue of all functions: PRE_NOPS_LEN nops
 # before the entry point, and the remaining nops after it. These nops
-# get replaced with other instructions when a live patch is applied.
-AC_SUBST([ULP_NOPS_LEN], [24])
-AC_SUBST([PRE_NOPS_LEN], [22])
+# serve two different purposes: 1. at compilation time, the ulp_post
+# tool replaces the initial TRM_NOPS_LEN nops with trampolines that
+# redirect execution to the library entrance tracking routine; 2. at
+# running time, and whenever a live patch is applied, libpulp replaces
+# the remaining nops with instructions that redirect execution to the
+# universe handling routines.
+AC_SUBST([ULP_NOPS_LEN], [40])
+AC_SUBST([PRE_NOPS_LEN], [38])
+AC_SUBST([TRM_NOPS_LEN], [16])
 AC_DEFINE_UNQUOTED([ULP_NOPS_LEN], [$ULP_NOPS_LEN],
 [Total number of padding nops])
 AC_DEFINE_UNQUOTED([PRE_NOPS_LEN], [$PRE_NOPS_LEN],
 [Padding nops before the entry point of functions])
+AC_DEFINE_UNQUOTED([TRM_NOPS_LEN], [$TRM_NOPS_LEN],
+[Padding nops used by trampolines])
 
 AC_CONFIG_FILES([Makefile
 		 include/Makefile

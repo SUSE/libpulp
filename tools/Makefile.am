@@ -18,12 +18,12 @@
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
 bin_PROGRAMS = \
-  ulp_dynsym_gate \
   ulp_packer \
   ulp_reverse \
   ulp_dump \
   ulp_trigger \
   ulp_check \
+  ulp_post \
   ulp
 
 noinst_HEADERS = introspection.h ptrace.h packer.h
@@ -35,11 +35,11 @@ noinst_LTLIBRARIES = libcommon.la
 libcommon_la_SOURCES = introspection.c ptrace.c
 libcommon_la_LIBADD = -lelf -ldl
 
-# The dynsym_gate tool fills in the trampoline slots in the .ulp section
-# of live patchable libraries.
+# The post tool fills in the trampoline slots of each live-patchable
+# function and updates the dynamic symbol table to use the trampolines.
 
-ulp_dynsym_gate_SOURCES = dynsym_gate.c
-ulp_dynsym_gate_LDADD = -lelf
+ulp_post_SOURCES = post.c
+ulp_post_LDADD = -lelf
 
 # The packer and reverse tools create metadata files for live patches,
 # whereas the dump tool dumps their content in human-readable format.

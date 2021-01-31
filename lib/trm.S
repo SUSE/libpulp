@@ -24,7 +24,7 @@
 /* Prevent the stack from being needlessly set to executable.  */
 .section .note.GNU-stack,"",%progbits
 
-.section .ulp.track,"ax",@progbits
+.section .text,"ax",@progbits
 
 // A weak symbol for __ulp_global_universe is needed so that __ulp_entry
 // can reference it via GOT, however, there should be no definition,

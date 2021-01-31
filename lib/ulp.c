@@ -41,23 +41,15 @@ char __ulp_path_buffer[256] = "";
 struct ulp_metadata *__ulp_metadata_ref = NULL;
 struct ulp_detour_root *__ulp_root = NULL;
 
-// push		function_index
-// jmpq		0x0(%rip)
-// <data>	&__ulp_manage_addresses
-//char ulp_prologue[21] = {0x68, 0x00, 0x00, 0x00, 0x00,
-//                         0xff, 0x25, 0x00, 0x00, 0x00, 0x00,
-//                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-//                         0xeb, - (PRE_NOPS_LEN + 2)};
-
-// push		%rdi
-// movq		$0xindex, %rdi
-// jmp1		0x0(%rip)
-// <data>	&__ulp_prologue
-char ulp_prologue[24] = {0x57,
-                         0x48, 0xc7, 0xc7, 0x00, 0x00, 0x00, 0x00,
-                         0xff, 0x25, 0x00, 0x00, 0x00, 0x00,
-                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                         0xeb, - (PRE_NOPS_LEN + 2)};
+char ulp_prologue[ULP_NOPS_LEN-TRM_NOPS_LEN] = {
+  // Preceding nops
+  0x57,                          // push    %rdi
+  0x48, 0xc7, 0xc7, 0, 0, 0, 0,  // movq    $index, %rdi
+  0xff, 0x25, 0, 0, 0, 0,        // jmp     0x0(%rip)
+  0, 0, 0, 0, 0, 0, 0, 0,        // <data>  &__ulp_prolog
+  // Function entry is here
+  0xeb, -((PRE_NOPS_LEN-TRM_NOPS_LEN) + 2) // jump above
+};
 
 unsigned int __ulp_root_index_counter = 0;
 unsigned long __ulp_global_universe = 0;
@@ -957,7 +949,7 @@ void ulp_patch_addr_absolute(void *old_fentry, void *manager)
 
 int ulp_patch_addr(void *old_faddr, unsigned int index)
 {
-    void *old_fentry = old_faddr - PRE_NOPS_LEN;
+    void *old_fentry = old_faddr - (PRE_NOPS_LEN - TRM_NOPS_LEN);
     void *manage;
 
     manage = &__ulp_prologue;

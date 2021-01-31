@@ -18,7 +18,7 @@
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
 # ULP tools location.
-ULP_DYNSYM_GATE = $(top_builddir)/tools/ulp_dynsym_gate
+ULP_POST = $(top_builddir)/tools/ulp_post
 ULP_PACKER = $(top_builddir)/tools/ulp_packer
 ULP_REVERSE = $(top_builddir)/tools/ulp_reverse
 
@@ -39,11 +39,11 @@ CONVENIENCE_LDFLAGS = -rpath $(libdir) $(AM_LDFLAGS)
 # The following custom rules are triggered by <testname>_DEPENDENCIES:
 
 # This rule causes the target library to be post-processed with
-# ulp_dynsym_gate, so that its .ulp section gets filled.  Files with
+# ulp_post, so that the trampolines gets filled and used. Files with
 # .post extension track whether the respective libraries have already
 # been post-processed.
 .libs/lib%.post: lib%.la
-	$(ULP_DYNSYM_GATE) .libs/lib$*.so
+	$(ULP_POST) .libs/lib$*.so
 	touch $@
 
 # These rules cause the livepatch metadata to be built.  The .ulp target

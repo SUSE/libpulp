@@ -90,10 +90,11 @@ Contains the tools used to trigger, check and build live patches.
 
 The tools are:
 
-- dynsym_gate: This tool is used to modify the library entry points to the
+- post: This tool is used to modify the library entry points to the
 special instrumentation used by Libpulp to track consistency. It modifies the
 values of the targets in the dynamic symbol table to, instead of pointing to
-the regular function, point to a trampoline table emitted by ld.
+the regular function, point to the trampoline of each function; as well as it
+writes the trampolines themselves.
 
 - packer: This tool creates the live patch metadata out of a description file
 and from the targeted library. The description file syntax is described below.
