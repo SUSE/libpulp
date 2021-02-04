@@ -171,6 +171,9 @@ Elf64_Addr get_loaded_symbol_addr(struct ulp_dynobj *obj, char *sym)
         if (strcmp(str, ".symtab") == 0)
             break;
     }
+    /* If the .symtab is not available, skip OBJ. */
+    if (scn == NULL)
+        return 0;
 
     /* Iterate over the data in the .symtab until SYMBOL is found. */
     len = shdr->sh_size / sizeof(ElfW(Sym));
