@@ -447,6 +447,7 @@ int
 main(int argc, char **argv)
 {
   int fd;
+  Elf_Scn *scn;
 
   if (argc != 2)
     errx(EXIT_FAILURE, "Usage: %s <library.so>", argv[0]);
@@ -460,6 +461,13 @@ main(int argc, char **argv)
 
   /* Do not let libelf change the layout of the elf file. */
   assert(elf_flagelf(elf, ELF_C_SET, ELF_F_LAYOUT));
+
+  /* Sanity check. */
+  scn = find_section_by_name("__patchable_function_entries");
+  if (scn == NULL)
+    errx(EXIT_FAILURE,
+         "Section __patchable_function_entries not found.\n"
+         "(Binary not built with -fpatchable-function-entry?)\n");
 
   trampolines_fixup();
   nops_fixup();
