@@ -1,7 +1,7 @@
 /*
  *  libpulp - User-space Livepatching Library
  *
- *  Copyright (C) 2019-2020 SUSE Software Solutions GmbH
+ *  Copyright (C) 2019-2021 SUSE Software Solutions GmbH
  *
  *  This file is part of libpulp.
  *
