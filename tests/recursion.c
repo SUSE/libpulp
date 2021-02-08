@@ -25,7 +25,8 @@
 
 #include <librecursion.h>
 
-int main(void)
+int
+main(void)
 {
   char buffer[128];
   int input;

@@ -19,47 +19,51 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <dlfcn.h>
 #include <link.h>
-#include <stdio.h>
 #include <signal.h>
 #include <stddef.h>
-#include <dlfcn.h>
+#include <stdio.h>
 
 #include "ulp_common.h"
 
 /* TODO: check/remove these OLD structures */
 
-struct ulp_applied_patch {
-    unsigned char patch_id[32];
-    struct ulp_applied_unit *units;
-    struct ulp_applied_patch *next;
-    struct ulp_dependency *deps;
+struct ulp_applied_patch
+{
+  unsigned char patch_id[32];
+  struct ulp_applied_unit *units;
+  struct ulp_applied_patch *next;
+  struct ulp_dependency *deps;
 };
 
-struct ulp_applied_unit {
-    void *patched_addr;
-    void *target_addr;
-    char overwritten_bytes[14];
-    char jmp_type;
-    struct ulp_applied_unit *next;
+struct ulp_applied_unit
+{
+  void *patched_addr;
+  void *target_addr;
+  char overwritten_bytes[14];
+  char jmp_type;
+  struct ulp_applied_unit *next;
 };
 
 /* ULP Structures */
-struct ulp_detour_root {
-    unsigned int index;
-    void *patched_addr;
-    void *handler;
-    struct ulp_detour_root *next;
-    struct ulp_detour *detours;
-    unsigned long (*get_local_universe)();
+struct ulp_detour_root
+{
+  unsigned int index;
+  void *patched_addr;
+  void *handler;
+  struct ulp_detour_root *next;
+  struct ulp_detour *detours;
+  unsigned long (*get_local_universe)();
 };
 
-struct ulp_detour {
-    unsigned char patch_id[32];
-    unsigned long universe;
-    void *target_addr;
-    char active;
-    struct ulp_detour *next;
+struct ulp_detour
+{
+  unsigned char patch_id[32];
+  unsigned long universe;
+  void *target_addr;
+  char active;
+  struct ulp_detour *next;
 };
 
 /* libpulp TLS variables */
@@ -71,7 +75,7 @@ int __ulp_apply_patch();
 
 void __ulp_print();
 
-void * __ulp_get_path_buffer_addr();
+void *__ulp_get_path_buffer_addr();
 
 /* functions */
 void free_metadata(struct ulp_metadata *ulp);

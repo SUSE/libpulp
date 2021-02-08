@@ -19,8 +19,6 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-void
-hello (void);
+void hello(void);
 
-void
-hello_loop (void);
+void hello_loop(void);

@@ -27,7 +27,7 @@
 #include <hundreds.h>
 
 int
-main (void)
+main(void)
 {
   char input[64];
 

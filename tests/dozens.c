@@ -20,13 +20,13 @@
  */
 
 static int
-hidden_dozen (void)
+hidden_dozen(void)
 {
   return 12;
 }
 
 int
-dozen (void)
+dozen(void)
 {
-  return hidden_dozen ();
+  return hidden_dozen();
 }

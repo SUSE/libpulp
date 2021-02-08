@@ -25,67 +25,67 @@
 
 struct ulp_process
 {
-    int pid;
+  int pid;
 
-    Elf64_Addr load_bias;
-    Elf64_Addr dyn_addr;
+  Elf64_Addr load_bias;
+  Elf64_Addr dyn_addr;
 
-    struct ulp_thread *threads;
-    struct ulp_thread *main_thread;
+  struct ulp_thread *threads;
+  struct ulp_thread *main_thread;
 
-    struct ulp_dynobj *dynobj_main;
-    struct ulp_dynobj *dynobj_libpulp;
-    struct ulp_dynobj *dynobj_targets;
-    struct ulp_dynobj *dynobj_patches;
-    struct ulp_dynobj *dynobj_others;
+  struct ulp_dynobj *dynobj_main;
+  struct ulp_dynobj *dynobj_libpulp;
+  struct ulp_dynobj *dynobj_targets;
+  struct ulp_dynobj *dynobj_patches;
+  struct ulp_dynobj *dynobj_others;
 
-    unsigned long global_universe;
+  unsigned long global_universe;
 
-    struct ulp_process *next;
+  struct ulp_process *next;
 };
 
 struct ulp_thread
 {
-    int tid;
-    struct user_regs_struct context;
-    int consistent;
-    struct ulp_thread *next;
+  int tid;
+  struct user_regs_struct context;
+  int consistent;
+  struct ulp_thread *next;
 };
 
 struct thread_state
 {
-    int tid;
-    unsigned long universe;
+  int tid;
+  unsigned long universe;
 
-    struct thread_state *next;
+  struct thread_state *next;
 };
 
 struct ulp_dynobj
 {
-    char *filename;
-    struct link_map link_map;
+  char *filename;
+  struct link_map link_map;
 
-    Elf64_Addr trigger;
-    Elf64_Addr check;
-    Elf64_Addr path_buffer;
-    Elf64_Addr state;
-    Elf64_Addr global;
-    Elf64_Addr local;
-    Elf64_Addr testlocks;
+  Elf64_Addr trigger;
+  Elf64_Addr check;
+  Elf64_Addr path_buffer;
+  Elf64_Addr state;
+  Elf64_Addr global;
+  Elf64_Addr local;
+  Elf64_Addr testlocks;
 
-    struct thread_state *thread_states;
+  struct thread_state *thread_states;
 
-    struct ulp_dynobj *next;
+  struct ulp_dynobj *next;
 };
 
 struct ulp_addresses
 {
-    Elf64_Addr trigger;
-    Elf64_Addr path_buffer;
-    Elf64_Addr check;
-    Elf64_Addr state;
-    Elf64_Addr global;
-    Elf64_Addr local;
+  Elf64_Addr trigger;
+  Elf64_Addr path_buffer;
+  Elf64_Addr check;
+  Elf64_Addr state;
+  Elf64_Addr global;
+  Elf64_Addr local;
 };
 
 int dig_main_link_map(struct ulp_process *process);
@@ -117,12 +117,12 @@ int apply_patch(struct ulp_process *process, char *metadata);
 
 int restore_threads(struct ulp_process *process);
 
-int read_global_universe (struct ulp_process *process);
+int read_global_universe(struct ulp_process *process);
 
-unsigned long read_local_universe (struct ulp_dynobj *library,
-                                   struct ulp_thread *thread);
+unsigned long read_local_universe(struct ulp_dynobj *library,
+                                  struct ulp_thread *thread);
 
-int read_local_universes (struct ulp_process *process);
+int read_local_universes(struct ulp_process *process);
 
 int load_patch_info(char *livepatch);
 

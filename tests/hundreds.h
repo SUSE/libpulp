@@ -19,4 +19,4 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-int hundred (void);
+int hundred(void);

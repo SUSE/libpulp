@@ -27,20 +27,21 @@
 #define OUT_PATCH_NAME "metadata.ulp"
 #define OUT_REVERSE_NAME "reverse.ulp"
 
-#define WARN(format, ...) \
-	fprintf(stderr, "ulp: " format "\n", ##__VA_ARGS__)
+#define WARN(format, ...) fprintf(stderr, "ulp: " format "\n", ##__VA_ARGS__)
 
 #define ULP_PATH_LEN 256
 #define RED_ZONE_LEN 128
 
 extern __thread int __ulp_pending;
 
-struct ulp_patching_state {
-    char load_state;
-    struct ulp_applied_patch *patches;
+struct ulp_patching_state
+{
+  char load_state;
+  struct ulp_applied_patch *patches;
 };
 
-struct ulp_metadata {
+struct ulp_metadata
+{
   unsigned char patch_id[32];
   char *so_filename;
   void *so_handler;
@@ -50,7 +51,8 @@ struct ulp_metadata {
   uint8_t type;
 };
 
-struct ulp_object {
+struct ulp_object
+{
   uint32_t build_id_len;
   uint32_t build_id_check;
   char *build_id;
@@ -61,14 +63,16 @@ struct ulp_object {
   struct ulp_unit *units;
 };
 
-struct ulp_unit {
+struct ulp_unit
+{
   char *old_fname;
   char *new_fname;
   void *old_faddr;
   struct ulp_unit *next;
 };
 
-struct ulp_dependency {
+struct ulp_dependency
+{
   unsigned char dep_id[32];
   char patch_id_check;
   struct ulp_dependency *next;

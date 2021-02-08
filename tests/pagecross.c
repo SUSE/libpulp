@@ -22,27 +22,27 @@
 #include <errno.h>
 #include <stdio.h>
 
-void function (void);
+void function(void);
 
 int
-main (void)
+main(void)
 {
   char buffer[128];
 
   /* Signal readiness. */
-  printf ("Waiting for input.\n");
+  printf("Waiting for input.\n");
 
   /* Loop waiting for input and calling function(). */
   while (1) {
-    if (fgets (buffer, sizeof(buffer), stdin) == NULL) {
+    if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
       if (errno) {
-        perror ("pagecross");
+        perror("pagecross");
         return 1;
       }
-      printf ("Reached the end of file; quitting.\n");
+      printf("Reached the end of file; quitting.\n");
       return 0;
     }
-    function ();
+    function();
   }
 
   return 0;

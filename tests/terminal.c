@@ -21,9 +21,9 @@
 
 #include <errno.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
 int
 main(int argc, char **argv, char **envp)
@@ -44,9 +44,9 @@ main(int argc, char **argv, char **envp)
   if ((pid = fork())) {
     if (waitpid(pid, &status, WUNTRACED | WCONTINUED) == -1)
       perror("terminal");
-    if(WIFSTOPPED(status))
+    if (WIFSTOPPED(status))
       printf("Child stopped with %d.\n", WSTOPSIG(status));
-    if(WIFCONTINUED(status))
+    if (WIFCONTINUED(status))
       printf("Child continued.\n");
     return 7;
   }

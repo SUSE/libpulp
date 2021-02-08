@@ -19,4 +19,4 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-int dozen (void);
+int dozen(void);

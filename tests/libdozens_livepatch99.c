@@ -20,7 +20,7 @@
  */
 
 int
-hidden_baker_dozen (void)
+hidden_baker_dozen(void)
 {
   return 13;
 }

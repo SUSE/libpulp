@@ -26,13 +26,13 @@
 #include <libparameters.h>
 
 int
-main (void)
+main(void)
 {
   char buffer[128] = "X";
   ssize_t ret;
 
   /* Signal readiness. */
-  printf ("Waiting for input.\n");
+  printf("Waiting for input.\n");
 
   /*
    * When a thread that is in the middle of a syscall receives a signal,
@@ -61,21 +61,21 @@ main (void)
    * syscall is not restarted.
    */
   errno = 0;
-  ret = read (STDIN_FILENO, buffer, 1);
+  ret = read(STDIN_FILENO, buffer, 1);
 
   if (ret < 0) {
     if (errno == EINTR) {
-      printf ("read syscall interrupted but not restarted.\n");
+      printf("read syscall interrupted but not restarted.\n");
     }
-    printf ("read syscall error code: %d", errno);
+    printf("read syscall error code: %d", errno);
     return 1; /* Libpulp should restart syscalls on its own. */
   }
   if (ret == 0) {
-    printf ("End of file.\n");
+    printf("End of file.\n");
     return 1; /* The test driver is not expected to send EOF. */
   }
 
-  int_params (1, 2, 3, 4, 5, 6, 7, 8);
-  float_params (1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+  int_params(1, 2, 3, 4, 5, 6, 7, 8);
+  float_params(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
   return 0; /* At least one byte was read. */
 }

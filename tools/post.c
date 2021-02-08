@@ -21,13 +21,13 @@
 
 #include <assert.h>
 #include <err.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include <libelf.h>
 
@@ -97,7 +97,7 @@ find_symbol_by_name(char *name)
   assert(shdr);
   entry_size = sizeof(Elf64_Sym);
   for (size_t i = 0; i < shdr->sh_size; i += entry_size) {
-    sym = (Elf64_Sym *) (data->d_buf + i);
+    sym = (Elf64_Sym *)(data->d_buf + i);
     str = elf_strptr(elf, shdr->sh_link, sym->st_name);
     if (strcmp(name, str) == 0) {
       return sym;
@@ -161,7 +161,7 @@ merge_nops_at_addr(Elf64_Addr addr, size_t amount)
 
   /* Iterate over the entries in the selected symbols section. */
   for (Elf64_Xword i = 0; i < shdr->sh_size; i += sizeof(Elf64_Sym)) {
-    sym = (Elf64_Sym *) (data->d_buf + i);
+    sym = (Elf64_Sym *)(data->d_buf + i);
     if (sym->st_value == addr) {
 
       /* Symbol found. Get its containing section. */
@@ -174,7 +174,7 @@ merge_nops_at_addr(Elf64_Addr addr, size_t amount)
 
       /* Merge two nops into a two-bytes, single one. */
       offset = addr - shdr->sh_addr;
-      * (uint8_t *) (data->d_buf + offset) = 0x66;
+      *(uint8_t *)(data->d_buf + offset) = 0x66;
       elf_flagdata(data, ELF_C_SET, ELF_F_DIRTY);
       elf_flagscn(scn, ELF_C_SET, ELF_F_DIRTY);
       return;
@@ -211,7 +211,7 @@ is_patchable(Elf64_Sym *sym)
   assert(data);
   entry_size = sizeof(Elf64_Addr);
   for (size_t i = 0; i < data->d_size; i += entry_size) {
-    entry = * (Elf64_Addr *) (data->d_buf + i);
+    entry = *(Elf64_Addr *)(data->d_buf + i);
     if (addr == entry)
       return 1;
   }
@@ -241,9 +241,9 @@ build_trampoline(Elf64_Addr addr, char *result, size_t max)
    *   push  %r11
    *   jmpq  __ulp_entry
    */
-  char lea[] = {0x4c, 0x8d, 0x1d, 0x00, 0x00, 0x00, 0x00};
-  char push[] = {0x41, 0x53};
-  char jmpq[] = {0xe9, 0x00, 0x00, 0x00, 0x00};
+  char lea[] = { 0x4c, 0x8d, 0x1d, 0x00, 0x00, 0x00, 0x00 };
+  char push[] = { 0x41, 0x53 };
+  char jmpq[] = { 0xe9, 0x00, 0x00, 0x00, 0x00 };
 
   /* Make sure it fits. */
   length = sizeof(lea) + sizeof(push) + sizeof(jmpq);
@@ -357,8 +357,8 @@ whitelisted(char *name)
   };
   /* clang-format on */
 
-  for (size_t i = 0; i < (sizeof(list)/sizeof(char*)); i++)
-    if (strcmp(name, list[i])==0)
+  for (size_t i = 0; i < (sizeof(list) / sizeof(char *)); i++)
+    if (strcmp(name, list[i]) == 0)
       return 1;
 
   return 0;
@@ -392,7 +392,7 @@ trampolines_fixup(void)
   /* Iterate over the entries in the .dynsym. */
   entry_size = sizeof(Elf64_Sym);
   for (size_t i = 0; i < shdr->sh_size; i += entry_size) {
-    sym = (Elf64_Sym *) (data->d_buf + i);
+    sym = (Elf64_Sym *)(data->d_buf + i);
     name = elf_strptr(elf, shdr->sh_link, sym->st_name);
     /* Skip libpulp functions. */
     if (whitelisted(name))
@@ -430,7 +430,7 @@ nops_fixup(void)
 
   /* Iterate over the entries in __patchable_function_entries. */
   for (Elf64_Xword i = 0; i < shdr->sh_size; i += sizeof(Elf64_Addr)) {
-    addr = * (Elf64_Addr *) (data->d_buf + i);
+    addr = *(Elf64_Addr *)(data->d_buf + i);
 
     /*
      * Each entry in the __patchable_function_entries section points to

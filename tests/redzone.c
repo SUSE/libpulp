@@ -29,7 +29,7 @@
 #define LOOPS 1000000000
 
 int
-main (void)
+main(void)
 {
   long int counter = LOOPS;
   long int result1;
@@ -37,7 +37,7 @@ main (void)
   long int result3;
 
   /* Signal readiness. */
-  printf ("Waiting for input.\n");
+  printf("Waiting for input.\n");
 
   /*
    * Play with double words in the red zone:
@@ -67,9 +67,9 @@ main (void)
   if (result1 == LOOPS && result2 == LOOPS && result3 == LOOPS)
     return 0;
 
-  hello ();
+  hello();
 
-  printf ("Got %ld, %ld, and %ld, when all values expected to be %ld\n",
-          result1, result2, result3, (long int) LOOPS);
+  printf("Got %ld, %ld, and %ld, when all values expected to be %ld\n",
+         result1, result2, result3, (long int)LOOPS);
   return 1;
 }

@@ -22,7 +22,7 @@
 #include <stdio.h>
 
 void
-function (void)
+function(void)
 {
-  printf ("default\n");
+  printf("default\n");
 }

@@ -37,9 +37,9 @@
  * reviewed and extended accordingly.
  */
 void
-int_params (int a, int b, int c, int d, int e, int f, int g, int h)
+int_params(int a, int b, int c, int d, int e, int f, int g, int h)
 {
-  printf ("%d-%d-%d-%d-%d-%d-%d-%d\n", a, b, c, d, e, f, g, h);
+  printf("%d-%d-%d-%d-%d-%d-%d-%d\n", a, b, c, d, e, f, g, h);
 }
 
 /*
@@ -53,9 +53,9 @@ int_params (int a, int b, int c, int d, int e, int f, int g, int h)
  * reviewed and extended accordingly.
  */
 void
-float_params (float a, float b, float c, float d, float e,
-              float f, float g, float h, float i, float j)
+float_params(float a, float b, float c, float d, float e, float f, float g,
+             float h, float i, float j)
 {
-  printf ("%.1f-%.1f-%.1f-%.1f-%.1f-%.1f-%.1f-%.1f-%.1f-%.1f\n",
-          a, b, c, d, e, f, g, h, i, j);
+  printf("%.1f-%.1f-%.1f-%.1f-%.1f-%.1f-%.1f-%.1f-%.1f-%.1f\n", a, b, c, d, e,
+         f, g, h, i, j);
 }

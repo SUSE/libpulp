@@ -25,23 +25,23 @@
 #include <libparameters.h>
 
 int
-main (void)
+main(void)
 {
   char buffer[128];
 
   /* Loop waiting for any input. */
   printf("Waiting for input.\n");
   while (1) {
-    if (fgets (buffer, sizeof(buffer), stdin) == NULL) {
+    if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
       if (errno) {
-        perror ("parameters");
+        perror("parameters");
         return 1;
       }
-      printf ("Reached the end of file; quitting.\n");
+      printf("Reached the end of file; quitting.\n");
       return 0;
     }
-    int_params (1, 2, 3, 4, 5, 6, 7, 8);
-    float_params (1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+    int_params(1, 2, 3, 4, 5, 6, 7, 8);
+    float_params(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
   }
 
   return 1;

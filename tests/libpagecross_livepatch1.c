@@ -22,7 +22,7 @@
 #include <stdio.h>
 
 void
-new_function (void)
+new_function(void)
 {
-  printf ("patched\n");
+  printf("patched\n");
 }

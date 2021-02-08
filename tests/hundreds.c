@@ -20,7 +20,7 @@
  */
 
 int
-hundred (void)
+hundred(void)
 {
   return 100;
 }

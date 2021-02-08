@@ -21,22 +21,22 @@
 
 #include <dlfcn.h>
 #include <errno.h>
-#include <stdio.h>
 #include <signal.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <libblocked.h>
 
 void
-handler (int sig __attribute__ ((unused)),
-         siginfo_t *info __attribute__ ((unused)),
-         void *ucontext __attribute__ ((unused)))
+handler(int sig __attribute__((unused)),
+        siginfo_t *info __attribute__((unused)),
+        void *ucontext __attribute__((unused)))
 {
-  hello ();
+  hello();
 }
 
 int
-main (void)
+main(void)
 {
   void *handle;
   struct sigaction act;
@@ -52,14 +52,14 @@ main (void)
   }
 
   /* Signal readiness. */
-  printf ("Waiting for signals.\n");
+  printf("Waiting for signals.\n");
 
   /* Wait for signals. */
   while (1) {
     /* Call dlopen functions in loop to make their locks busy. */
-    handle = dlopen (NULL, RTLD_LAZY | RTLD_NOLOAD);
+    handle = dlopen(NULL, RTLD_LAZY | RTLD_NOLOAD);
     if (handle != NULL) {
-      dlclose (handle);
+      dlclose(handle);
     }
   }
 

@@ -19,9 +19,7 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-void
-int_params (int a, int b, int c, int d, int e, int f, int g, int h);
+void int_params(int a, int b, int c, int d, int e, int f, int g, int h);
 
-void
-float_params (float a, float b, float c, float d, float e,
-              float f, float g, float h, float i, float j);
+void float_params(float a, float b, float c, float d, float e, float f,
+                  float g, float h, float i, float j);

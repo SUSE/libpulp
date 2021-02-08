@@ -19,8 +19,8 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdio.h>
 #include <gelf.h>
+#include <stdio.h>
 #include <unistd.h>
 
 #include "ulp_common.h"
@@ -46,7 +46,7 @@ int get_elf_tgt_addrs(Elf *elf, struct ulp_object *obj, Elf_Scn *st);
 int create_patch_metadata_file(struct ulp_metadata *ulp, char *filename);
 
 int add_dependency(struct ulp_metadata *ulp, struct ulp_dependency *dep,
-    char *filename);
+                   char *filename);
 
 int parse_description(char *filename, struct ulp_metadata *ulp);
 

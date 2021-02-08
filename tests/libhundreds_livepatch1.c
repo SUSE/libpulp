@@ -20,7 +20,7 @@
  */
 
 int
-two_hundreds (void)
+two_hundreds(void)
 {
   return 200;
 }

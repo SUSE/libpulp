@@ -20,7 +20,7 @@
  */
 
 int
-baker_dozen (void)
+baker_dozen(void)
 {
   return 13;
 }

@@ -42,44 +42,44 @@
 
 /* Do not optimize, otherwise the calloc/free sequences go away. */
 #pragma GCC push_options
-#pragma GCC optimize ("O0")
+#pragma GCC optimize("O0")
 
 /* Calls many of the functions that acquire the locks that might cause
  * live-patch installation to deadlock.
  */
 void *
-worker (void *arg __attribute__ ((unused)))
+worker(void *arg __attribute__((unused)))
 {
   void *handle;
-  void *symbol __attribute__ ((unused));
+  void *symbol __attribute__((unused));
   char *data;
 
   while (1) {
-    data = calloc (100, sizeof(char));
-    data = reallocarray (data, 200, sizeof(char));
-    free (data);
-    data = malloc (300 * sizeof(char));
-    data = realloc (data, 400 * sizeof(char));
-    free (data);
-    data = aligned_alloc (256, 500 * sizeof(char));
-    free (data);
-    data = valloc (600 * sizeof(char));
-    free (data);
-    data = pvalloc (700 * sizeof(char));
-    free (data);
-    if (!posix_memalign ((void **) &data, 512, 800 * sizeof(char)))
-      free (data);
+    data = calloc(100, sizeof(char));
+    data = reallocarray(data, 200, sizeof(char));
+    free(data);
+    data = malloc(300 * sizeof(char));
+    data = realloc(data, 400 * sizeof(char));
+    free(data);
+    data = aligned_alloc(256, 500 * sizeof(char));
+    free(data);
+    data = valloc(600 * sizeof(char));
+    free(data);
+    data = pvalloc(700 * sizeof(char));
+    free(data);
+    if (!posix_memalign((void **)&data, 512, 800 * sizeof(char)))
+      free(data);
 
-    handle = dlopen (NULL, RTLD_LAZY | RTLD_NOLOAD);
+    handle = dlopen(NULL, RTLD_LAZY | RTLD_NOLOAD);
     if (handle != NULL) {
-      symbol = dlsym (handle, "worker");
-      dlclose (handle);
+      symbol = dlsym(handle, "worker");
+      dlclose(handle);
     }
 
     /* Sleep for a brief while to increase the chances that the
      * application of the live-patch succeeds.
      */
-    usleep (1);
+    usleep(1);
   }
 }
 
@@ -87,7 +87,7 @@ worker (void *arg __attribute__ ((unused)))
 #pragma GCC pop_options
 
 int
-main (void)
+main(void)
 {
   char buffer[128];
   pthread_t thread[THREADS];
@@ -96,24 +96,24 @@ main (void)
    * infinite loop.
    */
   for (int iter = 0; iter < THREADS; iter++)
-    pthread_create (&thread[iter], NULL, worker, NULL);
+    pthread_create(&thread[iter], NULL, worker, NULL);
 
   /* Signal readiness. */
-  printf ("Waiting for input.\n");
+  printf("Waiting for input.\n");
 
   /* Wait for any input, then call hello(), which should produce
    * different output before and after the live-patching.
    */
   while (1) {
-    if (fgets (buffer, sizeof(buffer), stdin) == NULL) {
+    if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
       if (errno) {
-        perror ("deadlock");
+        perror("deadlock");
         return 1;
       }
-      printf ("Reached the end of file; quitting.\n");
+      printf("Reached the end of file; quitting.\n");
       return 0;
     }
-    hello ();
+    hello();
   }
 
   return 0;

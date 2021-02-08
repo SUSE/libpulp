@@ -21,7 +21,8 @@
 
 #include <librecursion.h>
 
-long long int new_recursion(long long int n)
+long long int
+new_recursion(long long int n)
 {
   return lucas(n);
 }
