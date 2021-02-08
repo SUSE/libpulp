@@ -349,11 +349,13 @@ symbol_fixup(Elf64_Sym *sym)
 int
 whitelisted(char *name)
 {
+  /* clang-format off */
   char *list[] = {
     "__ulp_entry",
     "__ulp_get_local_universe",
     "__ulp_ret_local_universe"
   };
+  /* clang-format on */
 
   for (size_t i = 0; i < (sizeof(list)/sizeof(char*)); i++)
     if (strcmp(name, list[i])==0)

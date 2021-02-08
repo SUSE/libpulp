@@ -45,6 +45,7 @@ main (void)
    *   - Iterate LOOPS times, incrementing them;
    *   - Output them to result<N>.
    */
+  /* clang-format off */
   asm volatile (
     "movq $0, -0x08(%%rsp)\n"
     "movq $0, -0x78(%%rsp)\n"
@@ -61,6 +62,7 @@ main (void)
     "movq -0x80(%%rsp), %2\n"
     : "=r"(result1), "=r"(result2), "=r"(result3), "+r"(counter)
   );
+  /* clang-format on */
 
   if (result1 == LOOPS && result2 == LOOPS && result3 == LOOPS)
     return 0;

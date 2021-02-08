@@ -909,10 +909,14 @@ void __ulp_manage_universes(unsigned long idx)
     }
     if (!target) target = root->patched_addr + 2;
 
-    asm ("movq %0, %%r11;"
-		    :
-		    : "r" (target)
-		    : );
+    /* clang-format off */
+    asm (
+      "movq %0, %%r11;"
+      :
+      : "r" (target)
+      :
+    );
+    /* clang-format on */
 }
 
 unsigned int get_next_function_index()

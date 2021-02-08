@@ -32,20 +32,22 @@
 
 void usage(char *name)
 {
-    fprintf(stderr, "Usage: %s <descr.txt> <target.so> [output file]", name);
-    fprintf(stderr, " * <descr.txt>: Text-file with patch description.\n");
-    fprintf(stderr, " * <target.so>: .so with to-be-patched function.\n");
-    fprintf(stderr, " * [output file] (optional): write to output file,\n");
-    fprintf(stderr, "   instead of to the standard, hardcoded path.\n\n");
-    fprintf(stderr, "   descr.txt format:\n\n");
-    fprintf(stderr, "   absolute path to patch.so\n");
-    fprintf(stderr, "   tgt_func1:patch_func1\n");
-    fprintf(stderr, "   tgt_func2:patch_func2\n");
-    fprintf(stderr, " * <tgt_func>: Function to be patched\n");
-    fprintf(stderr, " * <patch_func>: Function that will replace tgt_func\n");
-    fprintf(stderr, " * Each line describes a function to be patched\n");
-    fprintf(stderr, " * Patches are to the object listed in the previous line \
-	    started with a '@' and should be to a single shared object\n");
+  /* clang-format off */
+  fprintf(stderr, "Usage: %s <descr.txt> <target.so> [output file]", name);
+  fprintf(stderr, " * <descr.txt>: Text-file with patch description.\n");
+  fprintf(stderr, " * <target.so>: .so with to-be-patched function.\n");
+  fprintf(stderr, " * [output file] (optional): write to output file,\n");
+  fprintf(stderr, "   instead of to the standard, hardcoded path.\n\n");
+  fprintf(stderr, "   descr.txt format:\n\n");
+  fprintf(stderr, "   absolute path to patch.so\n");
+  fprintf(stderr, "   tgt_func1:patch_func1\n");
+  fprintf(stderr, "   tgt_func2:patch_func2\n");
+  fprintf(stderr, " * <tgt_func>: Function to be patched\n");
+  fprintf(stderr, " * <patch_func>: Function that will replace tgt_func\n");
+  fprintf(stderr, " * Each line describes a function to be patched\n");
+  fprintf(stderr, " * Patches are to the object listed in the previous line\n");
+  fprintf(stderr, "   started with a '@' and should be to a single shared object\n");
+  /* clang-format on */
 }
 
 void free_metadata(struct ulp_metadata *ulp)
