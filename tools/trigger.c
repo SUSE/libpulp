@@ -100,11 +100,11 @@ int main(int argc, char **argv)
         WARN("Locks are busy, try again later (%d).", ret);
       }
       else {
+        retry = 0;
         if (apply_patch(&target, livepatch))
           WARN("Apply patch to %d failed.", pid);
         else {
           WARN("Patching %d succesful.", pid);
-          retry = 0;
         }
       }
 
