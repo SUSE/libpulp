@@ -143,7 +143,7 @@ functions call to save and restore registers; and _ulp_interface.S_, which
 contains the entry-point functions that the _Trigger_ and _Check_ tools use to
 apply and check live patches.
 
-Also in this directory, _trm.S_ produces the object that that libraries need to
+Also in this directory, _trm.S_ produces the object that libraries need to
 link against in order to become live-patchable. It contains the library entrance
 tracking routine (see [Consistency](#consistency)), as well as routines to
 retrieve the value of thread-local counters.
@@ -160,7 +160,7 @@ The following tools comprise the tool set of Libpulp:
 
  * _Packer_: This tool creates the live patch metadata out of a description file
    and from the targeted library. The description file syntax is described in
-   the its own [section](#description-file-syntax).
+   its own [section](#description-file-syntax).
 
  * _Trigger_: This tool is used to introspect into the to-be-patched process and
    trigger the live patching process.
@@ -236,11 +236,13 @@ consistent).
 The live patching metadata is built from a description file which should be
 written with the following syntax:
 
+```
 1: <absolute path of .so with patching functions>
 2: @<absolute path of the targeted library>
 3: <old_fname_1>:<new_fname_1>
 4: <old_fname_2>:<new_fname_2>
 ...
+```
 
 Line 1 brings the absolute path of a .so file that contains all the functions
 which will be used to replace functions in the running process. Line 2 brings
