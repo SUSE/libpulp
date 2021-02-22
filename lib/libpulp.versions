@@ -2,6 +2,25 @@
   global:
     /* Accessed from from live-patchable libraries (see trm.S) */
     __ulp_global_universe;
+    /* Interposed from libc and libdl. */
+    free;
+    malloc;
+    calloc;
+    realloc;
+    reallocarray;
+    valloc;
+    pvalloc;
+    memalign;
+    aligned_alloc;
+    posix_memalign;
+    dlopen;
+    dlmopen;
+    dlsym;
+    dlvsym;
+    dlclose;
+    dladdr;
+    dladdr1;
+    dlinfo;
   local:
     *;
 };

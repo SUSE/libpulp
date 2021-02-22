@@ -82,9 +82,12 @@ main(int argc, char **argv)
   if (check_patch_sanity(&target))
     return 5;
 
-  /* For RETRY Times, test if it would be safe to apply a live-patch,
-   * i.e. if glibc internal locks for calloc and dlopen are free,
-   * before actually applying it.
+  /*
+   * Since live patching uses AS-Unsafe functions from the context of a
+   * signal-handler, libpulp first checks whether the operation could
+   * lead to a deadlock and returns with EAGAIN if so. Detaching and
+   * briefly waiting usually changes the situation and the assessment,
+   * so retry in a finite loop.
    */
   retry = 100;
   while (retry) {
@@ -93,22 +96,12 @@ main(int argc, char **argv)
     if (hijack_threads(&target))
       return 6;
 
-    /* Because apply_patch uses AS-Unsafe functions from the context
-     * of a signal-handler, first check, with testlocks, that doing so
-     * wouldn't cause a deadlock. If safe, call apply_patch,
-     * otherwise, loop around and try again after a short while.
-     */
-    ret = testlocks(&target);
-    if (ret) {
-      WARN("Locks are busy, try again later (%d).", ret);
-    }
+    ret = apply_patch(&target, livepatch);
+    if (ret)
+      WARN("Patching %d failed.", pid);
     else {
+      WARN("Patching %d succesful.", pid);
       retry = 0;
-      if (apply_patch(&target, livepatch))
-        WARN("Apply patch to %d failed.", pid);
-      else {
-        WARN("Patching %d succesful.", pid);
-      }
     }
 
     if (restore_threads(&target))

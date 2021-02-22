@@ -402,17 +402,16 @@ parse_lib_dynobj(struct ulp_process *process, struct link_map *link_map_addr)
   obj->state = get_loaded_symbol_addr(obj, "__ulp_state");
   obj->global = get_loaded_symbol_addr(obj, "__ulp_get_global_universe");
   obj->local = get_loaded_symbol_addr(obj, "__ulp_get_local_universe");
-  obj->testlocks = get_loaded_symbol_addr(obj, "__ulp_testlocks");
 
   /* libpulp must expose all these symbols. */
   if (obj->trigger && obj->path_buffer && obj->check && obj->state &&
-      obj->global && obj->testlocks) {
+      obj->global) {
     obj->next = NULL;
     process->dynobj_libpulp = obj;
   }
   /* No other library should expose these symbols. */
   else if (obj->trigger || obj->path_buffer || obj->check || obj->state ||
-           obj->global || obj->testlocks)
+           obj->global)
     WARN("libpulp symbol exposed by some other library.");
   /* Live-patchable libraries expose the local universe. */
   else if (obj->local) {
@@ -671,47 +670,6 @@ children_restore:
   return 1;
 }
 
-/* Jacks into PROCESS and checks the conditions that are necessary to
- * safely call dlopen and calloc from a signal handler, even though
- * these are AS-Unsafe functions. The conditions are:
- *
- *   - All of the locks in the malloc implementation must be free,
- *     otherwise, a call to any of the functions from the malloc family
- *     could cause a deadlock.
- *
- *   - The locks in the dynamic linker implementation (dl_load_lock and
- *     dl_load_write_lock) must be free, otherwise, a call to any of the
- *     functions from the dlopen family could cause a deadlock.
- *
- * Checking the conditions above is accomplished by __ulp_do_testlocks.
- * See its implementation for more information.
- *
- * Returns 0 if the process, in its currently hijacked condition is able
- * to apply a live patch. Otherwise, returns 1, which means that
- * applying a live patch could result in a deadlock.
- *
- * WARNING: this function is in the critical section, so it can only be
- * called after successful thread hijacking.
- */
-int
-testlocks(struct ulp_process *process)
-{
-  struct ulp_thread *thread;
-  struct user_regs_struct context;
-  ElfW(Addr) routine;
-
-  thread = process->main_thread;
-  context = thread->context;
-  routine = process->dynobj_libpulp->testlocks;
-
-  if (run_and_redirect(thread->tid, &context, routine)) {
-    WARN("error: unable to trig thread %d.", thread->tid);
-    return 2;
-  };
-
-  return context.rax;
-}
-
 /* Jacks into PROCESS and checks if the live patch with PATCH_ID has
  * already been applied. Returns 1 if it has and 0 it if hasn't.
  * On error, returns 2.
@@ -741,8 +699,10 @@ patch_applied(struct ulp_process *process, unsigned char *patch_id)
   return context.rax;
 }
 
-/* Jacks into PROCESS and installs the live patch pointed to by the
- * METADATA file. Returns 0 on success, and 1 otherwise.
+/*
+ * Jacks into PROCESS and installs the live patch pointed to by the
+ * METADATA file. Returns 0 on success, EAGAIN if live patching was
+ * avoided due to the risk of a deadlock, and 1 otherwise.
  *
  * WARNING: this function is in the critical section, so it can only be
  * called after successful thread hijacking.
@@ -766,12 +726,12 @@ apply_patch(struct ulp_process *process, char *metadata)
     return 1;
   };
 
-  if (!context.rax) {
-    WARN("apply patch error: patch not applied.");
-    return 1;
-  }
+  if (context.rax == EAGAIN)
+    WARN("libc/libdl locks are busy: patch not applied.");
+  else if (context.rax)
+    WARN("internal error: patch not applied.");
 
-  return 0;
+  return context.rax;
 }
 
 /* Reads the global universe counter in PROCESS. Returns the

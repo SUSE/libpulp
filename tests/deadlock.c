@@ -30,7 +30,7 @@
 /* At least one thread is required to cause the deadlock, otherwise,
  * malloc/calloc refrain from acquiring a lock, at all.
  */
-#define THREADS 50
+#define THREADS 15
 
 /* A live-patchable library is required so that a live patch can be
  * applied, however, this test case only relies on the fact that

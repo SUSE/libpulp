@@ -1,7 +1,7 @@
-From 213173363bfebd10d14f5a9027582b938ad4b085 Mon Sep 17 00:00:00 2001
+From ae97049a3b501927a743a2ea6a71f21b0235de85 Mon Sep 17 00:00:00 2001
 From: "Gabriel F. T. Gomes" <gagomes@suse.de>
 Date: Fri, 24 Jul 2020 11:10:25 -0300
-Subject: [PATCH 2/2] Non ABI-compliant __tls_get_addr for libpulp
+Subject: [PATCH] Non ABI-compliant __tls_get_addr for libpulp
 
 Userspace live-patching enabled libraries track all calls into the
 library via the __ulp_entry function.  This tracking is per-thread, so
@@ -14,36 +14,37 @@ without saving caller-save registers. If the hot-path finds the address,
 it returns quickly. Otherwise, it saves the registers that __ulp_entry
 did not save, and calls the slow C function.
 ---
- elf/Versions                                 |  4 ++
- sysdeps/unix/sysv/linux/x86_64/64/ld.abilist |  1 +
+ elf/Versions                                 |  5 ++
+ sysdeps/unix/sysv/linux/x86_64/64/ld.abilist |  2 +
  sysdeps/x86_64/tls_get_addr.S                | 63 ++++++++++++++++++++
- 3 files changed, 68 insertions(+)
+ 3 files changed, 70 insertions(+)
 
 diff --git a/elf/Versions b/elf/Versions
-index c0f59185e8..f075c579d8 100644
+index 3b09901f6c..90d7124ad2 100644
 --- a/elf/Versions
 +++ b/elf/Versions
-@@ -77,5 +77,9 @@ ld {
-   GLIBC_LIBPULP1 {
-     # Libpulp checks to avoid deadlock in AS-Unsafe functions.
-     __libpulp_dlopen_checks;
-+
+@@ -79,4 +79,9 @@ ld {
+     # Set value of a tunable.
+     __tunable_get_val;
+   }
++  GLIBC_LIBPULP1 {
 +    # Non ABI-compliant version of __tls_get_addr to avoid the need of
 +    # saving/restoring registers on the fast path.
 +    __libpulp_tls_get_addr;
-   }
++  }
  }
 diff --git a/sysdeps/unix/sysv/linux/x86_64/64/ld.abilist b/sysdeps/unix/sysv/linux/x86_64/64/ld.abilist
-index 861962ed19..08da57de8f 100644
+index 0dc9430611..fdc4208f28 100644
 --- a/sysdeps/unix/sysv/linux/x86_64/64/ld.abilist
 +++ b/sysdeps/unix/sysv/linux/x86_64/64/ld.abilist
-@@ -11,3 +11,4 @@ GLIBC_2.3 __tls_get_addr F
- GLIBC_2.4 GLIBC_2.4 A
- GLIBC_LIBPULP1 GLIBC_LIBPULP1 A
- GLIBC_LIBPULP1 __libpulp_dlopen_checks F
+@@ -6,3 +6,5 @@ GLIBC_2.2.5 free F
+ GLIBC_2.2.5 malloc F
+ GLIBC_2.2.5 realloc F
+ GLIBC_2.3 __tls_get_addr F
++GLIBC_LIBPULP1 GLIBC_LIBPULP1 A
 +GLIBC_LIBPULP1 __libpulp_tls_get_addr F
 diff --git a/sysdeps/x86_64/tls_get_addr.S b/sysdeps/x86_64/tls_get_addr.S
-index 9d38fb3be5..09c69314de 100644
+index 48b5e551b0..8e81cafa77 100644
 --- a/sysdeps/x86_64/tls_get_addr.S
 +++ b/sysdeps/x86_64/tls_get_addr.S
 @@ -58,4 +58,67 @@ ENTRY (__tls_get_addr)
@@ -115,5 +116,5 @@ index 9d38fb3be5..09c69314de 100644
 +END (__libpulp_tls_get_addr)
  #endif /* SHARED */
 -- 
-2.28.0
+2.30.1
 

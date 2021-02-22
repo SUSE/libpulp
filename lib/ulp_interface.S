@@ -37,12 +37,6 @@
  * executed, without side-effects).
  */
 
-__ulp_testlocks:
-    nop
-    nop
-    call    __ulp_do_testlocks@PLT
-    int3
-
 __ulp_trigger:
     nop
     nop

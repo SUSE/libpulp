@@ -76,16 +76,6 @@ AX_PYTHON_MODULE([pexpect], [fatal])
 AC_SUBST([AM_CFLAGS], ["-Wall -Wextra -Werror"])
 AC_SUBST([AM_CCASFLAGS], ["-Wa,--fatal-warnings"])
 
-# Libpulp makes calls to AS-Unsafe functions, calloc and dlopen, from a
-# signal handler, even though that might lead to a deadlock. To get rid
-# of the deadlock while still sticking to calloc and dlopen, glibc could
-# expose functions that let a signal handler check that all related
-# locks are free, but that is not available upstream. This check tests
-# that a downstream/custom glibc provides these lock-state checking
-# functions:
-AC_CHECK_FUNCS(__libpulp_malloc_checks)
-AC_CHECK_FUNCS(__libpulp_dlopen_checks)
-
 # The following test checks that a downstream/custom glibc provides
 # __libpulp_tls_get_addr for optimized library entrance tracking.
 # When available, trm.S avoids most of the register save/restore

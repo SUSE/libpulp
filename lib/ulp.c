@@ -34,6 +34,7 @@
 #include <unistd.h>
 
 #include "config.h"
+#include "interpose.h"
 #include "ulp.h"
 
 /* ulp data structures */
@@ -74,10 +75,29 @@ return_zero()
 int
 __ulp_apply_patch()
 {
-  if (!load_patch()) {
-    WARN("Patch not applied");
+  int result;
+
+  /*
+   * If the target process is busy within functions from the malloc or
+   * dlopen implementations, applying a live patch could lead to a
+   * deadlock, thus give up.
+   */
+  if (__ulp_asunsafe_trylock())
+    return EAGAIN;
+  __ulp_asunsafe_unlock();
+
+  /* Otherwise, try to apply the live patch. */
+  result = load_patch();
+
+  /*
+   * Live patching could fail for a couple of different reasons, thus
+   * check the result and return either zero for success or one for
+   * failures (except for EAGAIN above).
+   */
+  if (result) {
     return 0;
   }
+
   return 1;
 }
 
@@ -109,48 +129,6 @@ unsigned long
 __ulp_get_global_universe_value()
 {
   return __ulp_global_universe;
-}
-
-/*
- * Checks that all locks in the implementation of malloc and dlopen are
- * free. In order to do so, it makes calls into __libpulp_malloc_checks
- * and __libpulp_dlopen_check, which are not part of upstream glibc.
- *
- * A hijacked process uses this to determine if it can make calls to
- * calloc and dlopen (AS-Unsafe functions) from a signal handler. When
- * none of the locks are taken, the hijacked process may make calls to
- * calloc and dlopen without the risk to go into a deadlock.
- */
-int __libpulp_malloc_checks(void);
-int __libpulp_dlopen_checks(void);
-int
-__ulp_do_testlocks()
-{
-  int malloc_locks;
-  int dlopen_locks;
-
-  malloc_locks = 0;
-  dlopen_locks = 0;
-
-#ifdef HAVE___LIBPULP_MALLOC_CHECKS
-  malloc_locks = __libpulp_malloc_checks();
-  if (malloc_locks != 0 && malloc_locks != 1) {
-    WARN("FATAL: Invalid return from __libpulp_malloc_checks().");
-    return -1;
-  }
-#endif
-
-#ifdef HAVE___LIBPULP_DLOPEN_CHECKS
-  dlopen_locks = __libpulp_dlopen_checks();
-  if (dlopen_locks != 0 && dlopen_locks != 1) {
-    WARN("FATAL: Invalid return from __libpulp_dlopen_checks().");
-    return -1;
-  }
-#endif
-
-  if (malloc_locks || dlopen_locks)
-    return EAGAIN;
-  return 0;
 }
 
 /* libpulp functions */
