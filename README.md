@@ -1,5 +1,7 @@
 # Libpulp
 
+[![status](https://github.com/inconstante/cicdtest/actions/workflows/test-suite.yml/badge.svg)](https://github.com/inconstante/cicdtest/actions/workflows/test-suite.yml)
+
 # Table of contents
 
 1. [Introduction](#introduction)
