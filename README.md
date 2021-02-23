@@ -1,6 +1,6 @@
 # Libpulp
 
-[![status](https://github.com/inconstante/cicdtest/actions/workflows/test-suite.yml/badge.svg)](https://github.com/inconstante/cicdtest/actions/workflows/test-suite.yml)
+[![status](https://github.com/SUSE/libpulp/actions/workflows/test-suite.yml/badge.svg)](https://github.com/SUSE/libpulp/actions/workflows/test-suite.yml)
 
 # Table of contents
 
