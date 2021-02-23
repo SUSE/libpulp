@@ -27,6 +27,6 @@ jobs:
       run: make check
     - name: diagnostics
       if: ${{ failure () }}
-      run: head -n 1000 tests/*.log
+      run: gcc --version
     - name: make distcheck
       run: make distcheck
