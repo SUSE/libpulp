@@ -84,22 +84,6 @@ To work around this problem, disable dependency tracking during configuration:
 ./configure --disable-dependency-tracking
 ```
 
-### Deadlock
-
-Currently, Libpulp uses a few AS-Unsafe functions, such as _calloc_ and
-_dlopen_, during the application of a live patch. However, since live patching
-happens from a _ptrace_ context, calling AS-Unsafe functions might lead to a
-deadlock. In order to make the problem clear, the test suite has a test case,
-_deadlock.py_, which exposes the problem. The test suite should always fail,
-with the following error message, until the problem is solved:
-
-```
-FAIL: deadlock.py
-make[3]: *** [Makefile:1464: test-suite.log] Error 1
-```
-
-If it passes for you, please report.
-
 # Contributing
 
 Contributions are welcome! You are welcome to open bug reports at the git
