@@ -1,0 +1,25 @@
+name: Coding Style
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  clang-format:
+
+    runs-on: ubuntu-20.04
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: dependencies
+      run: sudo apt install clang-format-11
+    - name: format
+      run: find -type f -name "*.[c|h]" -exec clang-format-11 -style=file -i {} \;
+    - name: verify
+      run: /bin/bash -c "git status --short | file - | grep empty"
+      id: verify
+    - name: diagnostics
+      if: failure() && steps.verify.outcome == 'failure'
+      run: git diff

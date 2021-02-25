@@ -25,8 +25,9 @@ jobs:
       run: make
     - name: make check
       run: make check
+      id: check
     - name: diagnostics
-      if: ${{ failure () }}
-      run: head -n 1000 tests/*.log
+      if: failure () && steps.check.outcome == 'failure'
+      run: cat tests/test-suite.log
     - name: make distcheck
       run: make distcheck
