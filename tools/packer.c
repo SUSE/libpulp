@@ -106,7 +106,7 @@ load_elf(char *obj, int *fd)
 }
 
 Elf_Scn *
-get_symtab(Elf *elf)
+get_dynsym(Elf *elf)
 {
   size_t i, nsecs;
   Elf_Scn *s;
@@ -125,7 +125,7 @@ get_symtab(Elf *elf)
     }
     gelf_getshdr(s, &sh);
 
-    if (sh.sh_type == SHT_SYMTAB) {
+    if (sh.sh_type == SHT_DYNSYM) {
       return s;
     }
   }
@@ -165,10 +165,10 @@ int
 get_ulp_elf_metadata(Elf *elf, struct ulp_object *obj)
 {
 
-  Elf_Scn *symtab;
-  symtab = get_symtab(elf);
-  if (!symtab) {
-    WARN("Unable to get .symtab section (stripped binary?).");
+  Elf_Scn *dynsym;
+  dynsym = get_dynsym(elf);
+  if (!dynsym) {
+    WARN("Unable to get .dynsym section.");
     return 0;
   }
 
@@ -177,7 +177,7 @@ get_ulp_elf_metadata(Elf *elf, struct ulp_object *obj)
     return 0;
   }
 
-  if (!get_elf_tgt_addrs(elf, obj, symtab)) {
+  if (!get_elf_tgt_addrs(elf, obj, dynsym)) {
     WARN("Unable to get target addresses.");
     return 0;
   }

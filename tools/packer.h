@@ -33,7 +33,7 @@ void unload_elf(Elf **elf, int *fd);
 
 Elf *load_elf(char *obj, int *fd);
 
-Elf_Scn *get_symtab(Elf *elf);
+Elf_Scn *get_dynsym(Elf *elf);
 
 Elf_Scn *get_build_id_note(Elf *elf);
 
