@@ -351,9 +351,13 @@ whitelisted(char *name)
 {
   /* clang-format off */
   char *list[] = {
+    /* Functions in trm.S. */
     "__ulp_entry",
     "__ulp_get_local_universe",
-    "__ulp_ret_local_universe"
+    "__ulp_ret_local_universe",
+
+    /* Process initialization (glibc) */
+    "__libc_start_main"
   };
   /* clang-format on */
 
