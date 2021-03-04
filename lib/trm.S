@@ -47,11 +47,11 @@
 // Track library entrance
 __ulp_entry:
 
-    // In libraries that have been made live patchable, every function
-    // that has an entry in the PLT is modified so that calls do not go
-    // through the PLT at all. Instead, calls go through trampolines in
-    // the .ulp section. The trampolines push the address of the target
-    // function onto the stack, then jump here.
+    // In libraries that are made live patchable, the addresses of each
+    // exported function (which are encoded in the .dynsym) get replaced
+    // with the addresses of their corresponding ULP trampolines. Then,
+    // during execution, each of these trampolines pushes the address of
+    // the actual target function onto the stack, then jumps here.
     //
     // Thus, upon entry, the call stack looks similar to the following:
     //
