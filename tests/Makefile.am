@@ -106,6 +106,16 @@ libaddress_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
 POST_PROCESS += .libs/libaddress.post
 
+# Target libraries to test constructors
+check_LTLIBRARIES += libconstructor.la
+noinst_HEADERS += libconstructor.h
+
+libconstructor_la_SOURCES = libconstructor.c $(TARGET_TRM_SOURCES)
+libconstructor_la_CFLAGS = $(TARGET_CFLAGS)
+libconstructor_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
+
+POST_PROCESS += .libs/libconstructor.post
+
 # Live patches
 check_LTLIBRARIES += libdozens_livepatch1.la \
                      libdozens_livepatch99.la \
@@ -217,7 +227,8 @@ check_PROGRAMS = \
   loop \
   terminal \
   syscall_restart \
-  memory_protection
+  memory_protection \
+  constructor
 
 numserv_SOURCES = numserv.c
 numserv_LDADD = libdozens.la libhundreds.la
@@ -273,6 +284,12 @@ terminal_SOURCES = terminal.c
 terminal_CFLAGS = -pthread $(AM_CFLAGS)
 terminal_DEPENDENCIES = $(POST_PROCESS) $(METADATA) loop
 
+constructor_SOURCES = constructor.c
+constructor_LDADD = libconstructor.la
+constructor_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
+
+EXTRA_DIST += constructor-template.c
+
 memory_protection_SOURCES = memory_protection.c
 memory_protection_LDADD = libaddress.la
 memory_protection_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
@@ -292,7 +309,8 @@ TESTS = \
   thread_restore.py \
   syscall_restart.py \
   hidden.py \
-  memory_protection.py
+  memory_protection.py \
+  constructor.py
 
 XFAIL_TESTS = \
   hidden.py

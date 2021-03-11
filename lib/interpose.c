@@ -228,6 +228,14 @@ __attribute__((constructor)) void
 __ulp_asunsafe_begin(void)
 {
   /*
+   * If the address of dlsym is know (real_dlsym not NULL) this function
+   * has already been executed successfully and learned the real
+   * addresses of all interposed function, so do not run it again.
+   */
+  if (real_dlsym)
+    return;
+
+  /*
    * Calling dlsym to interpose dlsym itself is not possible, so take
    * advantage of the fact that, during process start up, DSOs are
    * available in-disk, find the file for libdl.so, open and parse it
@@ -349,6 +357,9 @@ realloc(void *ptr, size_t size)
 {
   void *result;
 
+  if (real_realloc == NULL)
+    __ulp_asunsafe_begin();
+
   __sync_fetch_and_add(&flag, 1);
   result = real_realloc(ptr, size);
   __sync_fetch_and_sub(&flag, 1);
@@ -360,6 +371,9 @@ void *
 reallocarray(void *ptr, size_t nmemb, size_t size)
 {
   void *result;
+
+  if (real_reallocarray == NULL)
+    __ulp_asunsafe_begin();
 
   __sync_fetch_and_add(&flag, 1);
   result = real_reallocarray(ptr, nmemb, size);
@@ -373,6 +387,9 @@ valloc(size_t size)
 {
   void *result;
 
+  if (real_valloc == NULL)
+    __ulp_asunsafe_begin();
+
   __sync_fetch_and_add(&flag, 1);
   result = real_valloc(size);
   __sync_fetch_and_sub(&flag, 1);
@@ -384,6 +401,9 @@ void *
 pvalloc(size_t size)
 {
   void *result;
+
+  if (real_pvalloc == NULL)
+    __ulp_asunsafe_begin();
 
   __sync_fetch_and_add(&flag, 1);
   result = real_pvalloc(size);
@@ -397,6 +417,9 @@ memalign(size_t alignment, size_t size)
 {
   void *result;
 
+  if (real_memalign == NULL)
+    __ulp_asunsafe_begin();
+
   __sync_fetch_and_add(&flag, 1);
   result = real_memalign(alignment, size);
   __sync_fetch_and_sub(&flag, 1);
@@ -408,6 +431,9 @@ void *
 aligned_alloc(size_t alignment, size_t size)
 {
   void *result;
+
+  if (real_aligned_alloc == NULL)
+    __ulp_asunsafe_begin();
 
   __sync_fetch_and_add(&flag, 1);
   result = real_aligned_alloc(alignment, size);
@@ -421,6 +447,9 @@ posix_memalign(void **memptr, size_t alignment, size_t size)
 {
   int result;
 
+  if (real_posix_memalign == NULL)
+    __ulp_asunsafe_begin();
+
   __sync_fetch_and_add(&flag, 1);
   result = real_posix_memalign(memptr, alignment, size);
   __sync_fetch_and_sub(&flag, 1);
@@ -432,6 +461,9 @@ void *
 dlopen(const char *filename, int flags)
 {
   void *result;
+
+  if (real_dlopen == NULL)
+    __ulp_asunsafe_begin();
 
   __sync_fetch_and_add(&flag, 1);
   result = real_dlopen(filename, flags);
@@ -445,6 +477,9 @@ dlmopen(Lmid_t nsid, const char *file, int mode)
 {
   void *result;
 
+  if (real_dlmopen == NULL)
+    __ulp_asunsafe_begin();
+
   __sync_fetch_and_add(&flag, 1);
   result = real_dlmopen(nsid, file, mode);
   __sync_fetch_and_sub(&flag, 1);
@@ -455,14 +490,10 @@ dlmopen(Lmid_t nsid, const char *file, int mode)
 void *
 dlsym(void *handle, const char *name)
 {
-  char message[] = "dlsym interposition is not ready. Aborting...\n";
   void *result;
-  ssize_t retcode __attribute__((unused));
 
-  if (real_dlsym == NULL) {
-    retcode = write(STDOUT_FILENO, message, sizeof(message));
-    exit(1);
-  }
+  if (real_dlsym == NULL)
+    __ulp_asunsafe_begin();
 
   __sync_fetch_and_add(&flag, 1);
   result = real_dlsym(handle, name);
@@ -476,6 +507,9 @@ dlvsym(void *handle, const char *name, const char *version)
 {
   void *result;
 
+  if (real_dlvsym == NULL)
+    __ulp_asunsafe_begin();
+
   __sync_fetch_and_add(&flag, 1);
   result = real_dlvsym(handle, name, version);
   __sync_fetch_and_sub(&flag, 1);
@@ -487,6 +521,9 @@ int
 dlclose(void *handle)
 {
   int result;
+
+  if (real_dlclose == NULL)
+    __ulp_asunsafe_begin();
 
   __sync_fetch_and_add(&flag, 1);
   result = real_dlclose(handle);
@@ -500,6 +537,9 @@ dladdr(const void *address, Dl_info *info)
 {
   int result;
 
+  if (real_dladdr == NULL)
+    __ulp_asunsafe_begin();
+
   __sync_fetch_and_add(&flag, 1);
   result = real_dladdr(address, info);
   __sync_fetch_and_sub(&flag, 1);
@@ -512,6 +552,9 @@ dladdr1(const void *address, Dl_info *info, void **extra_info, int flags)
 {
   int result;
 
+  if (real_dladdr1 == NULL)
+    __ulp_asunsafe_begin();
+
   __sync_fetch_and_add(&flag, 1);
   result = real_dladdr1(address, info, extra_info, flags);
   __sync_fetch_and_sub(&flag, 1);
@@ -523,6 +566,9 @@ int
 dlinfo(void *handle, int request, void *arg)
 {
   int result;
+
+  if (real_dlinfo == NULL)
+    __ulp_asunsafe_begin();
 
   __sync_fetch_and_add(&flag, 1);
   result = real_dlinfo(handle, request, arg);
