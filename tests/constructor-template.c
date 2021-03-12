@@ -22,7 +22,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-static void __attribute__((constructor))
+__attribute__((constructor)) static void
 init(void)
 {
   char message1[] = "malloc returned NULL\n";
