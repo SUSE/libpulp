@@ -228,7 +228,8 @@ check_PROGRAMS = \
   terminal \
   syscall_restart \
   memory_protection \
-  constructor
+  constructor \
+  cancel
 
 numserv_SOURCES = numserv.c
 numserv_LDADD = libdozens.la libhundreds.la
@@ -254,6 +255,11 @@ blocked_SOURCES = blocked.c
 blocked_CFLAGS = -pthread $(AM_CFLAGS)
 blocked_LDADD = libblocked.la
 blocked_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
+
+cancel_SOURCES = cancel.c
+cancel_CFLAGS = -pthread $(AM_CFLAGS)
+cancel_LDADD = libblocked.la
+cancel_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
 deadlock_SOURCES = deadlock.c
 deadlock_CFLAGS = -pthread $(AM_CFLAGS)
@@ -310,10 +316,12 @@ TESTS = \
   syscall_restart.py \
   hidden.py \
   memory_protection.py \
-  constructor.py
+  constructor.py \
+  cancel.py
 
 XFAIL_TESTS = \
-  hidden.py
+  hidden.py \
+  cancel.py
 
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON) -B
