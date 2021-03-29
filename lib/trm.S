@@ -66,6 +66,16 @@ __ulp_entry:
     .cfi_startproc
     .cfi_adjust_cfa_offset 8
 
+    // When libpulp.so has not been loaded by the target process, the
+    // address of the global counter will not have been filled in its
+    // GOT entry, thus it will be zeroed out. If that is true, skip
+    // everything related to library entrance tracking, specially TLS
+    // accesses, which are expensive.
+    movq    __ulp_global_universe@GOTPCREL(%rip), %r11
+    test    %r11, %r11
+    jz      .Learly_entry_bypass
+
+    // Save clobbered registers.
 #ifndef HAVE___LIBPULP_TLS_GET_ADDR
     pushq   %r10
     .cfi_adjust_cfa_offset 8
@@ -84,6 +94,8 @@ __ulp_entry:
     .cfi_adjust_cfa_offset 8
     pushq   %rax
     .cfi_adjust_cfa_offset 8
+
+    // Access TLS storage to track library entrance.
     leaq    __ulp_ret@tlsld(%rip), %rdi
 #ifndef HAVE___LIBPULP_TLS_GET_ADDR
     call    __tls_get_addr@PLT
@@ -246,6 +258,7 @@ __ulp_entry:
     popq    %r10
     .cfi_adjust_cfa_offset -8
 #endif
+.Learly_entry_bypass:
     pop     %r11
     .cfi_adjust_cfa_offset -8
     jmp     *%r11
