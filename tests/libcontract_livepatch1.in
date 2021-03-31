@@ -1,0 +1,5 @@
+__ABS_BUILDDIR__/.libs/libcontract_livepatch1.so
+@__ABS_BUILDDIR__/.libs/libcontract.so.0
+print:new_print
+fna:new_fna
+fnb:new_fnb

@@ -116,6 +116,16 @@ libconstructor_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
 POST_PROCESS += .libs/libconstructor.post
 
+# Target libraries to test consistency
+check_LTLIBRARIES += libcontract.la
+noinst_HEADERS += libcontract.h
+
+libcontract_la_SOURCES = libcontract.c $(TARGET_TRM_SOURCES)
+libcontract_la_CFLAGS = $(TARGET_CFLAGS)
+libcontract_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
+
+POST_PROCESS += .libs/libcontract.post
+
 # Live patches
 check_LTLIBRARIES += libdozens_livepatch1.la \
                      libdozens_livepatch99.la \
@@ -127,7 +137,8 @@ check_LTLIBRARIES += libdozens_livepatch1.la \
                      librecursion_livepatch1.la \
                      libblocked_livepatch1.la \
                      libpagecross_livepatch1.la \
-                     libaddress_livepatch1.la
+                     libaddress_livepatch1.la \
+                     libcontract_livepatch1.la
 
 libdozens_livepatch1_la_SOURCES = libdozens_livepatch1.c
 libdozens_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
@@ -162,6 +173,9 @@ libpagecross_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 libaddress_livepatch1_la_SOURCES = libaddress_livepatch1.c
 libaddress_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
+libcontract_livepatch1_la_SOURCES = libcontract_livepatch1.c
+libcontract_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
+
 METADATA = \
   libdozens_livepatch1.dsc \
   libdozens_livepatch1.ulp \
@@ -195,7 +209,10 @@ METADATA = \
   libpagecross_livepatch1.rev \
   libaddress_livepatch1.dsc \
   libaddress_livepatch1.ulp \
-  libaddress_livepatch1.rev
+  libaddress_livepatch1.rev \
+  libcontract_livepatch1.dsc \
+  libcontract_livepatch1.ulp \
+  libcontract_livepatch1.rev
 
 EXTRA_DIST = \
   libdozens_livepatch1.in \
@@ -208,7 +225,8 @@ EXTRA_DIST = \
   librecursion_livepatch1.in \
   libblocked_livepatch1.in \
   libpagecross_livepatch1.in \
-  libaddress_livepatch1.in
+  libaddress_livepatch1.in \
+  libcontract_livepatch1.in
 
 clean-local:
 	rm -f $(METADATA)
@@ -229,7 +247,8 @@ check_PROGRAMS = \
   syscall_restart \
   memory_protection \
   constructor \
-  cancel
+  cancel \
+  contract
 
 numserv_SOURCES = numserv.c
 numserv_LDADD = libdozens.la libhundreds.la
@@ -300,6 +319,10 @@ memory_protection_SOURCES = memory_protection.c
 memory_protection_LDADD = libaddress.la
 memory_protection_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
+contract_SOURCES = contract.c
+contract_LDADD = libcontract.la
+contract_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
+
 TESTS = \
   numserv.py \
   numserv_bsymbolic.py \
@@ -317,7 +340,8 @@ TESTS = \
   hidden.py \
   memory_protection.py \
   constructor.py \
-  cancel.py
+  cancel.py \
+  contract.py
 
 XFAIL_TESTS = \
   hidden.py \
