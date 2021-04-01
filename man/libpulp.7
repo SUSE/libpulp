@@ -47,18 +47,11 @@ Not every library in the system is eligible for live patching, only those that
 have been previously prepared to be so. These are referred to as
 .IR "target libraries" "."
 Making a target library does not require changes to its source code, however it
-requires:
-.\" XXX: Describe why 40,38 is the argument to -fpatchable-function-entry.
-1. rebuilding the library with patchable function entries (see
+requires rebuilding the library with patchable function entries (see
 .IR -fpatchable-function-entry
 in
 .IR gcc (1));
-.\" XXX: Library entrance tracking is likely to be removed from the project.
-2. linking against the library entrance tracking object,
-.IR trm.S/trm.o ,
-see LIBRARY ENTRANCE TRACKING;
-3. post-processing it with
-.IR ulp_post (1).
+.\" XXX: Describe why 24,22 is the argument to -fpatchable-function-entry.
 .TP
 .B Patch Granularity
 Live patches cannot be applied to arbitrarily tiny bits of a program. When a
@@ -81,11 +74,8 @@ Linux Security Modules (LSM) enabled, some extra convincing might be required
 Creating and applying live patches is achieved with the following tools:
 .TP 16
 .BR ulp_post (1)
-.\" XXX: Library entrance tracking is likely to be removed from the project.
-Takes the library file passed as argument and installs trampolines to every
-exported function that has a patchable function entry (see
-.IR gcc (1)),
-making them live patchable.
+Converts the sequences of one-byte nops at the entry of patchable functions
+into multi-byte nops.
 .TP 16
 .BR ulp_packer (1)
 Creates a live patch metadata file based on the live patch description file
@@ -203,16 +193,14 @@ proverb(void)
 .PP
 As explained in the Target Libraries Rebuilding section above, in order to be
 live patchable, a target library must be built with patchable function entries.
-.\" XXX: Library entrance tracking is likely to be removed from the project.
-Apart from that, it must include the library entrance tracking routine during
-the linking phase (link against trm.o), as well as be post-processed with
+Apart from that, it may be optionally post-processed with
 .IR ulp_post (1):
 .IP
 .EX
 \&
-$ gcc library.c trm.o -o library.so \\
+$ gcc library.c -o library.so \\
       -shared -fPIC \\
-      -fpatchable-function-entry=40,38
+      -fpatchable-function-entry=24,22
 $ ulp_post library.so
 .EE
 .PP
@@ -333,16 +321,6 @@ All good things must come to an end
 <ENTER>
 All good things must come to an end
 .EE
-.SH BUGS
-.\" XXX: Library entrance tracking is likely to be removed from the project.
-In order to track whether each thread in the process is within the target
-library or not, Libpulp steals a frame from the call stack. Since the stolen
-frame overwrites the return address on the stack, it breaks unwinding, which
-has the undesired side-effect of breaking thread cancellation and exception
-handling. Thus, only libraries that do not throw exceptions can be made live
-patchable. Likewise, programs that cancel threads (see
-.IR pthread_cancel (3))
-will break if linked against live patchable libraries.
 .SH SEE ALSO
 .BR ptrace (2),
 .BR ulp_packer (1),

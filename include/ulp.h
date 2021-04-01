@@ -54,7 +54,6 @@ struct ulp_detour_root
   void *handler;
   struct ulp_detour_root *next;
   struct ulp_detour *detours;
-  unsigned long (*get_local_universe)();
 };
 
 struct ulp_detour
@@ -82,7 +81,7 @@ void free_metadata(struct ulp_metadata *ulp);
 
 int unload_handlers(struct ulp_metadata *ulp);
 
-void *load_so_symbol(char *fname, void *handle, int trm);
+void *load_so_symbol(char *fname, void *handle);
 
 int load_so_handlers(struct ulp_metadata *ulp);
 

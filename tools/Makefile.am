@@ -35,8 +35,7 @@ noinst_LTLIBRARIES = libcommon.la
 libcommon_la_SOURCES = introspection.c ptrace.c
 libcommon_la_LIBADD = -lelf -ldl
 
-# The post tool fills in the trampoline slots of each live-patchable
-# function and updates the dynamic symbol table to use the trampolines.
+# The post tool replaces one-byte nops with multi-byte nop instructions.
 
 ulp_post_SOURCES = post.c
 ulp_post_LDADD = -lelf

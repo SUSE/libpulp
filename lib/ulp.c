@@ -43,14 +43,14 @@ char __ulp_path_buffer[256] = "";
 struct ulp_metadata *__ulp_metadata_ref = NULL;
 struct ulp_detour_root *__ulp_root = NULL;
 
-char ulp_prologue[ULP_NOPS_LEN - TRM_NOPS_LEN] = {
+char ulp_prologue[ULP_NOPS_LEN] = {
   // Preceding nops
   0x57,                         // push    %rdi
   0x48, 0xc7, 0xc7, 0, 0, 0, 0, // movq    $index, %rdi
   0xff, 0x25, 0, 0, 0, 0,       // jmp     0x0(%rip)
   0, 0, 0, 0, 0, 0, 0, 0,       // <data>  &__ulp_prolog
   // Function entry is here
-  0xeb, -((PRE_NOPS_LEN - TRM_NOPS_LEN) + 2) // jump above
+  0xeb, -(PRE_NOPS_LEN + 2) // jump above
 };
 
 unsigned int __ulp_root_index_counter = 0;
@@ -63,12 +63,6 @@ begin(void)
 {
   __ulp_state.load_state = 1;
   fprintf(stderr, "libpulp loaded...\n");
-}
-
-static unsigned long
-return_zero()
-{
-  return 0;
 }
 
 /* libpulp interfaces for livepatch trigger */
@@ -179,28 +173,7 @@ unload_handlers(struct ulp_metadata *ulp)
 }
 
 void *
-get_fentry_from_ulp(void *func)
-{
-  /* The jump slots in the .ulp section have the address of the
-   * destination function hardcoded as a displacement from %rip.
-   *
-   * The displacement is the 4-byte immediate field in the lea
-   * instruction (first instruction in each jump-slot), which requires
-   * a 32-bits variable (int32_t).  The immediate field begins at the
-   * forth byte in the instruction, hence the addition of 3 bytes to
-   * the address where memcpy begins copying from.  Finally, lea
-   * itself is 7-bytes long, hence the subtraction of 7 bytes after
-   * the load.  */
-  void *address;
-  int32_t offset = 0;
-  memcpy(&offset, func + 3, 4);
-  address = func + offset + 7;
-  return address;
-}
-
-// trm: should be set to take real function address out of .ulp section
-void *
-load_so_symbol(char *fname, void *handle, int trm)
+load_so_symbol(char *fname, void *handle)
 {
   void *func;
   char *error;
@@ -211,9 +184,6 @@ load_so_symbol(char *fname, void *handle, int trm)
     WARN("Unable to load function %s: %s.", fname, error);
     return NULL;
   }
-
-  if (trm)
-    func = get_fentry_from_ulp(func);
 
   return func;
 }
@@ -650,11 +620,11 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
   /* only shared objs have units, this loop never runs for main obj */
   unit = obj->units;
   while (unit) {
-    old_fun = load_so_symbol(unit->old_fname, obj->dl_handler, 1);
+    old_fun = load_so_symbol(unit->old_fname, obj->dl_handler);
     if (!old_fun)
       return 0;
 
-    new_fun = load_so_symbol(unit->new_fname, patch_so, 0);
+    new_fun = load_so_symbol(unit->new_fname, patch_so);
     if (!new_fun)
       return 0;
 
@@ -667,10 +637,6 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
       root->index = get_next_function_index();
       root->patched_addr = old_fun;
       root->handler = obj->dl_handler;
-      root->get_local_universe =
-          dlsym(root->handler, "__ulp_ret_local_universe");
-      if (!root->get_local_universe)
-        root->get_local_universe = return_zero;
     }
 
     if (!(push_new_detour(__ulp_global_universe, ulp->patch_id, root,
@@ -729,11 +695,11 @@ ulp_state_update(struct ulp_metadata *ulp)
       return 0;
     }
 
-    a_unit->patched_addr = load_so_symbol(unit->old_fname, obj->dl_handler, 1);
+    a_unit->patched_addr = load_so_symbol(unit->old_fname, obj->dl_handler);
     if (!a_unit->patched_addr)
       return 0;
 
-    a_unit->target_addr = load_so_symbol(unit->new_fname, ulp->so_handler, 0);
+    a_unit->target_addr = load_so_symbol(unit->new_fname, ulp->so_handler);
     if (!a_unit->target_addr)
       return 0;
 
@@ -952,7 +918,6 @@ ulp_patch_prologue_layout(void *old_fentry, unsigned int function_index)
 void
 __ulp_manage_universes(unsigned long idx)
 {
-  unsigned long universe;
   struct ulp_detour_root *root;
   struct ulp_detour *d;
   void *target;
@@ -965,14 +930,11 @@ __ulp_manage_universes(unsigned long idx)
 
   target = NULL;
 
-  universe = root->get_local_universe();
-  if (universe != 0) {
-    // since universes are kept in order, this is a top-down search
-    for (d = root->detours; d != NULL; d = d->next) {
-      if (d->universe == universe || (d->universe < universe && d->active)) {
-        target = d->target_addr;
-        break;
-      }
+  // since universes are kept in order, this is a top-down search
+  for (d = root->detours; d != NULL; d = d->next) {
+    if (d->active) {
+      target = d->target_addr;
+      break;
     }
   }
   if (!target)
@@ -1043,15 +1005,15 @@ ulp_patch_addr(void *old_faddr, unsigned int index)
    */
   page_size = getpagesize();
   page_mask = ~(page_size - 1);
-  if (ULP_NOPS_LEN - TRM_NOPS_LEN > page_size) {
+  if (ULP_NOPS_LEN > page_size) {
     WARN("Nop padding area unexpectedly large.");
     return 0;
   }
 
   /* Find the starting address of the pages containing the nops. */
-  addr = old_faddr - (PRE_NOPS_LEN - TRM_NOPS_LEN);
+  addr = old_faddr - PRE_NOPS_LEN;
   page1 = (uintptr_t)addr;
-  page2 = (uintptr_t)(addr + ULP_NOPS_LEN - TRM_NOPS_LEN - 1);
+  page2 = (uintptr_t)(addr + ULP_NOPS_LEN - 1);
   page1 = page1 & page_mask;
   page2 = page2 & page_mask;
 

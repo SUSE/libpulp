@@ -31,20 +31,20 @@ check_LTLIBRARIES = libdozens.la \
                     libhundreds_bsymbolic.la
 noinst_HEADERS = dozens.h hundreds.h
 
-libdozens_la_SOURCES = dozens.c $(TARGET_TRM_SOURCES)
+libdozens_la_SOURCES = dozens.c
 libdozens_la_CFLAGS = $(TARGET_CFLAGS)
 libdozens_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
-libhundreds_la_SOURCES = hundreds.c $(TARGET_TRM_SOURCES)
+libhundreds_la_SOURCES = hundreds.c
 libhundreds_la_CFLAGS = $(TARGET_CFLAGS)
 libhundreds_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
-libdozens_bsymbolic_la_SOURCES = dozens.c $(TARGET_TRM_SOURCES)
+libdozens_bsymbolic_la_SOURCES = dozens.c
 libdozens_bsymbolic_la_CFLAGS = $(TARGET_CFLAGS)
 libdozens_bsymbolic_la_LDFLAGS = -Wl,-Bsymbolic \
   $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
-libhundreds_bsymbolic_la_SOURCES = hundreds.c $(TARGET_TRM_SOURCES)
+libhundreds_bsymbolic_la_SOURCES = hundreds.c
 libhundreds_bsymbolic_la_CFLAGS = $(TARGET_CFLAGS)
 libhundreds_bsymbolic_la_LDFLAGS = -Wl,-Bsymbolic \
   $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
@@ -58,7 +58,7 @@ POST_PROCESS = .libs/libdozens.post \
 check_LTLIBRARIES += libparameters.la
 noinst_HEADERS += libparameters.h
 
-libparameters_la_SOURCES = libparameters.c $(TARGET_TRM_SOURCES)
+libparameters_la_SOURCES = libparameters.c
 libparameters_la_CFLAGS = $(TARGET_CFLAGS)
 libparameters_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
@@ -68,7 +68,7 @@ POST_PROCESS += .libs/libparameters.post
 check_LTLIBRARIES += librecursion.la
 noinst_HEADERS += librecursion.h
 
-librecursion_la_SOURCES = librecursion.c $(TARGET_TRM_SOURCES)
+librecursion_la_SOURCES = librecursion.c
 librecursion_la_CFLAGS = $(TARGET_CFLAGS)
 librecursion_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
@@ -78,7 +78,7 @@ POST_PROCESS += .libs/librecursion.post
 check_LTLIBRARIES += libblocked.la
 noinst_HEADERS += libblocked.h
 
-libblocked_la_SOURCES = libblocked.c $(TARGET_TRM_SOURCES)
+libblocked_la_SOURCES = libblocked.c
 libblocked_la_CFLAGS = $(TARGET_CFLAGS)
 libblocked_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
@@ -88,8 +88,8 @@ POST_PROCESS += .libs/libblocked.post
 check_LTLIBRARIES += libpagecross.la
 
 libpagecross_la_SOURCES = libpagecross_padding.S \
-                          libpagecross.c \
-                          $(TARGET_TRM_SOURCES)
+                          libpagecross.c
+
 libpagecross_la_CFLAGS = $(TARGET_CFLAGS)
 libpagecross_la_CCASFLAGS = -DPAGE_SIZE=$(PAGE_SIZE) $(AM_CCASFLAGS)
 libpagecross_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
@@ -100,7 +100,7 @@ POST_PROCESS += .libs/libpagecross.post
 check_LTLIBRARIES += libaddress.la
 noinst_HEADERS += libaddress.h
 
-libaddress_la_SOURCES = libaddress.c $(TARGET_TRM_SOURCES)
+libaddress_la_SOURCES = libaddress.c
 libaddress_la_CFLAGS = $(TARGET_CFLAGS)
 libaddress_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
@@ -110,7 +110,7 @@ POST_PROCESS += .libs/libaddress.post
 check_LTLIBRARIES += libconstructor.la
 noinst_HEADERS += libconstructor.h
 
-libconstructor_la_SOURCES = libconstructor.c $(TARGET_TRM_SOURCES)
+libconstructor_la_SOURCES = libconstructor.c
 libconstructor_la_CFLAGS = $(TARGET_CFLAGS)
 libconstructor_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
@@ -120,7 +120,7 @@ POST_PROCESS += .libs/libconstructor.post
 check_LTLIBRARIES += libcontract.la
 noinst_HEADERS += libcontract.h
 
-libcontract_la_SOURCES = libcontract.c $(TARGET_TRM_SOURCES)
+libcontract_la_SOURCES = libcontract.c
 libcontract_la_CFLAGS = $(TARGET_CFLAGS)
 libcontract_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
@@ -130,7 +130,7 @@ POST_PROCESS += .libs/libcontract.post
 check_LTLIBRARIES += libexception.la
 noinst_HEADERS += libexception.h
 
-libexception_la_SOURCES = libexception.cc $(TARGET_TRM_SOURCES)
+libexception_la_SOURCES = libexception.cc
 libexception_la_CXXFLAGS = $(TARGET_CFLAGS)
 libexception_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
@@ -350,7 +350,6 @@ TESTS = \
   revert.py \
   pagecross.py \
   terminal.py \
-  thread_restore.py \
   syscall_restart.py \
   hidden.py \
   memory_protection.py \
@@ -360,9 +359,9 @@ TESTS = \
   exception_handling.py
 
 XFAIL_TESTS = \
-  hidden.py \
-  cancel.py \
-  exception_handling.py
+  blocked.py \
+  contract.py \
+  hidden.py
 
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON) -B

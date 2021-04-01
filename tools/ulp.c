@@ -56,7 +56,7 @@ libpulp_loaded(FILE *map)
 }
 
 /* Attaches to PROCESS multiple times and collect information about its
- * global and thread-local, per-library universe counters. Returns 0 on
+ * applied live patches and loaded libraries. Returns 0 on
  * success; 1 if process information was not properly parsed; and -1 if
  * process hijacking went wrong, which also means that PROCESS was
  * probably put into an inconsistent state and should be killed.
@@ -71,7 +71,6 @@ get_process_universes(struct ulp_process *process)
     return -1;
 
   read_global_universe(process);
-  read_local_universes(process);
 
   if (restore_threads(process))
     return -1;
@@ -157,7 +156,6 @@ print_process_list(struct ulp_process *process_list)
 {
   struct ulp_process *process_item;
   struct ulp_dynobj *object_item;
-  struct thread_state *state_item;
 
   process_item = process_list;
   while (process_item) {
@@ -175,25 +173,12 @@ print_process_list(struct ulp_process *process_list)
       object_item = object_item->next;
     }
 
-    printf("  Local universes:\n");
+    printf("  Loaded libraries:\n");
     object_item = process_item->dynobj_targets;
     if (!object_item)
       printf("    (none)\n");
     while (object_item) {
       printf("    in %s:\n", object_item->filename);
-      state_item = object_item->thread_states;
-      while (state_item) {
-        printf("      thread #%06d: ", state_item->tid);
-        if (state_item->universe == (unsigned long)-1)
-          printf("OK (queued - not currently in the library)\n");
-        else if (state_item->universe < process_item->global_universe)
-          printf("NOK (blocked - thread-local universe=%lu)\n",
-                 state_item->universe);
-        else
-          printf("OK (ready - thread-local universe=%lu)\n",
-                 state_item->universe);
-        state_item = state_item->next;
-      }
       object_item = object_item->next;
     }
     process_item = process_item->next;

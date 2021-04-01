@@ -29,16 +29,4 @@ libpulp_la_LDFLAGS = \
 
 AM_CFLAGS += -I$(top_srcdir)/include
 
-EXTRA_DIST = trm.S libpulp.versions
-
-all-local: trm.o
-
-trm.o: $(srcdir)/trm.S
-	$(CPPASCOMPILE) -fPIC -c -o $@ $^
-
-install-exec-local: trm.o
-	install -d $(DESTDIR)/$(libdir)
-	install -t $(DESTDIR)/$(libdir) $^
-
-uninstall-local:
-	rm -f $(DESTDIR)/$(libdir)/trm.o
+EXTRA_DIST = libpulp.versions

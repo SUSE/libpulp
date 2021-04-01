@@ -28,7 +28,6 @@ TARGET_CFLAGS = \
   -fpatchable-function-entry=$(ULP_NOPS_LEN),$(PRE_NOPS_LEN) \
   $(AM_CFLAGS)
 TARGET_LDFLAGS = --build-id $(AM_LDFLAGS)
-TARGET_TRM_SOURCES = $(top_srcdir)/lib/trm.S
 
 # In libtool, convenience libraries are not installed, so they do not
 # need -rpath, which causes them to be statically linked.  However,
@@ -39,7 +38,7 @@ CONVENIENCE_LDFLAGS = -rpath $(libdir) $(AM_LDFLAGS)
 # The following custom rules are triggered by <testname>_DEPENDENCIES:
 
 # This rule causes the target library to be post-processed with
-# ulp_post, so that the trampolines gets filled and used. Files with
+# ulp_post, which replaces single-byte with multi-byte nops. Files with
 # .post extension track whether the respective libraries have already
 # been post-processed.
 .libs/lib%.post: lib%.la

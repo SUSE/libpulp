@@ -40,8 +40,6 @@
  *          - apply_patch() to apply a live patch.
  *          - patch_applied() to verify if a live patch is applied.
  *          - read_global_universe() to read the global universe.
- *          - read_local_universes() to read all of the per-library,
- *            per-thread universes.
  *        Low-level routines (typically only used within this library):
  *          - set_id_buffer()
  *          - set_path_buffer()
@@ -413,7 +411,6 @@ parse_lib_dynobj(struct ulp_process *process, struct link_map *link_map_addr)
   obj->check = get_loaded_symbol_addr(obj, "__ulp_check_patched");
   obj->state = get_loaded_symbol_addr(obj, "__ulp_state");
   obj->global = get_loaded_symbol_addr(obj, "__ulp_get_global_universe");
-  obj->local = get_loaded_symbol_addr(obj, "__ulp_get_local_universe");
 
   /* libpulp must expose all these symbols. */
   if (obj->trigger && obj->path_buffer && obj->check && obj->state &&
@@ -426,12 +423,6 @@ parse_lib_dynobj(struct ulp_process *process, struct link_map *link_map_addr)
   else if (obj->trigger || obj->path_buffer || obj->check || obj->state ||
            obj->global)
     WARN("unexpected subset of libpulp symbols exposed by %s.", libname);
-  /* Live-patchable libraries expose the local universe. */
-  else if (obj->local) {
-    obj->next = process->dynobj_targets;
-    process->dynobj_targets = obj;
-    DEBUG("(live-patchable library found)");
-  }
   /* Live patch objects. */
   /* XXX: Searching for the '_livepatch' substring in the filename of
    * a dynamically loaded object is rather frail. Alternatives:
@@ -442,10 +433,10 @@ parse_lib_dynobj(struct ulp_process *process, struct link_map *link_map_addr)
     obj->next = process->dynobj_patches;
     process->dynobj_patches = obj;
   }
-  /* All other libraries go into the generic list. */
+  /* All other libraries go into the targets list. */
   else {
-    obj->next = process->dynobj_others;
-    process->dynobj_others = obj;
+    obj->next = process->dynobj_targets;
+    process->dynobj_targets = obj;
   }
 
   return link_map;
@@ -806,53 +797,6 @@ read_global_universe(struct ulp_process *process)
   };
 
   process->global_universe = context.rax;
-  return 0;
-}
-
-/* Returns the local universe counter for the THREAD-LIBRARY pair in
- * PROCESS. The return value does not distinguish between successfull
- * and erroneous reads, although an error messages gets printed.
- */
-unsigned long
-read_local_universe(struct ulp_dynobj *library, struct ulp_thread *thread)
-{
-  struct user_regs_struct context;
-  ElfW(Addr) routine;
-
-  context = thread->context;
-  routine = library->local;
-
-  if (run_and_redirect(thread->tid, &context, routine))
-    WARN("error: unable to read local universe from thread %d.", thread->tid);
-
-  return context.rax;
-}
-
-/* For each pair of library and thread in PROCESS, reads its
- * per-library, per-thread universe counter (only libraries that are
- * live patchable are taken into account). Always returns 0.
- */
-int
-read_local_universes(struct ulp_process *process)
-{
-  struct ulp_dynobj *library;
-  struct ulp_thread *thread;
-  struct thread_state *state;
-
-  library = process->dynobj_targets;
-  while (library) {
-    library->thread_states = NULL;
-    thread = process->threads;
-    while (thread) {
-      state = malloc(sizeof(struct thread_state));
-      state->tid = thread->tid;
-      state->universe = read_local_universe(library, thread);
-      state->next = library->thread_states;
-      library->thread_states = state;
-      thread = thread->next;
-    }
-    library = library->next;
-  }
   return 0;
 }
 

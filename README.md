@@ -21,9 +21,9 @@ Libpulp is a framework that enables userspace live patching. It is composed of a
 library per se and a collection of tools used in the preparation of
 live-patchable libraries and in the application of live patches to running
 processes. In order to be live-patchable, a library must be compiled with
-patchable function entries<sup>1</sup>, then post-processed with the _post_
-tool, but no changes to the library source-code are needed. Apart from that,
-processes must preload <sup>2</sup> _libpulp.so_ in order to be live-patchable.
+patchable function entries<sup>1</sup>, but no changes to the library
+source-code are needed. Apart from that, processes must preload <sup>2</sup>
+_libpulp.so_ in order to be live-patchable.
 
 <sup>1</sup> _GCC provides the -fpatchable-function-entry option, which adds nop
 instructions to the prologue of functions. These nops are used by Libpulp to
@@ -61,30 +61,6 @@ Libpulp is free software; you can redistribute it and/or modify it under the
 terms of the GNU Lesser General Public License as published by the Free Software
 Foundation; either version 2.1 of the License, or (at your option) any later
 version.
-
-## Known issues
-
-### Requirement on automake 1.16
-
-Even though the build system makes heavy use of automake, a few rules in the
-Makefiles have been manually written. Such rules do not play well with versions
-of automake older than 1.16. When older versions are used, the following build
-problem might happen:
-
-```
-Making all in tests
-make[1]: Entering directory '/home/gabriel/libpulp/tests'
-Makefile:1174: ../lib/.deps/trm.Plo: No such file or directory
-make[1]: *** No rule to make target '../lib/.deps/trm.Plo'.  Stop.
-make[1]: Leaving directory '/home/gabriel/libpulp/tests'
-make: *** [Makefile:421: all-recursive] Error 1
-```
-
-To work around this problem, disable dependency tracking during configuration:
-
-```
-./configure --disable-dependency-tracking
-```
 
 # Contributing
 
@@ -129,20 +105,12 @@ functions call to save and restore registers; and _ulp_interface.S_, which
 contains the entry-point functions that the _Trigger_ and _Check_ tools use to
 apply and check live patches.
 
-Also in this directory, _trm.S_ produces the object that libraries need to
-link against in order to become live-patchable. It contains the library entrance
-tracking routine (see [Consistency](#consistency)), as well as routines to
-retrieve the value of thread-local counters.
-
 #### tools
 
 The following tools comprise the tool set of Libpulp:
 
- * _Post_: This tool is used to modify the library entry points to the special
-   instrumentation used by Libpulp to track consistency. It modifies the values
-   of the targets in the dynamic symbol table to, instead of pointing to the
-   regular function, point to the trampoline of each function; as well as it
-   writes the trampolines themselves.
+ * _Post_: This tool converts sequences of one-byte nops at the entry of
+   patchable functions into multi-byte nops.
 
  * _Packer_: This tool creates the live patch metadata out of a description file
    and from the targeted library. The description file syntax is described in
@@ -174,25 +142,6 @@ that their outputs changed accordingly. Files with the _\_livepatch_ suffix are
 built into the live patches per se. Everything else is test libraries and
 applications.
 
-# Consistency
-
-To ensure correct program semantics, it is important to keep atomicity during
-the execution of live patchable functions. This means that, for each thread in
-the affected process, all the functions which are part of a live patch set are
-migrated to their newer versions simultaneously.
-
-To achieve this, all replacement functions loaded by a live patch become
-associated with a single and unique number, so that they are all perceived as
-belonging to the same universe (snapshot) of the program. Apart from that, each
-thread in the process has a thread-local counter, which is compared against
-those unique numbers to select between original and replacement functions.
-
-Whenever a thread is within a library, its thread-local counter does not change,
-so it uses functions from the same universe. Then, when the thread crosses the
-application-library boundary, the thread-local counter gets update and new
-library calls use new functions all at once, even if there are intra-library
-calls (notice that intra-library calls do not update the thread-local counter).
-
 # The patching process
 
 A live patch is built on top of existing libraries. The Libpulp framework
@@ -204,18 +153,14 @@ routines from Libpulp to make the process load the new version of the functions
 to its address space; then, through adding detours to the old function
 prologues, ensure that only the new version of the functions are invoked.
 
-The detours are not patched directly on top of previously existing instructions.
-Instead, the function must be emitted by gcc with an area of padding nops which
-is then overwritten. This is important to enable per-thread migration of
-universes -- by having a thread-local variable which flags if a given thread
-was already migrated into a new universe or not, it is possible to decide,
-upon function invocation, if the newer or older version of the function must
-be reached by the control-flow. In this scenario, in the moment of the patch
-application, a thread which has functions from the target library in an active
-state won't be migrated, and the older version will continue to be reached.
-Through using the instrumentation in the function entry points, this thread
-can later migrate itself safely (given that an entering library is always
-consistent).
+The detours are not patched directly on top of previously existing functions.
+Instead, every function must be emitted by gcc with an area of padding nops
+which is then overwritten. Once overwritten, the new instructions transfer
+control to a selection routine, which has access to all live patches and
+re-transfers control to the currently active version of the target function
+(functions can be live patched multiple times, and live patches can be
+deactivated, which causes the previous version (or the baseline) to become
+active again).
 
 # Description file syntax
 

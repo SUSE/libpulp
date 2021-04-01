@@ -19,7 +19,7 @@
 
 .TH ULP_POST 1 "" "" "Libpulp Tools"
 .SH NAME
-ulp_post \- Install libpulp trampolines in target libraries
+ulp_post \- Post-process live patchable libraries
 .SH SYNOPSIS
 .B ulp_post
 .I file
@@ -27,25 +27,9 @@ ulp_post \- Install libpulp trampolines in target libraries
 .B ulp_post
 opens the library
 .I file
-passed as argument and installs trampolines to every exported function that has
-a patchable function entry (see
+passed as argument and replaces one-byte nops with multi-byte nop instructions
+at patchable function entries (see
 .IR gcc (1)).
-The trampolines divert control to the library entrance tracking routine, which
-performs its role then retransfers control to the target function. Entrance
-information is used by Libpulp to determine when to switch between versions of
-live patched functions.
-.SH BUGS
-.\" XXX: Library entrance tracking is likely to be removed from the project.
-In order to track whether each thread in the process is within the target
-library or not, the trampolines installed by
-.I ulp_post
-steal a frame from the call stack. Since the stolen frame overwrites the return
-address on the stack, it breaks unwinding, which has the undesired side-effect
-of breaking thread cancellation and exception handling. Thus, only libraries
-that do not throw exceptions can be made live patchable. Likewise, programs
-that cancel threads (see
-.IR pthread_cancel (3))
-will break if linked against live patchable libraries.
 .SH EXIT STATUS
 .B ulp_post
 exits 0 on success, and 1 on error.
