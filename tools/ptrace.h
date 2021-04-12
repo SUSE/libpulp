@@ -32,7 +32,7 @@
 /* Memory read/write helper functions */
 int write_byte(char byte, int pid, Elf64_Addr addr);
 
-int write_string(char *buffer, int pid, Elf64_Addr addr);
+int write_string(char *buffer, int pid, Elf64_Addr addr, int length);
 
 int read_byte(char *byte, int pid, Elf64_Addr addr);
 

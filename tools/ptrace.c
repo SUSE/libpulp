@@ -59,18 +59,26 @@ write_byte(char byte, int pid, Elf64_Addr addr)
   return 0;
 }
 
+/*
+ * Writes the string pointed to by BUFFER into the address space of PID at
+ * ADDR. At most LENGTH bytes are written. If BUFFER is not null-terminated,
+ * the destination string will have its last byte converted into null.
+ *
+ * Returns 0 if the operation succeeds; 1 otherwise.
+ */
 int
-write_string(char *buffer, int pid, Elf64_Addr addr)
+write_string(char *buffer, int pid, Elf64_Addr addr, int length)
 {
   int i;
 
-  for (i = 0; i < 255 && buffer[i] != '\0'; i++) {
+  for (i = 0; i < length && buffer[i] != '\0'; i++) {
     if (write_byte(buffer[i], pid, addr + i))
-      return 2;
+      return 1;
   }
 
-  if (write_byte('\0', pid, addr + i))
-    return 3;
+  if (i < length)
+    if (write_byte('\0', pid, addr + i))
+      return 1;
 
   return 0;
 }

@@ -522,7 +522,7 @@ set_path_buffer(struct ulp_process *process, char *path)
   thread = process->main_thread;
   path_addr = process->dynobj_libpulp->path_buffer;
 
-  if (write_string(path, thread->tid, path_addr)) {
+  if (write_string(path, thread->tid, path_addr, ULP_PATH_LEN)) {
     WARN("Unable to write path buffer.");
     return 1;
   }
