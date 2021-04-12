@@ -259,13 +259,13 @@ load_metadata()
   ulp = calloc(1, sizeof(struct ulp_metadata));
   if (!ulp) {
     WARN("Unable to allocate memory for ulp metadata");
-    return 0;
+    return NULL;
   }
 
   __ulp_metadata_ref = ulp;
   if (!parse_metadata(ulp)) {
     WARN("Error parsing metadata.\n");
-    return 0;
+    return NULL;
   };
 
   return ulp;
@@ -513,6 +513,9 @@ load_patch()
   int patch;
 
   ulp = load_metadata();
+  if (ulp == NULL)
+    return 0;
+
   patch = ulp->type;
 
   switch (patch) {

@@ -37,7 +37,7 @@ print('ok.')
 errors = 0
 try:
   # Apply the live patch.
-  ret = subprocess.run([trigger, str(child.pid),
+  ret = subprocess.run([trigger, '-r', '100', '-p', str(child.pid),
                         'libblocked_livepatch1.ulp'], timeout=1)
   if ret.returncode:
     print('Failed to apply livepatch #1 for libblocked')

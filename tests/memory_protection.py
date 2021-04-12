@@ -36,7 +36,7 @@ print('ok.')
 
 # Apply live patch
 print('Applying live patch... ', end='')
-ret = subprocess.run([trigger, str(child.pid),
+ret = subprocess.run([trigger, '-p', str(child.pid),
                       'libaddress_livepatch1.ulp'])
 if ret.returncode:
   print('fail.')

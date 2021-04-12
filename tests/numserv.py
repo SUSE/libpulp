@@ -39,7 +39,7 @@ child.expect('100');
 print('First call to libhundreds... ok.')
 
 # Apply live patch and check for new behavior
-ret = subprocess.run([trigger, str(child.pid),
+ret = subprocess.run([trigger, '-p', str(child.pid),
                      'libdozens_livepatch1.ulp' if not bsymbolic else
                      'libdozens_bsymbolic_livepatch1.ulp'])
 if ret.returncode:
@@ -60,7 +60,7 @@ child.expect('100');
 print('Second call to libhundreds... ok.')
 
 # Apply live patch and check for new behavior
-ret = subprocess.run([trigger, str(child.pid),
+ret = subprocess.run([trigger, '-p', str(child.pid),
                      'libhundreds_livepatch1.ulp' if not bsymbolic else
                      'libhundreds_bsymbolic_livepatch1.ulp'])
 if ret.returncode:

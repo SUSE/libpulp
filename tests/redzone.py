@@ -30,16 +30,16 @@ child.expect('Waiting for input.')
 print('Greeting... ok.')
 
 # Apply live patch, which should not touch the redzone
-ret = subprocess.run([trigger, str(child.pid),
+ret = subprocess.run([trigger, '-p', str(child.pid),
                      'libblocked_livepatch1.ulp'])
 if ret.returncode:
   print('Failed to apply livepatch #1 for libblocked')
   exit(1)
 
 # Check live patch, which should not touch the redzone
-ret = subprocess.run([check, str(child.pid),
+ret = subprocess.run([check, '-p', str(child.pid),
                      'libblocked_livepatch1.ulp'])
-if ret.returncode:
+if ret.returncode == -1:
   print('Failed to check livepatch status')
   exit(1)
 

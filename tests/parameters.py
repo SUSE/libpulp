@@ -35,7 +35,7 @@ child.expect('1.0-2.0-3.0-4.0-5.0-6.0-7.0-8.0-9.0-10.0\r\n');
 print('First call to libparameters... ok.')
 
 # Apply live patch and check for new behavior
-ret = subprocess.run([trigger, str(child.pid),
+ret = subprocess.run([trigger, '-p', str(child.pid),
                       'libparameters_livepatch1.ulp'])
 if ret.returncode:
   print('Failed to apply livepatch #1 for libparameters')

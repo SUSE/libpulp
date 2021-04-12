@@ -19,9 +19,39 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef _INTROSPECTION_H_
+#define _INTROSPECTION_H_
+
 #include <link.h>
 
 #include "ptrace.h"
+#include "ulp_common.h"
+
+extern int ulp_verbose;
+extern int ulp_quiet;
+
+#undef WARN // Defined in ulp_common.h
+
+#define FATAL(format, ...) \
+  do { \
+    fprintf(stderr, "ulp: " format "\n", ##__VA_ARGS__); \
+    fprintf(stderr, "PROGRAM POTENTIALLY LEFT IN INCONSISTENT STATE."); \
+  } \
+  while (0)
+
+#define WARN(format, ...) \
+  do { \
+    if (!ulp_quiet) \
+      fprintf(stderr, "ulp: " format "\n", ##__VA_ARGS__); \
+  } \
+  while (0)
+
+#define DEBUG(format, ...) \
+  do { \
+    if (ulp_verbose) \
+      fprintf(stderr, "ulp: " format "\n", ##__VA_ARGS__); \
+  } \
+  while (0)
 
 struct ulp_process
 {
@@ -108,7 +138,7 @@ int set_id_buffer(struct ulp_process *process, unsigned char *patch_id);
 
 int set_path_buffer(struct ulp_process *process, char *path);
 
-int patch_applied(struct ulp_process *process, unsigned char *patch_id);
+int patch_applied(struct ulp_process *process, unsigned char *id, int *result);
 
 int apply_patch(struct ulp_process *process, char *metadata);
 
@@ -124,3 +154,5 @@ int read_local_universes(struct ulp_process *process);
 int load_patch_info(char *livepatch);
 
 int check_patch_sanity();
+
+#endif

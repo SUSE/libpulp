@@ -36,7 +36,7 @@ child.expect('1134903170\r\n');
 print('ok.')
 
 # Apply live patch and check for new behavior
-ret = subprocess.run([trigger, str(child.pid),
+ret = subprocess.run([trigger, '-p', str(child.pid),
                       'librecursion_livepatch1.ulp'])
 if ret.returncode:
   print('Failed to apply livepatch #1 for librecursion')

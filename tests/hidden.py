@@ -34,7 +34,7 @@ child.expect('12');
 print('First call to libdozens... ok.')
 
 # Apply live patch and check for new behavior
-ret = subprocess.run([trigger, str(child.pid),
+ret = subprocess.run([trigger, '-p', str(child.pid),
                      'libdozens_livepatch99.ulp'])
 if ret.returncode:
   print('Failed to apply livepatch #99 for libdozens')

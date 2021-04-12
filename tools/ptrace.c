@@ -44,16 +44,17 @@ write_byte(char byte, int pid, Elf64_Addr addr)
 {
   Elf64_Addr value;
 
+  errno = 0;
   value = ptrace(PTRACE_PEEKDATA, pid, addr, 0);
   if (errno) {
-    WARN("Unable to read byte (write).\n");
-    return 2;
+    DEBUG("unable to read byte before writing: %s\n", strerror(errno));
+    return 1;
   }
   memset(&value, byte, 1);
   ptrace(PTRACE_POKEDATA, pid, addr, value);
   if (errno) {
-    WARN("Unable to write byte.\n");
-    return 3;
+    DEBUG("Unable to write byte: %s\n", strerror(errno));
+    return 1;
   }
 
   return 0;
@@ -88,8 +89,10 @@ read_byte(char *byte, int pid, Elf64_Addr addr)
 {
   Elf64_Addr value;
 
+  errno = 0;
   value = ptrace(PTRACE_PEEKDATA, pid, addr, 0);
   if (errno) {
+    DEBUG("unable to read byte: %s\n", strerror(errno));
     return 1;
   }
   *byte = value & 0xff;
@@ -103,20 +106,17 @@ read_memory(char *byte, size_t len, int pid, Elf64_Addr addr)
   size_t i;
 
   if (attach(pid)) {
-    WARN("Unable to attach to %d.\n", pid);
+    DEBUG("unable to attach to %d to read data.\n", pid);
     return 1;
   };
 
-  for (i = 0; i < len; i++) {
-    if (read_byte(byte + i, pid, addr + i)) {
-      WARN("read_memory error.\n");
-      return 2;
-    }
-  }
+  for (i = 0; i < len; i++)
+    if (read_byte(byte + i, pid, addr + i))
+      return 1;
 
   if (detach(pid)) {
-    WARN("Unable to detach from %d.\n", pid);
-    return 3;
+    DEBUG("unable to detach from %d after reading data.\n", pid);
+    return 1;
   };
 
   return 0;
@@ -129,62 +129,46 @@ read_string(char **buffer, int pid, Elf64_Addr addr)
   char byte;
 
   if (attach(pid)) {
-    WARN("Unable to attach to %d.\n", pid);
+    DEBUG("unable to attach to %d to read string.", pid);
     return 1;
-  };
+  }
 
   while (!read_byte(&byte, pid, addr + len) && byte)
     len++;
 
   *buffer = malloc(len + 1);
   if (!buffer) {
-    WARN("read string malloc error.\n");
-    return 2;
+    DEBUG("unable to allocate memory (%d bytes).", len);
+    return 1;
   }
 
-  for (i = 0; i < len; i++) {
-    if (read_byte((*buffer + i), pid, addr + i)) {
-      WARN("read string error.\n");
-      return 3;
-    }
-  }
+  for (i = 0; i < len; i++)
+    if (read_byte((*buffer + i), pid, addr + i))
+      return 1;
   *(*buffer + i) = '\0';
 
   if (detach(pid)) {
-    WARN("Unable to detach from %d.\n", pid);
+    DEBUG("unable to detach from %d after reading string.", pid);
+    return 1;
   };
 
   return 0;
 }
 
-/* Signaling functions */
-int
-stop(int pid)
-{
-  return kill(pid, SIGSTOP);
-}
-
-int
-restart(int pid)
-{
-  return kill(pid, SIGCONT);
-}
-
-/* attach/detach and run functions */
 int
 attach(int pid)
 {
   int status;
 
   if (ptrace(PTRACE_ATTACH, pid, NULL, NULL)) {
-    WARN("PTRACE_ATTACH error.\n");
+    DEBUG("PTRACE_ATTACH error: %s.\n", strerror(errno));
     return 1;
   }
 
   usleep(1000);
   if (waitpid(-1, &status, __WALL) == -1) {
-    WARN("waitpid error (pid %d).\n", pid);
-    return 2;
+    DEBUG("waitpid error (pid %d): %s.\n", pid, strerror(errno));
+    return 1;
   }
 
   return 0;
@@ -194,7 +178,7 @@ int
 detach(int pid)
 {
   if (ptrace(PTRACE_DETACH, pid, NULL, NULL)) {
-    WARN("PTRACE_DETACH error.\n");
+    DEBUG("PTRACE_DETACH error: %s.\n", strerror(errno));
     return 1;
   }
   return 0;
@@ -204,7 +188,7 @@ int
 get_regs(int pid, struct user_regs_struct *regs)
 {
   if (ptrace(PTRACE_GETREGS, pid, NULL, regs)) {
-    WARN("PTRACE_GETREGS error.\n");
+    DEBUG("PTRACE_GETREGS error: %s.\n", strerror(errno));
     return 1;
   }
   return 0;
@@ -214,7 +198,7 @@ int
 set_regs(int pid, struct user_regs_struct *regs)
 {
   if (ptrace(PTRACE_SETREGS, pid, NULL, regs)) {
-    WARN("PTRACE_SETREGS error.\n");
+    DEBUG("PTRACE_SETREGS error: %s.\n", strerror(errno));
     return 1;
   }
   return 0;
@@ -279,34 +263,34 @@ run_and_redirect(int pid, struct user_regs_struct *regs, ElfW(Addr) routine)
 
   if (ptrace(PTRACE_SETREGS, pid, NULL, regs)) {
     WARN("PTRACE_SETREGS error (pid %d).\n", pid);
-    return 2;
+    return 1;
   }
 
   if (ptrace(PTRACE_CONT, pid, NULL, NULL)) {
     WARN("PTRACE_CONT error (pid %d).\n", pid);
-    return 3;
+    return 1;
   }
 
   usleep(1000);
   if (waitpid(-1, &status, __WALL) == -1) {
     WARN("waitpid error (pid %d).\n", pid);
-    return 4;
+    return -1;
   }
 
   if (WIFEXITED(status) || WCOREDUMP(status)) {
     WARN("%d failed %s.\n", pid, strsignal(WEXITSTATUS(status)));
-    return 5;
+    return -1;
   }
 
   if (!WIFSTOPPED(status)) {
     WARN("Target %d did not stop.\n", pid);
-    return 6;
+    return -1;
   }
 
   /* Read the full context to learn about return values. */
   if (ptrace(PTRACE_GETREGS, pid, NULL, regs)) {
     WARN("PTRACE_GETREGS error (pid %d).\n", pid);
-    return 7;
+    return -1;
   }
 
   return 0;

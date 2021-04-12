@@ -46,7 +46,7 @@ for attempt in range(32):
   # such, should not make calls to Asynchronous Signal Unsafe functions.
   # However, libpulp calls dlopen, which is AS-Unsafe.
   try:
-    ret = subprocess.run([trigger, str(child.pid),
+    ret = subprocess.run([trigger, '-r', '100', '-p', str(child.pid),
                           'libblocked_livepatch1.ulp'], timeout=20)
     if ret.returncode:
       print('Failed to apply livepatch #1 for libblocked')
@@ -58,8 +58,15 @@ for attempt in range(32):
     # Check that the livepatch was applied correctly
     print('Testing output after live patch... ', end='')
     child.sendline('')
-    child.expect('hello_world\r\n')
-    print('OK.')
+    index = child.expect(['hello\r\n', 'hello_world\r\n', pexpect.TIMEOUT])
+    if index == 0:
+      print('nok; old behavior. Patch not applied?')
+      errors = 1
+    if index == 1:
+      print('ok.')
+    if index == 2:
+      print('nok; timed out')
+      errors
   finally:
     # Always kill the child process
     child.close(force=True)

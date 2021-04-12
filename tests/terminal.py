@@ -41,7 +41,7 @@ errors = 0
 for i in range(32):
 
   # Attach and detach with ulp tools
-  ret = subprocess.run([check, pid, 'libblocked_livepatch1.ulp'])
+  ret = subprocess.run([check, '-p', pid, 'libblocked_livepatch1.ulp'])
   if ret.returncode:
     print('Failed to check livepatch #1 for libblocked')
     errors = 99

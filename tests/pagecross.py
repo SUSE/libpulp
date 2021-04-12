@@ -30,7 +30,7 @@ child.logfile = sys.stdout
 child.expect('Waiting for input.\r\n')
 
 # Apply live patch and check for new behavior
-ret = subprocess.run([trigger, str(child.pid),
+ret = subprocess.run([trigger, '-p', str(child.pid),
                       'libpagecross_livepatch1.ulp'])
 if ret.returncode:
   print('Failed to apply livepatch #1 for libpagecross')

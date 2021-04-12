@@ -32,7 +32,7 @@ child.expect('100');
 print('First call to libhundreds... ok.')
 
 # Apply first live patch
-ret = subprocess.run([trigger, str(child.pid),
+ret = subprocess.run([trigger, '-p', str(child.pid),
                      'libhundreds_livepatch1.ulp'], timeout=20)
 if ret.returncode:
   print('Failed to apply livepatch #1 for libhundreds')
@@ -48,7 +48,7 @@ if index == 1:
   exit (1)
 
 # Apply second live patch
-ret = subprocess.run([trigger, str(child.pid),
+ret = subprocess.run([trigger, '-p', str(child.pid),
                      'libhundreds_livepatch2.ulp'], timeout=20)
 if ret.returncode:
   print('Failed to apply livepatch #2 for libhundreds')
@@ -64,7 +64,7 @@ if index == 1 or index == 2:
   exit (1)
 
 # Revert the second live patch
-ret = subprocess.run([trigger, str(child.pid),
+ret = subprocess.run([trigger, '-p', str(child.pid),
                      'libhundreds_livepatch2.rev'], timeout=20)
 if ret.returncode:
   print('Failed to revert livepatch #2 for libhundreds')
@@ -80,7 +80,7 @@ if index == 1 or index == 2:
   exit (1)
 
 # Revert the first live patch
-ret = subprocess.run([trigger, str(child.pid),
+ret = subprocess.run([trigger, '-p', str(child.pid),
                      'libhundreds_livepatch1.rev'], timeout=20)
 if ret.returncode:
   print('Failed to revert livepatch #1 for libhundreds')

@@ -45,7 +45,7 @@ print('Inside the library, waiting for further input.')
 
 # Apply live patch while inside library
 print('Applying live patch.')
-ret = subprocess.run([trigger, str(child.pid),
+ret = subprocess.run([trigger, '-p', str(child.pid),
                       'libcontract_livepatch1.ulp'])
 if ret.returncode:
   print('Failed to apply livepatch #1 for libcontract')

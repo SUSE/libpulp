@@ -32,7 +32,7 @@ print('Greeting... ok.')
 # After printing the greeting message, the target process makes a call
 # to fgets, which calls the read syscall. Applying a live patch will
 # interrupt the syscall.
-ret = subprocess.run([trigger, str(child.pid),
+ret = subprocess.run([trigger, '-p', str(child.pid),
                       'libparameters_livepatch1.ulp'])
 if ret.returncode:
   print('Failed to apply livepatch #1 for libparameters')

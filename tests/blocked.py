@@ -42,7 +42,7 @@ print('Thread #2... ok.')
 # After the live patching, thread1, which is looping outside the
 # library, should produce a different output, whereas thread2, which
 # never leaves the library, should display the  old behavior.
-ret = subprocess.run([trigger, str(child.pid),
+ret = subprocess.run([trigger, '-p', str(child.pid),
                       'libblocked_livepatch1.ulp'])
 if ret.returncode:
   print('Failed to apply livepatch #1 for libblocked')
