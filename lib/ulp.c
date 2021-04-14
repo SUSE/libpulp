@@ -118,7 +118,7 @@ __ulp_check_applied_patch()
 {
   struct ulp_applied_patch *patch;
 
-  patch = ulp_get_applied_patch(__ulp_metadata_ref->patch_id);
+  patch = ulp_get_applied_patch((unsigned char *)__ulp_path_buffer);
   if (patch)
     return 1;
   else
