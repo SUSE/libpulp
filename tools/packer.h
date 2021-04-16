@@ -37,7 +37,7 @@ Elf_Scn *get_dynsym(Elf *elf);
 
 Elf_Scn *get_build_id_note(Elf *elf);
 
-int get_ulp_elf_metadata(Elf *elf, struct ulp_object *obj);
+int get_ulp_elf_metadata(char *filename, struct ulp_object *obj);
 
 int get_object_metadata(Elf *elf, struct ulp_object *obj);
 

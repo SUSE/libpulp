@@ -45,7 +45,7 @@ ulp_post_LDADD = -lelf
 # whereas the dump tool dumps their content in human-readable format.
 
 ulp_packer_SOURCES = packer.c
-ulp_packer_LDADD = -lelf
+ulp_packer_LDADD = libcommon.la -lelf
 
 ulp_reverse_SOURCES = revert.c
 

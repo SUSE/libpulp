@@ -54,7 +54,7 @@ CONVENIENCE_LDFLAGS = -rpath $(libdir) $(AM_LDFLAGS)
 	sed -e "s|__ABS_BUILDDIR__|$(abs_builddir)|" $^ > $@
 
 %.ulp: %.dsc $(check_LTLIBRARIES)
-	$(ULP_PACKER) $< $@
+	$(ULP_PACKER) $< -o $@
 
 %.rev: %.ulp
 	$(ULP_REVERSE) $< $@

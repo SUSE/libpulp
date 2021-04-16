@@ -19,6 +19,7 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <argp.h>
 #include <err.h>
 #include <fcntl.h>
 #include <gelf.h>
@@ -28,27 +29,82 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "config.h"
+#include "introspection.h"
+#include "ulp_common.h"
+
 #include "packer.h"
 
-void
-usage(char *name)
+const char *argp_program_version = PACKAGE_STRING;
+
+struct arguments
 {
-  /* clang-format off */
-  fprintf(stderr, "Usage: %s <descr.txt> <target.so> [output file]", name);
-  fprintf(stderr, " * <descr.txt>: Text-file with patch description.\n");
-  fprintf(stderr, " * <target.so>: .so with to-be-patched function.\n");
-  fprintf(stderr, " * [output file] (optional): write to output file,\n");
-  fprintf(stderr, "   instead of to the standard, hardcoded path.\n\n");
-  fprintf(stderr, "   descr.txt format:\n\n");
-  fprintf(stderr, "   absolute path to patch.so\n");
-  fprintf(stderr, "   tgt_func1:patch_func1\n");
-  fprintf(stderr, "   tgt_func2:patch_func2\n");
-  fprintf(stderr, " * <tgt_func>: Function to be patched\n");
-  fprintf(stderr, " * <patch_func>: Function that will replace tgt_func\n");
-  fprintf(stderr, " * Each line describes a function to be patched\n");
-  fprintf(stderr, " * Patches are to the object listed in the previous line\n");
-  fprintf(stderr, "   started with a '@' and should be to a single shared object\n");
-  /* clang-format on */
+  char *description;
+  char *livepatch;
+  char *library;
+  char *metadata;
+  int quiet;
+  int verbose;
+};
+
+static char doc[] =
+    "Creates a livepatch METADATA file based on a live patch DESCRIPTION file";
+
+static char args_doc[] = "DESCRIPTION";
+
+static struct argp_option options[] = {
+  { 0, 0, 0, 0, "Options:", 0 },
+  { "output", 'o', "METADATA", 0,
+    "Write output to METADATA\nDefaults to the standard output", 1 },
+  { "livepatch", 'p', "LIVEPATCH", 0,
+    "Use this livepatch file\nDefaults to the one in DESCRIPTION", 2 },
+  { "target", 't', "LIBRARY", 0,
+    "Use this target library\nDefaults to the one in DESCRIPTION", 2 },
+  { "verbose", 'v', 0, 0, "Produce verbose output", 3 },
+  { "quiet", 'q', 0, 0, "Don't produce any output", 3 },
+  { 0 }
+};
+
+static error_t
+parser(int key, char *arg, struct argp_state *state)
+{
+  struct arguments *arguments;
+
+  arguments = state->input;
+
+  switch (key) {
+    case 'v':
+      arguments->verbose = 1;
+      break;
+    case 'q':
+      arguments->quiet = 1;
+      break;
+    case 'o':
+      arguments->metadata = arg;
+      break;
+    case 'p':
+      arguments->livepatch = arg;
+      break;
+    case 't':
+      arguments->library = arg;
+      break;
+    case ARGP_KEY_ARG:
+      if (state->arg_num >= 1) {
+        argp_error(state, "Too many arguments.");
+      }
+      arguments->description = arg;
+      break;
+    case ARGP_KEY_END:
+      if (state->arg_num < 1)
+        argp_error(state, "Too few arguments.");
+      if (arguments->quiet && arguments->verbose)
+        argp_error(state, "You must specify either '-v' or '-q' or none.");
+      break;
+    default:
+      return ARGP_ERR_UNKNOWN;
+  }
+
+  return 0;
 }
 
 void
@@ -92,13 +148,13 @@ load_elf(char *obj, int *fd)
 
   *fd = open(obj, O_RDONLY);
   if (*fd == -1) {
-    err(0, "Error opening %s", obj);
+    WARN("error opening %s: %s", obj, strerror(errno));
     return NULL;
   }
 
   elf = elf_begin(*fd, ELF_C_READ, NULL);
   if (!elf) {
-    err(0, "Error invoking elf_begin()");
+    WARN("error invoking elf_begin()");
     close(*fd);
     return NULL;
   }
@@ -113,14 +169,14 @@ get_dynsym(Elf *elf)
   GElf_Shdr sh;
 
   if (elf_getshdrnum(elf, &nsecs)) {
-    err(0, "Error invoking elf_getshdrnum()");
+    WARN("error invoking elf_getshdrnum()");
     return NULL;
   }
 
   for (i = 0; i < nsecs; i++) {
     s = elf_getscn(elf, i);
     if (!s) {
-      err(0, "Error invoking elf_getscn()");
+      WARN("error invoking elf_getscn()");
       return NULL;
     }
     gelf_getshdr(s, &sh);
@@ -162,27 +218,40 @@ get_build_id_note(Elf *elf)
 }
 
 int
-get_ulp_elf_metadata(Elf *elf, struct ulp_object *obj)
+get_ulp_elf_metadata(char *filename, struct ulp_object *obj)
 {
-
+  int fd;
+  Elf *elf;
   Elf_Scn *dynsym;
+
+  fd = 0;
+  elf = load_elf(filename, &fd);
+  if (!elf) {
+    WARN("Unable to load elf file: %s", filename);
+    return 0;
+  }
+
   dynsym = get_dynsym(elf);
   if (!dynsym) {
     WARN("Unable to get .dynsym section.");
-    return 0;
+    goto error_elf_loaded;
   }
 
   if (!get_object_metadata(elf, obj)) {
     WARN("Unable to get object metadata.");
-    return 0;
+    goto error_elf_loaded;
   }
 
   if (!get_elf_tgt_addrs(elf, obj, dynsym)) {
     WARN("Unable to get target addresses.");
-    return 0;
+    goto error_elf_loaded;
   }
 
   return 1;
+
+error_elf_loaded:
+  unload_elf(&elf, &fd);
+  return 0;
 }
 
 int
@@ -221,7 +290,7 @@ create_patch_metadata_file(struct ulp_metadata *ulp, char *filename)
   uint8_t type = 1;
 
   if (filename == NULL)
-    file = fopen(OUT_PATCH_NAME, "w");
+    file = stdout;
   else
     file = fopen(filename, "w");
   if (!file) {
@@ -555,50 +624,52 @@ int
 main(int argc, char **argv)
 {
   struct ulp_metadata ulp;
-  Elf *target_elf = NULL;
-  int fd;
-  char *filename = NULL;
-  char *target_filename = NULL;
 
-  fd = 0;
+  struct argp argp = { options, parser, args_doc, doc, NULL, NULL, NULL };
+  struct arguments arguments = { 0 };
+
+  argp_parse(&argp, argc, argv, 0, 0, &arguments);
+
+  /* Set the verbosity level in the common introspection infrastructure. */
+  ulp_verbose = arguments.verbose;
+  ulp_quiet = arguments.quiet;
+
   memset(&ulp, 0, sizeof(ulp));
-
-  if (argc < 2) {
-    usage(argv[0]);
-    return 1;
-  }
-
-  if (argc > 2) {
-    filename = strndup(argv[2], NAME_MAX);
-  }
 
   elf_version(EV_CURRENT);
 
-  if (!parse_description(argv[1], &ulp)) {
-    WARN("Unable to parse patch description from %s.", argv[1]);
+  DEBUG("parsing the description file (%s).", arguments.description);
+  if (!parse_description(arguments.description, &ulp)) {
+    WARN("unable to parse description file (%s).", arguments.description);
     goto main_error;
   }
 
-  /* Get the target library filename from the description file. */
-  target_filename = ulp.objs->name;
+  /* Select source of the target library filename. */
+  if (arguments.library == NULL) {
+    arguments.library = ulp.objs->name;
+    DEBUG("path to target library taken from the description file.");
+  }
+  else {
+    DEBUG("path to target library taken from the command-line.");
+  }
+  DEBUG("target library: %s.", arguments.library);
 
-  target_elf = load_elf(target_filename, &fd);
-  if (!target_elf)
+  if (!get_ulp_elf_metadata(arguments.library, ulp.objs)) {
+    WARN("unable to parse target library.");
     goto main_error;
-  if (!get_ulp_elf_metadata(target_elf, ulp.objs))
-    goto main_error;
-  unload_elf(&target_elf, &fd);
+  }
 
   if (!generate_random_patch_id(&ulp))
     goto main_error;
-  if (!create_patch_metadata_file(&ulp, filename))
+  if (!create_patch_metadata_file(&ulp, arguments.metadata))
     goto main_error;
 
   free_metadata(&ulp);
+  WARN("metadata file generated successfully.");
   return 0;
 
 main_error:
-  unload_elf(&target_elf, &fd);
   free_metadata(&ulp);
+  WARN("metadata file generation failed.");
   return 1;
 }
