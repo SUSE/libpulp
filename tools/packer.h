@@ -53,5 +53,3 @@ int parse_description(char *filename, struct ulp_metadata *ulp);
 int get_build_id(Elf_Scn *s, struct ulp_object *obj);
 
 void *get_symbol_addr(Elf *elf, Elf_Scn *s, char *search);
-
-int generate_random_patch_id(struct ulp_metadata *ulp);

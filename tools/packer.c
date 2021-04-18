@@ -31,6 +31,7 @@
 
 #include "config.h"
 #include "introspection.h"
+#include "md4.h"
 #include "ulp_common.h"
 
 #include "packer.h"
@@ -579,6 +580,40 @@ get_build_id(Elf_Scn *s, struct ulp_object *obj)
   return 1;
 }
 
+int
+parse_build_id(Elf_Scn *s, char **result, int *length)
+{
+  GElf_Nhdr nhdr;
+  Elf_Data *d;
+  size_t namep, descp;
+  int found = 0;
+  size_t offset = 0, n;
+
+  d = elf_getdata(s, NULL);
+  if (!d) {
+    WARN("Unable to find pointer to build id header.");
+    return 1;
+  }
+
+  for (; (n = gelf_getnote(d, offset, &nhdr, &namep, &descp) > 0);
+       offset = n) {
+    if (nhdr.n_type == NT_GNU_BUILD_ID) {
+      found = 1;
+      break;
+    }
+  }
+
+  if (!found) {
+    WARN("Unable to find note with expected build id type.");
+    return 1;
+  }
+
+  *result = (d->d_buf + descp);
+  *length = nhdr.n_descsz;
+
+  return 0;
+}
+
 void *
 get_symbol_addr(Elf *elf, Elf_Scn *s, char *search)
 {
@@ -607,17 +642,96 @@ get_symbol_addr(Elf *elf, Elf_Scn *s, char *search)
 }
 
 int
-generate_random_patch_id(struct ulp_metadata *ulp)
+write_patch_id(struct ulp_metadata *ulp, char *description, char *livepatch)
 {
-  int r;
-  r = open("/dev/urandom", O_RDONLY);
-  if (read(r, &ulp->patch_id, 32) < 0) {
-    WARN("Error generating patch id.");
-    close(r);
-    return 0;
+  int half;
+  int total;
+  int retcode;
+  int length;
+
+  char *input;
+  FILE *fp;
+  uint8_t *digest;
+
+  Elf *elf;
+  Elf_Scn *note;
+  int fd;
+  char *id;
+
+  _Static_assert((sizeof(ulp->patch_id) % 2) == 0);
+  total = sizeof(ulp->patch_id);
+  half = total / 2;
+
+  /* Initialize the patch id with zeroes. */
+  memset(ulp->patch_id, 0, total);
+
+  /* Find the build ID of LIVEPATCH. */
+  elf = load_elf(livepatch, &fd);
+  if (elf == NULL) {
+    WARN("error opening %s with libelf", livepatch);
+    return 1;
   }
-  close(r);
-  return 1;
+  note = get_build_id_note(elf);
+  if (note == NULL) {
+    WARN("error finding the build id section of %s", livepatch);
+    return 1;
+  }
+  retcode = parse_build_id(note, &id, &length);
+  if (retcode) {
+    WARN("error parsing the build id for %s", livepatch);
+    return 1;
+  }
+
+  /* Write the build id as the first half of the patch id. */
+  if (length > half)
+    length = half;
+  memcpy(ulp->patch_id, id, length);
+
+  unload_elf(&elf, &fd);
+
+  /* Read the whole DESCRIPTION File into memory to use as digest input. */
+  fp = fopen(description, "r");
+  if (fp == NULL) {
+    WARN("error opening %s: %s", description, strerror(errno));
+    return 1;
+  }
+  retcode = fseek(fp, 0, SEEK_END);
+  if (retcode == -1) {
+    WARN("error seeking %s: %s", description, strerror(errno));
+    return 1;
+  }
+  length = ftell(fp);
+  if (length == -1) {
+    WARN("error checking length of %s: %s", description, strerror(errno));
+    return 1;
+  }
+  rewind(fp);
+  input = malloc(length);
+  if (input == NULL) {
+    WARN("unable to allocate memory: %s", strerror(errno));
+    return 1;
+  }
+  retcode = fread(input, 1, length, fp);
+  if (retcode != length) {
+    WARN("error reading description file to memory: %s", strerror(errno));
+    return 1;
+  }
+
+  /* Generate a digest out of the description file. */
+  digest = MD4(input, length);
+  if (digest == NULL) {
+    WARN("error generating message digest from description file");
+    return 1;
+  }
+
+  /* Write the digest as the second half of the patch id. */
+  if (MD4_LENGTH > half)
+    length = half;
+  else
+    length = MD4_LENGTH;
+  memcpy(ulp->patch_id + half, digest, length);
+
+  return 0;
 }
 
 int
@@ -659,8 +773,20 @@ main(int argc, char **argv)
     goto main_error;
   }
 
-  if (!generate_random_patch_id(&ulp))
+  if (arguments.livepatch == NULL) {
+    arguments.livepatch = ulp.so_filename;
+    DEBUG("path to live patch taken from the description file.");
+  }
+  else {
+    DEBUG("path to live patch taken from the command-line.");
+  }
+  DEBUG("live patch: %s.", arguments.livepatch);
+
+  if (write_patch_id(&ulp, arguments.description, arguments.livepatch)) {
+    WARN("unable to generate live patch ID.");
     goto main_error;
+  }
+
   if (!create_patch_metadata_file(&ulp, arguments.metadata))
     goto main_error;
 

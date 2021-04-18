@@ -26,7 +26,7 @@ bin_PROGRAMS = \
   ulp_post \
   ulp
 
-noinst_HEADERS = introspection.h ptrace.h packer.h
+noinst_HEADERS = introspection.h ptrace.h packer.h md4.h
 
 # Static library shared among the tools.
 
@@ -44,7 +44,7 @@ ulp_post_LDADD = -lelf
 # The packer and reverse tools create metadata files for live patches,
 # whereas the dump tool dumps their content in human-readable format.
 
-ulp_packer_SOURCES = packer.c
+ulp_packer_SOURCES = packer.c md4.c
 ulp_packer_LDADD = libcommon.la -lelf
 
 ulp_reverse_SOURCES = revert.c
