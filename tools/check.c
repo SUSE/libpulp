@@ -139,6 +139,7 @@ main(int argc, char **argv)
     return 1;
   }
 
+  memset(&target, 0, sizeof(target));
   target.pid = arguments.pid;
   ret = initialize_data_structures(&target);
   if (ret) {
