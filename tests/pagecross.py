@@ -19,29 +19,19 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-from tests import *
+import testsuite
 
-# Start the test program and check default behavior
-child = pexpect.spawn('./' + testname, timeout=1, env=preload,
-                      encoding='utf-8')
-child.logfile = sys.stdout
+child = testsuite.spawn('pagecross')
 
-# Wait for the test program to be ready
-child.expect('Waiting for input.\r\n')
-
-# Apply live patch and check for new behavior
-ret = subprocess.run([trigger, '-p', str(child.pid),
-                      'libpagecross_livepatch1.ulp'])
-if ret.returncode:
-  print('Failed to apply livepatch #1 for libpagecross')
-  exit(1)
+child.expect('Waiting for input.')
 
 child.sendline('')
-index = child.expect(['default\r\n', 'patched\r\n']);
-if index == 0:
-  print('Patch not applied correctly')
-  exit(1)
+child.expect('default');
 
-# Kill the child process and exit
+child.livepatch('libpagecross_livepatch1.ulp')
+
+child.sendline('')
+child.expect('patched', reject='default');
+
 child.close(force=True)
 exit(0)

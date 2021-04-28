@@ -19,34 +19,22 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-from tests import *
+import testsuite
 
-# Start the test program
-child = pexpect.spawn('./' + testname, timeout=10, env=preload,
-                      encoding='utf-8')
-child.logfile = sys.stdout
+child = testsuite.spawn('redzone', timeout=10)
 
 child.expect('Waiting for input.')
-print('Greeting... ok.')
 
-# Apply live patch, which should not touch the redzone
-ret = subprocess.run([trigger, '-p', str(child.pid),
-                     'libblocked_livepatch1.ulp'])
-if ret.returncode:
-  print('Failed to apply livepatch #1 for libblocked')
-  exit(1)
+child.livepatch('libblocked_livepatch1.ulp')
 
 # Check live patch, which should not touch the redzone
-ret = subprocess.run([check, '-p', str(child.pid),
-                     'libblocked_livepatch1.ulp'])
-if ret.returncode == -1:
-  print('Failed to check livepatch status')
-  exit(1)
+child.is_patch_applied('libblocked_livepatch1.ulp')
 
 # Read error output, if any
 child.readline()
 child.readline()
 
+# XXX: Use isalive to avoid blocking
 ret = child.wait()
 if ret:
   exit(1)

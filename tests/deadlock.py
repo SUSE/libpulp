@@ -19,25 +19,19 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-from tests import *
+import testsuite
 
 # Since the deadlock demonstrated by this test case does not occur
 # everytime it executes, run it in a loop. The amount of iterations
 # hardcoded is arbitrary
 errors = 0
 for attempt in range(32):
-  # Start the test program
-  child = pexpect.spawn('./' + testname, timeout=20, env=preload,
-                        encoding='utf-8')
+  child = testsuite.spawn('deadlock', log=None)
 
-  # Wait for the test program to be ready
-  child.expect('Waiting for input.\r\n')
+  child.expect('Waiting for input.')
 
-  # Check default behavior
-  print('Testing output before live patch... ', end='')
   child.sendline('')
-  child.expect('hello\r\n')
-  print('OK.')
+  child.expect('hello')
 
   # Applying a live patch to a process entails stopping all of its
   # threads, then stealing one of them to jack into the process and call
@@ -46,27 +40,13 @@ for attempt in range(32):
   # such, should not make calls to Asynchronous Signal Unsafe functions.
   # However, libpulp calls dlopen, which is AS-Unsafe.
   try:
-    ret = subprocess.run([trigger, '-r', '100', '-p', str(child.pid),
-                          'libblocked_livepatch1.ulp'], timeout=20)
-    if ret.returncode:
-      print('Failed to apply livepatch #1 for libblocked')
-      errors = 1
+    child.livepatch('libblocked_livepatch1.ulp', retries=100, timeout=20)
   except subprocess.TimeoutExpired:
-    print('Deadlock reached when appling livepatch')
+    print('Deadlock detected.')
     errors = 1
   else:
-    # Check that the livepatch was applied correctly
-    print('Testing output after live patch... ', end='')
     child.sendline('')
-    index = child.expect(['hello\r\n', 'hello_world\r\n', pexpect.TIMEOUT])
-    if index == 0:
-      print('nok; old behavior. Patch not applied?')
-      errors = 1
-    if index == 1:
-      print('ok.')
-    if index == 2:
-      print('nok; timed out')
-      errors
+    child.expect('hello_world', reject='hello')
   finally:
     # Always kill the child process
     child.close(force=True)

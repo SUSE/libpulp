@@ -19,34 +19,19 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-from tests import *
+import testsuite
 
-# Start the test program and check default behavior
-child = pexpect.spawn('./' + testname, timeout=60, env=preload,
-                      encoding='utf-8')
-child.logfile = sys.stdout
+child = testsuite.spawn('recursion', timeout=60)
 
-print('Greeting... ', end='')
-child.expect('Waiting for input.\r\n')
-print('ok.')
+child.expect('Waiting for input.')
 
-print('Fibonacci... ', end='')
 child.sendline('45')
-child.expect('1134903170\r\n');
-print('ok.')
+child.expect('1134903170');
 
-# Apply live patch and check for new behavior
-ret = subprocess.run([trigger, '-p', str(child.pid),
-                      'librecursion_livepatch1.ulp'])
-if ret.returncode:
-  print('Failed to apply livepatch #1 for librecursion')
-  exit(1)
+child.livepatch('librecursion_livepatch1.ulp')
 
-print('Lucas... ', end='')
 child.sendline('45')
-child.expect('2537720636\r\n');
-print('ok.')
+child.expect('2537720636');
 
-# Kill the child process and exit
 child.close(force=True)
 exit(0)

@@ -71,6 +71,7 @@ AC_MSG_ERROR([Libelf development files are missing.]))
 # Python and python's pexpect are required to run the tests.
 AM_PATH_PYTHON([3])
 AX_PYTHON_MODULE([pexpect], [fatal])
+AX_PYTHON_MODULE([psutil], [fatal])
 
 # Add the following flags to the compilation of all files
 AC_SUBST([AM_CFLAGS], ["-Wall -Wextra -Werror"])

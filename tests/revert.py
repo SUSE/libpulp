@@ -19,89 +19,34 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-from tests import *
+import testsuite
 
-# Start the test program and check default behavior
-child = pexpect.spawn('./numserv', timeout=1, env=preload)
+child = testsuite.spawn('numserv')
 
 child.expect('Waiting for input.')
-print('Greeting... ok.')
 
 child.sendline('hundred')
-child.expect('100');
-print('First call to libhundreds... ok.')
+child.expect('100')
 
-# Apply first live patch
-ret = subprocess.run([trigger, '-p', str(child.pid),
-                     'libhundreds_livepatch1.ulp'], timeout=20)
-if ret.returncode:
-  print('Failed to apply livepatch #1 for libhundreds')
-  exit(1)
+child.livepatch('libhundreds_livepatch1.ulp')
 
 child.sendline('hundred')
-index = child.expect(['200', '100']);
-print('Second call to libhundreds... ', end='')
-if index == 0:
-  print('ok.')
-if index == 1:
-  print('not ok; old behavior.')
-  exit (1)
+child.expect('200', reject='100')
 
-# Apply second live patch
-ret = subprocess.run([trigger, '-p', str(child.pid),
-                     'libhundreds_livepatch2.ulp'], timeout=20)
-if ret.returncode:
-  print('Failed to apply livepatch #2 for libhundreds')
-  exit(1)
+child.livepatch('libhundreds_livepatch2.ulp')
 
 child.sendline('hundred')
-index = child.expect(['300', '100', '200']);
-print('Third call to libhundreds... ', end='')
-if index == 0:
-  print('ok.')
-if index == 1 or index == 2:
-  print('not ok; old behavior.')
-  exit (1)
+child.expect('300', reject=['100', '200'])
 
-# Revert the second live patch
-ret = subprocess.run([trigger, '-p', str(child.pid),
-                     'libhundreds_livepatch2.rev'], timeout=20)
-if ret.returncode:
-  print('Failed to revert livepatch #2 for libhundreds')
-  exit(1)
+child.livepatch('libhundreds_livepatch2.rev')
 
 child.sendline('hundred')
-index = child.expect(['200', '100', '300']);
-print('Fourth call to libhundreds... ', end='')
-if index == 0:
-  print('ok.')
-if index == 1 or index == 2:
-  print('not ok; old behavior.')
-  exit (1)
+child.expect('200', reject=['100', '300'])
 
-# Revert the first live patch
-ret = subprocess.run([trigger, '-p', str(child.pid),
-                     'libhundreds_livepatch1.rev'], timeout=20)
-if ret.returncode:
-  print('Failed to revert livepatch #1 for libhundreds')
-  exit(1)
+child.livepatch('libhundreds_livepatch1.rev')
 
 child.sendline('hundred')
-index = child.expect(['100', '200', '300']);
-print('Fifth call to libhundreds... ', end='')
-if index == 0:
-  print('ok.')
-if index == 1 or index == 2:
-  print('not ok; old behavior.')
-  exit (1)
+child.expect('100', reject=['200', '300']);
 
-# Try to terminate the child normally, otherwise kill it
-child.sendline('quit')
-ret = child.expect('Quitting.')
-if ret == 0:
-  print('Quit... ok.')
-  exit(0)
-else:
-  print('Failed to quit the test program.')
-  child.close(force=True)
-  exit(1)
+child.close(force=True)
+exit(0)

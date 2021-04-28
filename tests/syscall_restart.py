@@ -19,33 +19,23 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-from tests import *
+import testsuite
 
-# Start the test program and check default behavior
-child = pexpect.spawn('./' + testname, timeout=1, env=preload,
-                      encoding='utf-8')
-child.logfile = sys.stdout
+child = testsuite.spawn('syscall_restart')
 
 child.expect('Waiting for input.')
-print('Greeting... ok.')
 
 # After printing the greeting message, the target process makes a call
 # to fgets, which calls the read syscall. Applying a live patch will
 # interrupt the syscall.
-ret = subprocess.run([trigger, '-p', str(child.pid),
-                      'libparameters_livepatch1.ulp'])
-if ret.returncode:
-  print('Failed to apply livepatch #1 for libparameters')
-  exit(1)
+child.livepatch('libparameters_livepatch1.ulp')
 
 # Send a newline, which should be received by the read syscall if it has
 # been successfully restarted by libpulp. If the syscall has not been
 # restarted, the child program will exit without printing anything.
 child.sendline('')
-child.expect('8-7-6-5-4-3-2-1\r\n');
-child.expect('10.0-9.0-8.0-7.0-6.0-5.0-4.0-3.0-2.0-1.0\r\n');
-print('Syscall restarting... ok.')
+child.expect('8-7-6-5-4-3-2-1');
+child.expect('10.0-9.0-8.0-7.0-6.0-5.0-4.0-3.0-2.0-1.0');
 
-# Kill the child process and exit
 child.close(force=True)
 exit(0)

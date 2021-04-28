@@ -19,27 +19,31 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-from tests import *
+import subprocess
+import time
 
-# Start the test program and check default behavior
-child = pexpect.spawn('./blocked', timeout=1, env=preload,
-                      encoding='utf-8')
-child.logfile = sys.stdout
+import testsuite
+
+child = testsuite.spawn('blocked')
 
 # Wait for both threads to be ready (the order does not matter)
-child.expect('Waiting for signals.\r\n')
-child.expect('Waiting for signals.\r\n')
+child.expect('Waiting for signals.')
+child.expect('Waiting for signals.')
 
 # The ulp tool reads the thread-local counter from every thread in live
 # patchable processes. It must not break the process.
-ret = subprocess.run([ulp, '-p', str(child.pid)])
-if ret.returncode:
-  print('Unable to run ulp tool')
-  exit(1)
+try:
+  subprocess.run([testsuite.ulptool, '-p', str(child.pid)])
+except:
+  # Testing whether the ulp tool works or not is not the intent of this test
+  # case, so forward a hard error to the test harness..
+  child.close(force=True)
+  exit(99)
 
 # Kill the child process and exit
 time.sleep(1)
 if child.isalive():
+  child.close(force=True)
   exit(0)
 else:
   print('Live patchable process died')

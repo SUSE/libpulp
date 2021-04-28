@@ -19,15 +19,13 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-from tests import *
+import testsuite
 
-# Start the test program and check default behavior
-child = pexpect.spawn('./' + testname, timeout=1, env=preload,
-                      encoding='utf-8')
-child.logfile = sys.stdout
+child = testsuite.spawn('constructor')
 
+# Simply check that the test program works correctly with malloc interposition.
+# See constructor.c for a lengthier explanation.
 child.expect('OK')
 
-# Kill the child process and exit
 child.close(force=True)
 exit(0)

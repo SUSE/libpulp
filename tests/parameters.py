@@ -19,33 +19,21 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-from tests import *
+import testsuite
 
-# Start the test program and check default behavior
-child = pexpect.spawn('./' + testname, timeout=1, env=preload,
-                      encoding='utf-8')
-child.logfile = sys.stdout
+child = testsuite.spawn('parameters')
 
 child.expect('Waiting for input.')
-print('Greeting... ok.')
 
 child.sendline('')
-child.expect('1-2-3-4-5-6-7-8\r\n');
-child.expect('1.0-2.0-3.0-4.0-5.0-6.0-7.0-8.0-9.0-10.0\r\n');
-print('First call to libparameters... ok.')
+child.expect('1-2-3-4-5-6-7-8');
+child.expect('1.0-2.0-3.0-4.0-5.0-6.0-7.0-8.0-9.0-10.0');
 
-# Apply live patch and check for new behavior
-ret = subprocess.run([trigger, '-p', str(child.pid),
-                      'libparameters_livepatch1.ulp'])
-if ret.returncode:
-  print('Failed to apply livepatch #1 for libparameters')
-  exit(1)
+child.livepatch('libparameters_livepatch1.ulp')
 
 child.sendline('')
-child.expect('8-7-6-5-4-3-2-1\r\n');
-child.expect('10.0-9.0-8.0-7.0-6.0-5.0-4.0-3.0-2.0-1.0\r\n');
-print('Second call to libparameters... ok.')
+child.expect('8-7-6-5-4-3-2-1');
+child.expect('10.0-9.0-8.0-7.0-6.0-5.0-4.0-3.0-2.0-1.0');
 
-# Kill the child process and exit
 child.close(force=True)
 exit(0)

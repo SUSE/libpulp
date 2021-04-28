@@ -19,42 +19,31 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-from tests import *
+import testsuite
 
-# Start the test program and check default behavior
-child = pexpect.spawn('./' + testname, timeout=1, env=preload,
-                      encoding='utf-8')
+child = testsuite.spawn('memory_protection')
 
 child.expect('Waiting for input.')
-print('Greeting... ok.')
 
 # Every time a newline is sent, the test program touchs code memory
-print('Testing output before live patch... ', end='')
 child.sendline('')
-child.expect('Non-NULL\r\n');
-print('ok.')
+child.expect('Non-NULL');
 
-# Apply live patch
-print('Applying live patch... ', end='')
-ret = subprocess.run([trigger, '-p', str(child.pid),
-                      'libaddress_livepatch1.ulp'])
-if ret.returncode:
-  print('fail.')
-  exit(1)
-print('ok.')
+child.livepatch('libaddress_livepatch1.ulp')
 
 # Try to touch code memory after live patching
-print('Testing output after live patch... ', end='')
 child.sendline('')
-index = child.expect(['NULL\r\n', pexpect.EOF]);
-if index == 0:
-  print('ok.')
-if index == 1:
-  print('fail.')
+try:
+  child.expect('NULL');
+except EOFError:
+  # Diagnose the error
+  print('Touching code after live patch failed.')
   if child.isalive() == False:
-    print('Test program is dead')
-  exit(1)
+    print('The test program is dead')
+  else:
+    child.close(force=True)
+  # Let the exception propagate, so that the stack trace gets printed
+  raise
 
-# Kill the child process and exit
 child.close(force=True)
 exit(0)

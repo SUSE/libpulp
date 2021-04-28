@@ -19,65 +19,32 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-from tests import *
+import testsuite
 
-# Start the test program and check default behavior
-child = pexpect.spawn('./contract', timeout=1, env=preload,
-                      encoding='utf-8')
-child.logfile = sys.stdout
+child = testsuite.spawn('contract')
 
 child.expect('Waiting for input.')
-print('Greeting ok.')
 
 errors = 0
 child.sendline('')
-print('Inside the library, waiting for further input.')
 child.sendline('')
-child.expect('TYPE A data 128\r\n');
-print('Still inside the library, waiting for further input.')
+child.expect('TYPE A data 128');
 child.sendline('')
-child.expect('TYPE B data 256.000000\r\n');
-print('Behavior prior to live patching ok.')
+child.expect('TYPE B data 256.000000');
 
 # Send the test program into the library.
 child.sendline('')
-print('Inside the library, waiting for further input.')
 
 # Apply live patch while inside library
-print('Applying live patch.')
-ret = subprocess.run([trigger, '-p', str(child.pid),
-                      'libcontract_livepatch1.ulp'])
-if ret.returncode:
-  print('Failed to apply livepatch #1 for libcontract')
-  exit(1)
+child.livepatch('libcontract_livepatch1.ulp')
 
 # Let the process resume and check fna behavior
 child.sendline('')
-index = child.expect(['TYPE A data 128\r\n', 'Invalid type.\r\n',
-                      pexpect.TIMEOUT]);
-if index == 0:
-  print('Behavior of fna after live patching... ok.')
-if index == 2:
-  print('Behavior of fna after live patching... error.')
-  errors = 1
-if index == 3:
-  print('Behavior of fna after live patching... timedout.')
-  errors = 1
+child.expect('TYPE A data 128', reject='Invalid type.')
 
 # Let the process resume and check fnb behavior
-print('Still inside the library, waiting for further input.')
 child.sendline('')
-index = child.expect(['TYPE B data 1024.000000\r\n', 'Invalid type.\r\n',
-                      pexpect.TIMEOUT]);
-if index == 0:
-  print('Behavior of fnb after live patching... ok.')
-if index == 2:
-  print('Behavior of fnb after live patching... error.')
-  errors = 1
-if index == 3:
-  print('Behavior of fnb after live patching... timedout.')
-  errors = 1
+child.expect('TYPE B data 1024.000000', reject='Invalid type.')
 
-# Kill the child process and exit
 child.close(force=True)
 exit(errors)
