@@ -34,7 +34,7 @@ child.livepatch('libaddress_livepatch1.ulp')
 # Try to touch code memory after live patching
 child.sendline('')
 try:
-  child.expect('NULL');
+  child.expect('NULL', reject='Non-NULL');
 except EOFError:
   # Diagnose the error
   print('Touching code after live patch failed.')

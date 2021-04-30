@@ -80,7 +80,11 @@ main(void)
       return 0;
     }
 
-    /* Read and write to the code area. */
+    /*
+     * If applying a live patch fails to restore the write permission set
+     * above, writing to addr (with disturb_memory(addr)) will cause a
+     * segmentation fault.
+     */
     disturb_memory(addr);
 
     /* Use the library. */

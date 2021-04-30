@@ -31,7 +31,7 @@ child.expect('1134903170');
 child.livepatch('librecursion_livepatch1.ulp')
 
 child.sendline('45')
-child.expect('2537720636');
+child.expect('2537720636', reject='1134903170');
 
 child.close(force=True)
 exit(0)

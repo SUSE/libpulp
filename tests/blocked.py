@@ -38,13 +38,13 @@ child.expect('hello')
 
 # After the live patching, thread1, which is looping outside the
 # library, should produce a different output, whereas thread2, which
-# never leaves the library, should display the  old behavior.
+# never leaves the library, should display the old behavior.
 child.livepatch('libblocked_livepatch1.ulp')
 
 child.kill(signal.SIGUSR1)
-child.expect('hello_world')
+child.expect('hello_world', reject='hello')
 child.kill(signal.SIGUSR2)
-child.expect('hello')
+child.expect('hello', reject='hello_world')
 
 child.close(force=True)
 exit(0)
