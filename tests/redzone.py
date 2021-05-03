@@ -34,7 +34,6 @@ child.is_patch_applied('libblocked_livepatch1.ulp')
 child.readline()
 child.readline()
 
-# XXX: Use isalive to avoid blocking
 ret = child.wait()
 if ret:
   exit(1)

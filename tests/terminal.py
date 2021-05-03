@@ -33,8 +33,12 @@ parent.expect('Parent ready')
 
 # Read the pid of the child process, which wrote it to stdout
 parent.expect('Child ready')
-parent.expect('[0-9]+\r\n')
-pid = parent.after # XXX: Missing input validation
+parent.expect('[0-9]+')
+pid = parent.after
+if not type(pid) == str:
+  raise TypeError
+if not pid.isnumeric():
+  raise ValueError
 
 # If live patching SIGSTOPs the target process, the parent detects it
 # with waitpid, but only most of the time. If the trigger and check
