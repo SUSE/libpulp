@@ -52,6 +52,7 @@ AM_INIT_AUTOMAKE([-Wall -Wno-portability foreign subdir-objects])
 LT_INIT([shared disable-static])
 
 AC_PROG_CC
+AC_PROG_CXX
 AM_PROG_AS
 
 # Check if the compiler provides the -fpatchable-function-entry option,

@@ -126,6 +126,16 @@ libcontract_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
 POST_PROCESS += .libs/libcontract.post
 
+# Target libraries to test exception handling
+check_LTLIBRARIES += libexception.la
+noinst_HEADERS += libexception.h
+
+libexception_la_SOURCES = libexception.cc $(TARGET_TRM_SOURCES)
+libexception_la_CXXFLAGS = $(TARGET_CFLAGS)
+libexception_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
+
+POST_PROCESS += .libs/libexception.post
+
 # Live patches
 check_LTLIBRARIES += libdozens_livepatch1.la \
                      libdozens_livepatch99.la \
@@ -248,7 +258,8 @@ check_PROGRAMS = \
   memory_protection \
   constructor \
   cancel \
-  contract
+  contract \
+  exception_handling
 
 numserv_SOURCES = numserv.c
 numserv_LDADD = libdozens.la libhundreds.la
@@ -323,6 +334,10 @@ contract_SOURCES = contract.c
 contract_LDADD = libcontract.la
 contract_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
+exception_handling_SOURCES = exception_handling.cc
+exception_handling_LDADD = libexception.la
+exception_handling_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
+
 TESTS = \
   numserv.py \
   numserv_bsymbolic.py \
@@ -341,11 +356,13 @@ TESTS = \
   memory_protection.py \
   constructor.py \
   cancel.py \
-  contract.py
+  contract.py \
+  exception_handling.py
 
 XFAIL_TESTS = \
   hidden.py \
-  cancel.py
+  cancel.py \
+  exception_handling.py
 
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON) -B
