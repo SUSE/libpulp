@@ -1,0 +1,353 @@
+.\" libpulp - User-space Livepatching Library
+.\"
+.\" Copyright (C) 2021 SUSE Software Solutions GmbH
+.\"
+.\" This file is part of libpulp.
+.\"
+.\" libpulp is free software; you can redistribute it and/or
+.\" modify it under the terms of the GNU Lesser General Public
+.\" License as published by the Free Software Foundation; either
+.\" version 2.1 of the License, or (at your option) any later version.
+.\"
+.\" libpulp is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+.\" Lesser General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License
+.\" along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
+
+.TH LIBPULP 7 "" "" "Libpulp Overview"
+.SH NAME
+Libpulp \- Userspace Live Patching
+.SH INTRODUCTION
+Libpulp is a framework that enables live patching of userspace processes. In
+other words, it allows that a running process be modified without restarting
+the whole application. Libpulp is composed of a library, which provides live
+patching capabilities to running processes, as well as of a collection of tools
+to trigger live patching operations.
+.SH REQUIREMENTS AND RESTRICTIONS
+.PP
+The following requirements and restrictions must be met for live patching
+operations to work:
+.TP
+.B Process Startup
+Live patches cannot be applied to every process in the system. In order for a
+process to be eligible for live patching, it must dynamically load libpulp.so,
+the runtime support for live patching operations. Typically, dynamically linked
+libraries needed by a program are automatically loaded into memory during
+process initialization. However, since live patching operations are not
+triggered by the program itself (but from an external tool), there is no real
+dependency, and libpulp.so might be missing from DT_NEEDED entries (see
+ld.so(8)). To bridge this gap, processes should be started with
+LD_PRELOAD=libpulp.so.
+.TP
+.B Target Libraries Rebuilding
+Not every library in the system is eligible for live patching, only those that
+have been previously prepared to be so. These are referred to as
+.IR "target libraries" "."
+Making a target library does not require changes to its source code, however it
+requires:
+.\" XXX: Describe why 40,38 is the argument to -fpatchable-function-entry.
+1. rebuilding the library with patchable function entries (see
+.IR -fpatchable-function-entry
+in
+.IR gcc (1));
+.\" XXX: Library entrance tracking is likely to be removed from the project.
+2. linking against the library entrance tracking object,
+.IR trm.S/trm.o ,
+see LIBRARY ENTRANCE TRACKING;
+3. post-processing it with
+.IR ulp_post (1).
+.TP
+.B Patch Granularity
+Live patches cannot be applied to arbitrarily tiny bits of a program. When a
+live patch is applied, it replaces entire functions at a time.
+.TP
+.B Function visibility
+Live patches cannot be applied to every function in a process. First, only
+functions belonging to shared libraries can be live patched; functions in the
+application itself, or functions linked from static libraries are not eligible.
+Secondly, only externally visible (GLOBAL or WEAK) functions can be targets of
+a live patch.
+.TP
+.B Process Permissions
+Libpulp uses ptrace to attach to target processes, thus only the owner of a
+process (or root) can apply a live patch to it. Moreover, on systems that have
+Linux Security Modules (LSM) enabled, some extra convincing might be required
+(see Ptrace access mode checking in
+.IR ptrace (2)).
+.SH TOOLS
+Creating and applying live patches is achieved with the following tools:
+.TP 16
+.BR ulp_post (1)
+.\" XXX: Library entrance tracking is likely to be removed from the project.
+Takes the library file passed as argument and installs trampolines to every
+exported function that has a patchable function entry (see
+.IR gcc (1)),
+making them live patchable.
+.TP 16
+.BR ulp_packer (1)
+Creates a live patch metadata file based on the live patch description file
+that it takes as argument. The metadata file can later be used by
+.IR ulp_trigger (1)
+to actually apply the live patch to a running process. For more information
+about the description file format, see the METADATA section.
+.TP 16
+.BR ulp_reverse (1)
+Opens the metadata file passed as argument and creates a new metadata file that
+can be used to reverse a previously applied live patch.
+.TP 16
+.BR ulp_dump (1)
+Parses the metadata file passed as argument and prints its contents in
+human-readable format.
+.TP 16
+.BR ulp_trigger (1)
+Applies the live patch described by the metadata file received as argument to
+the process with the specified
+.IR pid .
+.TP 16
+.BR ulp_check (1)
+Checks if the live patch referred to by the metadata file has already been
+applied to the process with the specified
+.IR pid .
+.SH ANATOMY OF LIVE PATCHES
+A live patch is very simple. It is composed of a dynamic shared object (DSO)
+containing replacement functions, and of a metadata file describing which
+target library and functions they are meant for. The DSO is no different than a
+regular shared library, in the sense that it is built from regular source code
+into a shared object. The metadata is described below.
+.SH METADATA
+A metadata file describes a live patch. It contanis three pieces of
+information:
+.TP
+.B Path to live patch DSO
+Live patching operates on a function-by-function basis (see Patch Granularity).
+These functions are provided in a dynamic shared object file. The absolute path
+to this file is recorded in the metadata.
+.TP
+.B Path to the target library DSO
+Each live patch contains replacement functions for a specific library. The
+absolute path to the in-disk location of the library is recorded in the
+metadata. Libpulp compares this path against the memory mappings of the target
+process, as provided by
+.IR procfs (5).
+.TP
+.B List of replacement functions
+Libpulp needs a correlation between original functions in the target library
+and replacement functions provided by the live patch. This correlation is
+recorded in the metadata file as a list of pairs of functions.
+.TP
+.B Description file format
+The metadata file is created based on a description file. The description file
+is rather simple. The first line contains the absolute path to the live patch
+DSO. The second line starts with the '@' character, immediately followed by the
+absolute path to the target library DSO. Finally, all following lines provide
+the list of replacement function, where each line starts with the name of the
+original function, followed by a colon, then by the name of the replacement
+function.
+.IP
+For example, a live patch to the math library could have a description file
+that looked like the following snippet (paths may differ across distributions):
+.RS
+.IP
+.EX
+\&
+/usr/lib64/livepatches/libm_livepatch_20210514.so
+@/lib64/libm.so.6
+hypot:hypot_v2
+gamma:new_gamma
+atan:atan_new
+.EE
+.RE
+.PP
+Notice, however, that even though the paths mentioned above refer to files in
+storage, the patches are not applied to the files themselves. Rather, they are
+applied to running processes that have loaded these files. See
+.IR ulp_trigger (1).
+.SH EXAMPLES
+The programs and commands below demonstrate how to use Libpulp.
+.PP
+First, a live patchable library must be created and properly compiled:
+.TP
+.B Library source
+.EX
+\&
+#include <stdlib.h>
+#include <string.h>
+
+char *
+proverb(void)
+{
+  int selection;
+  char *result;
+  char *proverbs[] = {
+    "A picture is worth a thousand words",
+    "Actions speak louder than words",
+    "An apple a day keeps the doctor away",
+    "Birds of a feather flock together",
+    "Do not judge a book by its cover",
+    "Never look a gift horse in the mouth",
+    "Practice makes perfect",
+    "Slow and steady wins the race",
+    "There is no place like home",
+    "Too many cooks spoil the broth"
+  };
+
+  selection = rand() % (sizeof(proverbs) / sizeof(char *));
+  result = strdup(proverbs[selection]);
+
+  return result;
+}
+.EE
+.PP
+As explained in the Target Libraries Rebuilding section above, in order to be
+live patchable, a target library must be built with patchable function entries.
+.\" XXX: Library entrance tracking is likely to be removed from the project.
+Apart from that, it must include the library entrance tracking routine during
+the linking phase (link against trm.o), as well as be post-processed with
+.IR ulp_post (1):
+.IP
+.EX
+\&
+$ gcc library.c trm.o -o library.so \\
+      -shared -fPIC \\
+      -fpatchable-function-entry=40,38
+$ ulp_post library.so
+.EE
+.PP
+Next, a program that uses the library:
+.TP
+.B Program source
+.EX
+\&
+#include <stdio.h>
+#include <unistd.h>
+
+char *proverb(void);
+
+int
+main(void)
+{
+  char buffer[128];
+
+  printf("%d\\n", getpid());
+  while (fgets(buffer, sizeof(buffer), stdin))
+    printf("%s\\n", proverb());
+
+  return 0;
+}
+.EE
+.PP
+Applications themselves do not require rebuilds, but for the sake of
+completeness, commands to build an application and link it to a library in a
+non-default location are shown below:
+.IP
+.EX
+\&
+$ gcc program.c -L$PWD -lrary -Wl,-rpath=$PWD -o program
+.EE
+.PP
+After startup, the program prints its own PID, which will be used further down
+in this example. Also, hitting ENTER causes the program to call into the
+library, which responds with a message.
+.IP
+.EX
+\&
+$ LD_PRELOAD=libpulp.so ./program
+libpulp loaded...
+12345
+<ENTER>
+Birds of a feather flock together
+<ENTER>
+An apple a day keeps the doctor away
+(and so on...)
+.EE
+.PP
+Next, recall that a live patch can only replace entire functions (see Patch
+Granularity), thus the following live patch source provides a reimplementation
+of the
+.I proverbs
+function, giving it a different name to avoid clashes:
+.TP
+.B Live patch source
+.EX
+\&
+#include <string.h>
+
+char *
+proverb_v2(void)
+{
+  return strdup("All good things must come to an end");
+}
+.EE
+.PP
+Live patches must be built like shared libraries (notice the use of the
+.I -shared
+option):
+.IP
+.EX
+\&
+$ gcc livepatch.c -shared -fPIC -o livepatch.so
+.EE
+.PP
+Next, recall that a live patch is not only composed of the object created
+above; it also requires a metadata file, which lets Libpulp know which library
+the live patch refers to, as well as it provides the correlation between
+original and replaced functions. A metadata file is built out of a description
+file.
+.TP
+.B Description file
+.EX
+\&
+/absolute/path/to/livepatch.so
+@/absolute/path/to/library.so
+proverb:proverb_v2
+.EE
+.PP
+Converting from description to metadata is accomplished with
+.IR ulp_packer (1):
+.IP
+.EX
+\&
+$ ulp_packer livepatch.dsc -o livepatch.ulp
+.EE
+.PP
+Finally,
+.IR ulp_trigger (1)
+can be used to connect to the target process and apply the live patch:
+.IP
+.EX
+\&
+$ ulp_trigger -p 12345 livepatch.ulp
+.EE
+.PP
+Wrapping up, the target process is now live patched and should behave
+differently when ENTER is hit in its controlling terminal:
+.IP
+.EX
+\&
+(...)
+<ENTER>
+All good things must come to an end
+<ENTER>
+All good things must come to an end
+.EE
+.SH BUGS
+.\" XXX: Library entrance tracking is likely to be removed from the project.
+In order to track whether each thread in the process is within the target
+library or not, Libpulp steals a frame from the call stack. Since the stolen
+frame overwrites the return address on the stack, it breaks unwinding, which
+has the undesired side-effect of breaking thread cancellation and exception
+handling. Thus, only libraries that do not throw exceptions can be made live
+patchable. Likewise, programs that cancel threads (see
+.IR pthread_cancel (3))
+will break if linked against live patchable libraries.
+.SH SEE ALSO
+.BR ptrace (2),
+.BR ulp_packer (1),
+.BR ulp_reverse (1),
+.BR ulp_dump (1),
+.BR ulp_post (1),
+.BR ulp_trigger (1),
+.BR ulp_check (1).

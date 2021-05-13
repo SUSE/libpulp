@@ -1,0 +1,46 @@
+.\" libpulp - User-space Livepatching Library
+.\"
+.\" Copyright (C) 2021 SUSE Software Solutions GmbH
+.\"
+.\" This file is part of libpulp.
+.\"
+.\" libpulp is free software; you can redistribute it and/or
+.\" modify it under the terms of the GNU Lesser General Public
+.\" License as published by the Free Software Foundation; either
+.\" version 2.1 of the License, or (at your option) any later version.
+.\"
+.\" libpulp is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+.\" Lesser General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License
+.\" along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
+
+.TH ULP_REVERSE 1 "" "" "Libpulp Tools"
+.SH NAME
+ulp_reverse \- Create live patch metadata
+.SH SYNOPSIS
+.B ulp_reverse
+.I file
+.SH DESCRIPTION
+.B ulp_reverse
+creates a live patch metadata used to revert the effects of the metadata
+.I file
+that it takes as argument.
+Live patch reversal does not require a live patch object file, because it does
+not add new replacement functions; rather, it causes the reverse-patched
+process to fallback to the functions that had been previously replaced. These
+functions are already present in the memory space of the target process.
+.PP
+.SH EXIT STATUS
+.B ulp_reverse
+exits 0 on success and a positive integer on error.
+.SH SEE ALSO
+.BR libpulp (7),
+.BR ulp_packer (1),
+.BR ulp_reverse (1),
+.BR ulp_dump (1),
+.BR ulp_post (1),
+.BR ulp_trigger (1),
+.BR ulp_check (1).

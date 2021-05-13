@@ -1,0 +1,136 @@
+.\" libpulp - User-space Livepatching Library
+.\"
+.\" Copyright (C) 2021 SUSE Software Solutions GmbH
+.\"
+.\" This file is part of libpulp.
+.\"
+.\" libpulp is free software; you can redistribute it and/or
+.\" modify it under the terms of the GNU Lesser General Public
+.\" License as published by the Free Software Foundation; either
+.\" version 2.1 of the License, or (at your option) any later version.
+.\"
+.\" libpulp is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+.\" Lesser General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License
+.\" along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
+
+.TH ULP_TRIGGER 1 "" "" "Libpulp Tools"
+.SH NAME
+ulp_trigger \- Apply a live patch
+.SH SYNOPSIS
+.B ulp_trigger
+[OPTION]...
+.BR -p pid
+.I file
+.SH DESCRIPTION
+.B ulp_trigger
+attaches to the target process specified by
+.I pid
+and applies the live patch described by the metadata
+.I file
+that it takes as argument.
+After parsing the metadata file, several checks are performed to verify that
+the target process can receive the specified live patch:
+.TP
+.B Target Library
+A live patch replaces functions belonging to a shared library, thus,
+.B ulp_trigger
+searches the memory space of the target process for its presence. When the
+library is not present,
+.B ulp_trigger
+exits in error.
+.TP
+.B Replacement functions
+The metadata file contains a list of replacement functions, which must be
+present in the live patch object (DSO). If all functions are present, the live
+patching operation can proceed, otherwise
+.B ulp_trigger
+exits in error.
+.TP
+.B Attaching to the Target Process
+Libpulp uses ptrace to attach to target processes, thus only the owner of a
+process (or root) can apply a live patch to it. Moreover, on systems that have
+Linux Security Modules (LSM) enabled, some extra convincing might be required
+(see Ptrace access mode checking in
+.IR ptrace (2)).
+When
+.B ulp_trigger
+is unable to attach to the target process, it exits in error.
+.TP
+.B Runtime support
+Applying a live patch requires functions from libpulp.so, which must have been
+loaded into the address space of the target process. Typically, this is
+accomplished with LD_PRELOAD (see
+.IR libpulp (7)).
+.TP
+.B Forward progress
+After attaching to the target process with ptrace, Libpulp calls functions from
+libpulp.so. The execution of these functions happens from the context of a
+signal handler, thus
+.I AS-Unsafe
+functions are not allowed (see
+.IR attributes (7)).
+However, Libpulp requires the use of
+.IR malloc (3),
+.IR dlopen (3)
+and
+.IR dlsym (3),
+which are all
+.IR AS-Unsafe .
+In order to avoid deadlocks, libpulp.so checks that these functions are not in
+execution anywhere in the target process, before starting the live patching
+operation.
+.SH FATAL ERRORS
+If a problem happens after Libpulp started replacing functions from the target
+process, the process might end up in an inconsistent state. When that happens
+.B ulp_trigger
+exits with error code
+.BR -1 ,
+and the user is advised to kill the process.
+.SH OPTIONS
+.TP
+.B -r, --retries=N
+To guarantee
+.BR "Forward Progress" ,
+Libpulp first checks whether trying to apply a live patch would cause a
+deadlock in the target process, or if it would be safe to do so. By default,
+.B ulp_trigger
+performs this check a single time and exits in error if the check fails.
+However, the state of the relevant locks usually changes very quickly, thus,
+there is a high chance that trying again after a brief moment would allow the
+live patching operation to succeed without risk of deadlock. This option tells
+.B ulp_trigger
+to try again
+.I N
+times.
+.TP
+.B -q, --quiet
+Do not produce any output.
+.TP
+.B -v, --verbose
+Produce verbose output.
+.TP
+.B -?, --help
+Display a lengthy usage message.
+.TP
+.B -usage
+Display a brief usage message.
+.TP
+.B -V --version
+Print program version and exit.
+.SH EXIT STATUS
+.B ulp_trigger
+exits 0 on success, 1 on error, and -1 on fatal errors. A fatal error is an
+indication that the target process should be killed, because it was probably
+left in an inconsistent state.
+.SH SEE ALSO
+.BR libpulp (7),
+.BR ulp_packer (1),
+.BR ulp_reverse (1),
+.BR ulp_dump (1),
+.BR ulp_post (1),
+.BR ulp_trigger (1),
+.BR ulp_check (1).

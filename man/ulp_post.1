@@ -1,0 +1,59 @@
+.\" libpulp - User-space Livepatching Library
+.\"
+.\" Copyright (C) 2021 SUSE Software Solutions GmbH
+.\"
+.\" This file is part of libpulp.
+.\"
+.\" libpulp is free software; you can redistribute it and/or
+.\" modify it under the terms of the GNU Lesser General Public
+.\" License as published by the Free Software Foundation; either
+.\" version 2.1 of the License, or (at your option) any later version.
+.\"
+.\" libpulp is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+.\" Lesser General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License
+.\" along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
+
+.TH ULP_POST 1 "" "" "Libpulp Tools"
+.SH NAME
+ulp_post \- Install libpulp trampolines in target libraries
+.SH SYNOPSIS
+.B ulp_post
+.I file
+.SH DESCRIPTION
+.B ulp_post
+opens the library
+.I file
+passed as argument and installs trampolines to every exported function that has
+a patchable function entry (see
+.IR gcc (1)).
+The trampolines divert control to the library entrance tracking routine, which
+performs its role then retransfers control to the target function. Entrance
+information is used by Libpulp to determine when to switch between versions of
+live patched functions.
+.SH BUGS
+.\" XXX: Library entrance tracking is likely to be removed from the project.
+In order to track whether each thread in the process is within the target
+library or not, the trampolines installed by
+.I ulp_post
+steal a frame from the call stack. Since the stolen frame overwrites the return
+address on the stack, it breaks unwinding, which has the undesired side-effect
+of breaking thread cancellation and exception handling. Thus, only libraries
+that do not throw exceptions can be made live patchable. Likewise, programs
+that cancel threads (see
+.IR pthread_cancel (3))
+will break if linked against live patchable libraries.
+.SH EXIT STATUS
+.B ulp_post
+exits 0 on success, and 1 on error.
+.SH SEE ALSO
+.BR libpulp (7),
+.BR ulp_packer (1),
+.BR ulp_reverse (1),
+.BR ulp_dump (1),
+.BR ulp_post (1),
+.BR ulp_trigger (1),
+.BR ulp_check (1).

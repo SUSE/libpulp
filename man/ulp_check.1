@@ -1,0 +1,94 @@
+.\" libpulp - User-space Livepatching Library
+.\"
+.\" Copyright (C) 2021 SUSE Software Solutions GmbH
+.\"
+.\" This file is part of libpulp.
+.\"
+.\" libpulp is free software; you can redistribute it and/or
+.\" modify it under the terms of the GNU Lesser General Public
+.\" License as published by the Free Software Foundation; either
+.\" version 2.1 of the License, or (at your option) any later version.
+.\"
+.\" libpulp is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+.\" Lesser General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License
+.\" along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
+
+.TH ULP_CHECK 1 "" "" "Libpulp Tools"
+.SH NAME
+ulp_check \- Apply a live patch
+.SH SYNOPSIS
+.B ulp_check
+[OPTION]...
+.BR -p pid
+.I file
+.SH DESCRIPTION
+.B ulp_check
+attaches to the target process specified by
+.I pid
+and checks whether the live patch described by the metadata
+.I file
+that it takes as argument has already been applied or not.
+.PP
+Only relevant processes can be inspected with
+.BR ulp_check .
+More specifically, the following conditions must be met:
+.TP
+.B Attaching to the Target Process
+Libpulp uses ptrace to attach to target processes, thus only the owner of a
+process (or root) can apply a live patch to it. Moreover, on systems that have
+Linux Security Modules (LSM) enabled, some extra convincing might be required
+(see Ptrace access mode checking in
+.IR ptrace (2)).
+When
+.B ulp_check
+is unable to attach to the target process, it exits in error.
+.TP
+.B Runtime support
+Applying a live patch requires functions from libpulp.so, which must have been
+loaded into the address space of the target process. Typically, this is
+accomplished with LD_PRELOAD (see
+.IR libpulp (7)).
+.SH FATAL ERRORS
+If a problem happens during the execution of functions from libpulp.so, the
+target process might end up in an inconsistent state. When that happens
+.B ulp_check
+exits with error code
+.BR -1 ,
+and the user is advised to kill the process.
+.SH OPTIONS
+.TP
+.B -q, --quiet
+Do not produce any output.
+.TP
+.B -v, --verbose
+Produce verbose output.
+.TP
+.B -?, --help
+Display a lengthy usage message.
+.TP
+.B -usage
+Display a brief usage message.
+.TP
+.B -V --version
+Print program version and exit.
+.SH BUGS
+.B ulp_check
+also returns -1 on non-fatal errors.
+.SH EXIT STATUS
+.B ulp_check
+.\" XXX: ulp_check curretly returns -1 on non-fatal errors.
+exits 0 on success, 1 on error, and -1 on fatal errors. A fatal error is an
+indication that the target process should be killed, because it was probably
+left in an inconsistent state.
+.SH SEE ALSO
+.BR libpulp (7),
+.BR ulp_packer (1),
+.BR ulp_reverse (1),
+.BR ulp_dump (1),
+.BR ulp_post (1),
+.BR ulp_trigger (1),
+.BR ulp_check (1).

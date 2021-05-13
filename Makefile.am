@@ -19,6 +19,6 @@
 
 ACLOCAL_AMFLAGS = -I config
 
-SUBDIRS = include lib tools tests
+SUBDIRS = include lib man tools tests
 
 EXTRA_DIST = LICENSE README.md

@@ -116,6 +116,7 @@ AC_DEFINE_UNQUOTED([TRM_NOPS_LEN], [$TRM_NOPS_LEN],
 AC_CONFIG_FILES([Makefile
 		 include/Makefile
 		 lib/Makefile
+		 man/Makefile
 		 tests/Makefile
 		 tools/Makefile])
 
