@@ -71,6 +71,20 @@ AX_PYTHON_MODULE([psutil], [fatal])
 AC_SUBST([AM_CFLAGS], ["-Wall -Wextra -Werror"])
 AC_SUBST([AM_CCASFLAGS], ["-Wa,--fatal-warnings"])
 
+# Checking the call stack of all threads enables libpulp to only apply a live
+# patch when no threads sit within the target library.
+AC_ARG_ENABLE(stack-check,
+AS_HELP_STRING([--enable-stack-check],
+[build support for stack checking during live patch application [default=no]]),
+[enable_stack_check=yes],
+[enable_stach_check=no; break])
+AS_IF([test "$enable_stack_check" = "yes"],
+AC_CHECK_HEADER([libunwind.h],,
+AC_MSG_ERROR([Libunwind required for stack checking.]))
+AC_SUBST([LIBUNWIND_LIBS], ["-lunwind-generic -lunwind-ptrace -lunwind"])
+AC_DEFINE(ENABLE_STACK_CHECK, 1, [Enable stack checking routines]),
+AC_DEFINE(ENABLE_STACK_CHECK, 0, [Disable stack checking routines]))
+
 # The test suite covers patching of functions near page boundaries, so
 # try to detect the size of a page in the system, using getconf. If
 # getconf is not available, set the page size to a large power of two,

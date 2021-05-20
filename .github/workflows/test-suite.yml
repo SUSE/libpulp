@@ -14,13 +14,13 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: dependencies
-      run: sudo apt install autoconf-archive libelf-dev python3-pexpect python3-psutil
+      run: sudo apt install autoconf-archive libelf-dev python3-pexpect python3-psutil libunwind-dev
     - name: permissions
       run: echo 0 | sudo tee /proc/sys/kernel/yama/ptrace_scope
     - name: bootstrap
       run: ./bootstrap
     - name: configure
-      run: ./configure
+      run: ./configure --enable-stack-check
     - name: make
       run: make
     - name: make check

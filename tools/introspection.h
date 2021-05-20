@@ -147,4 +147,8 @@ int load_patch_info(char *livepatch);
 
 int check_patch_sanity();
 
+#if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
+int coarse_library_range_check(struct ulp_process *process, char *library);
+#endif
+
 #endif
