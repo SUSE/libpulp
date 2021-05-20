@@ -59,8 +59,13 @@
 #include <sys/user.h>
 #include <unistd.h>
 
+#include "config.h"
 #include "introspection.h"
 #include "ulp_common.h"
+
+#if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
+#include <libunwind-ptrace.h>
+#endif
 
 struct ulp_metadata ulp;
 int ulp_verbose;
@@ -1064,3 +1069,167 @@ check_patch_sanity(struct ulp_process *process)
 
   return 0;
 }
+
+#if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
+/*
+ * Opens /proc/PID/maps and searches for the addresses where LIBRARY have been
+ * loaded into. Then updates RANGE_START and RANGE_END with the lowest and
+ * highest addresses that contain the library. Returns 0 on success and 1 on
+ * error.
+ */
+int
+library_range_detect(pid_t pid, char *library, uintptr_t *range_start,
+                     uintptr_t *range_end)
+{
+  FILE *fp;
+  char *line;
+  char *end;
+  char *str;
+  char procmaps[PATH_MAX];
+  int retcode;
+  size_t size;
+  uintptr_t addr1;
+  uintptr_t addr2;
+
+  *range_start = UINTPTR_MAX;
+  *range_end = 0;
+
+  retcode = snprintf(procmaps, sizeof(procmaps), "/proc/%d/maps", pid);
+  if (retcode < 0)
+    return 1;
+
+  fp = fopen(procmaps, "r");
+  if (fp == NULL)
+    return 1;
+
+  size = PATH_MAX;
+  line = malloc(size);
+
+  errno = 0;
+  while (getline(&line, &size, fp) > 0) {
+    if (strstr(line, library) == NULL)
+      continue;
+
+    /* Parse the address range in the current line. */
+    str = line;
+    addr1 = strtoul(str, &end, 16);
+    str = end + 1; /* Skip the dash used in the range output. */
+    addr2 = strtoul(str, &end, 16);
+
+    if (addr1 < *range_start)
+      *range_start = addr1;
+    if (addr2 > *range_end)
+      *range_end = addr2;
+  }
+  if (errno)
+    WARN("error parsing /proc/%d/maps: %s", pid, strerror(errno));
+
+  free(line);
+
+  if (errno)
+    return 1;
+  return 0;
+}
+
+/*
+ * Iterates over all threads in the target PROCESS, unwinds their stacks, and
+ * checks whether any frame lies within the target LIBRARY. This provides a
+ * coarse lock to live patching: if any thread is within the target library,
+ * the trigger tool can avoid live patching altogether; on the other hand, if
+ * no threads are within the target library, the live patch can be applied
+ * without consistency concerns. Returns 0 if no frame in any of the threads
+ * currently sits within the target library, 1 if any frame does, or -1 if some
+ * error ocurred during the unwinding of the stacks.
+ *
+ * WARNING: this function is in the critical section, so it can only be
+ * called after successful thread hijacking.
+ */
+int
+coarse_library_range_check(struct ulp_process *process, char *library)
+{
+  int found;
+  int retcode;
+  uintptr_t range_start;
+  uintptr_t range_end;
+
+  void *context;
+  unw_addr_space_t as;
+  unw_cursor_t cursor;
+  unw_word_t pc;
+
+  struct ulp_thread *thread;
+
+  /* Optionally retrieve library name from patch metadata. */
+  if (library == NULL)
+    library = ulp.objs->name;
+
+  DEBUG("checking if process %d is within %s.", process->pid, library);
+
+  /* Determine the in-memory address range of the target library. */
+  retcode =
+      library_range_detect(process->pid, library, &range_start, &range_end);
+  if (retcode)
+    return -1;
+
+  DEBUG("library memory range is [0x%lx..0x%lx].", range_start, range_end);
+
+  /* Check every thread in the process. */
+  found = 0;
+  for (thread = process->threads; thread; thread = thread->next) {
+    DEBUG("thread id %d:", thread->tid);
+
+    /* Initialize libunwind. */
+    context = _UPT_create(thread->tid);
+    if (context == NULL)
+      return -1;
+    as = unw_create_addr_space(&_UPT_accessors, 0);
+    if (as == NULL)
+      goto error_path_context;
+    retcode = unw_init_remote(&cursor, as, context);
+    if (retcode)
+      goto error_path_address_space;
+
+    /* Compare every program counter on the stack against the range. */
+    while (1) {
+      /* Read the program counter. */
+      retcode = unw_get_reg(&cursor, UNW_REG_IP, &pc);
+      if (retcode)
+        goto error_path_address_space;
+
+      DEBUG("  pc=0x%lx", pc);
+
+      /* Range check. */
+      if (range_start < pc && pc < range_end)
+        found++;
+      if (found)
+        break;
+
+      /* Unwind to the previous frame. */
+      retcode = unw_step(&cursor);
+      if (retcode == 0)
+        break;
+      if (retcode < 0)
+        goto error_path_address_space;
+    }
+
+    /* Release libunwind resources. */
+    unw_destroy_addr_space(as);
+    _UPT_destroy(context);
+
+    /* Stop the search if the current thread is within range. */
+    if (found)
+      break;
+  }
+
+  DEBUG("stack check complete, found %d frames within the library", found);
+
+  return found;
+
+/* Clean up and return with error. */
+error_path_address_space:
+  unw_destroy_addr_space(as);
+error_path_context:
+  _UPT_destroy(context);
+  return -1;
+}
+#endif
