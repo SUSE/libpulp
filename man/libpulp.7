@@ -25,7 +25,7 @@ Libpulp is a framework that enables live patching of userspace processes. In
 other words, it allows that a running process be modified without restarting
 the whole application. Libpulp is composed of a library, which provides live
 patching capabilities to running processes, as well as of a collection of tools
-to trigger live patching operations.
+to perform live patching operations.
 .SH REQUIREMENTS AND RESTRICTIONS
 .PP
 The following requirements and restrictions must be met for live patching
@@ -37,7 +37,7 @@ process to be eligible for live patching, it must dynamically load libpulp.so,
 the runtime support for live patching operations. Typically, dynamically linked
 libraries needed by a program are automatically loaded into memory during
 process initialization. However, since live patching operations are not
-triggered by the program itself (but from an external tool), there is no real
+called by the program itself (but from an external tool), there is no real
 dependency, and libpulp.so might be missing from DT_NEEDED entries (see
 ld.so(8)). To bridge this gap, processes should be started with
 LD_PRELOAD=libpulp.so.
@@ -121,7 +121,9 @@ Each live patch contains replacement functions for a specific library. The
 absolute path to the in-disk location of the library is recorded in the
 metadata. Libpulp compares this path against the memory mappings of the target
 process, as provided by
-.IR procfs (5).
+.IR procfs (5),
+thus, even if the library is removed from disk between the starting of the
+process and the application of the live patch, the comparison works.
 .TP
 .B List of replacement functions
 Libpulp needs a correlation between original functions in the target library
@@ -133,7 +135,7 @@ The metadata file is created based on a description file. The description file
 is rather simple. The first line contains the absolute path to the live patch
 DSO. The second line starts with the '@' character, immediately followed by the
 absolute path to the target library DSO. Finally, all following lines provide
-the list of replacement function, where each line starts with the name of the
+the list of replacement functions, where each line starts with the name of the
 original function, followed by a colon, then by the name of the replacement
 function.
 .IP
@@ -238,7 +240,7 @@ $ gcc program.c -L$PWD -lrary -Wl,-rpath=$PWD -o program
 .PP
 After startup, the program prints its own PID, which will be used further down
 in this example. Also, hitting ENTER causes the program to call into the
-library, which responds with a message.
+library, which replies with a message.
 .IP
 .EX
 \&
