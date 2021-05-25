@@ -21,7 +21,7 @@
 
 #include <stdio.h>
 void
-hello_world(void)
+olleh(void)
 {
-  printf("hello_world\n");
+  printf("olleh\n");
 }

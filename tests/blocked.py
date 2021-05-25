@@ -42,9 +42,9 @@ child.expect('hello')
 child.livepatch('libblocked_livepatch1.ulp')
 
 child.kill(signal.SIGUSR1)
-child.expect('hello_world', reject='hello')
+child.expect('olleh', reject='hello')
 child.kill(signal.SIGUSR2)
-child.expect('hello', reject='hello_world')
+child.expect('hello', reject='olleh')
 
 child.close(force=True)
 exit(0)

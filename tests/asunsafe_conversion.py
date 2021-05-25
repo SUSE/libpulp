@@ -64,7 +64,7 @@ else:
   for attempt in range(1000):
     child.kill(signal.SIGUSR1)
     try:
-      child.expect('hello_world')
+      child.expect('olleh')
     except TimeoutError:
       print('AS-Unsafe conversion detected')
       errors = 1

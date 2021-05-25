@@ -89,9 +89,9 @@ main(void)
 
     /* Use the library. */
     if (get_address() == NULL)
-      printf("NULL\n");
+      printf("patched\n");
     else
-      printf("Non-NULL\n");
+      printf("pristine\n");
   }
 
   return 1;

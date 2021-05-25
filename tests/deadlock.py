@@ -46,7 +46,7 @@ for attempt in range(32):
     errors = 1
   else:
     child.sendline('')
-    child.expect('hello_world', reject='hello')
+    child.expect('olleh', reject='hello')
   finally:
     # Always kill the child process
     child.close(force=True)

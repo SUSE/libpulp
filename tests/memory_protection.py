@@ -27,14 +27,14 @@ child.expect('Waiting for input.')
 
 # Every time a newline is sent, the test program touchs code memory
 child.sendline('')
-child.expect('Non-NULL');
+child.expect('pristine');
 
 child.livepatch('libaddress_livepatch1.ulp')
 
 # Try to touch code memory after live patching
 child.sendline('')
 try:
-  child.expect('NULL', reject='Non-NULL');
+  child.expect('patched', reject='pristine');
 except EOFError:
   # Diagnose the error
   print('Touching code after live patch failed.')
