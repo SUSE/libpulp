@@ -33,7 +33,7 @@ noinst_HEADERS = introspection.h ptrace.h packer.h md4.h
 noinst_LTLIBRARIES = libcommon.la
 
 libcommon_la_SOURCES = introspection.c ptrace.c
-libcommon_la_LIBADD = -lelf -ldl
+libcommon_la_LIBADD = -lelf -ldl $(LIBUNWIND_LIBS)
 
 # The post tool replaces one-byte nops with multi-byte nop instructions.
 

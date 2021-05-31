@@ -107,6 +107,15 @@ to try again
 .I N
 times.
 .TP
+.B -c, --check-stack
+Before applying the live patch to the target process, unwind the stacks of all
+threads and make sure that none of them have library calls in execution. If any
+thread is within the target library,
+.B ulp_trigger
+aborts the live patching operation; on the other hand, if no threads are within
+the target library, the live patch can be applied with additional consistency
+guarantees.
+.TP
 .B -q, --quiet
 Do not produce any output.
 .TP
