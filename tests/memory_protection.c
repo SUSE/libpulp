@@ -29,8 +29,12 @@
 #include <libaddress.h>
 
 /* Do not optimize, otherwise the read/write sequence go away. */
+#ifndef __clang__
 #pragma GCC push_options
 #pragma GCC optimize("O0")
+#else
+#pragma clang optimize off
+#endif
 
 void
 disturb_memory(void *addr)
@@ -42,7 +46,11 @@ disturb_memory(void *addr)
 }
 
 /* Restore optimization level. */
+#ifndef __clang__
 #pragma GCC pop_options
+#else
+#pragma clang optimize on
+#endif
 
 int
 main(void)

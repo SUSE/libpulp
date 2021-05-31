@@ -79,7 +79,8 @@ MD4(char *input, uint64_t length)
    * Tie the width of the length parameter to the width of the size field
    * as specified in the RFC.
    */
-  _Static_assert(sizeof(length) == SIZE_FIELD);
+  _Static_assert(sizeof(length) == SIZE_FIELD,
+                 "The length of a block does not match the RFC");
 
   /*
    * Calculate the total number of bytes in the message after padding, starting
@@ -263,7 +264,8 @@ MD4(char *input, uint64_t length)
   free(buffer);
 
   /* Allocate space for the whole digest, i.e. 4 32-bits words. */
-  _Static_assert(MD4_LENGTH == 16);
+  _Static_assert(MD4_LENGTH == 16,
+                 "The length of the digest does not match the RFC");
   result = malloc(MD4_LENGTH);
   if (result == NULL) {
     warn("unable to allocate memory: %s", strerror(errno));

@@ -41,8 +41,12 @@
 #include <libblocked.h>
 
 /* Do not optimize, otherwise the calloc/free sequences go away. */
+#ifndef __clang__
 #pragma GCC push_options
 #pragma GCC optimize("O0")
+#else
+#pragma clang optimize off
+#endif
 
 /* Calls many of the functions that acquire the locks that might cause
  * live-patch installation to deadlock.
@@ -84,7 +88,11 @@ worker(void *arg __attribute__((unused)))
 }
 
 /* Restore optimization level. */
+#ifndef __clang__
 #pragma GCC pop_options
+#else
+#pragma clang optimize on
+#endif
 
 int
 main(void)

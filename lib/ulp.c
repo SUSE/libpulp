@@ -941,12 +941,12 @@ __ulp_manage_universes(unsigned long idx)
     target = root->patched_addr + 2;
 
   /* clang-format off */
-    asm (
-      "movq %0, %%r11;"
-      :
-      : "r" (target)
-      :
-    );
+  asm (
+    "movq %0, %%r11;"
+    :
+    : "r" (target)
+    :
+  );
   /* clang-format on */
 }
 

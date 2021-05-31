@@ -658,7 +658,8 @@ write_patch_id(struct ulp_metadata *ulp, char *description, char *livepatch)
   int fd;
   char *id;
 
-  _Static_assert((sizeof(ulp->patch_id) % 2) == 0);
+  _Static_assert((sizeof(ulp->patch_id) % 2) == 0,
+                 "Patch ID length must be a multiple of two");
   total = sizeof(ulp->patch_id);
   half = total / 2;
 

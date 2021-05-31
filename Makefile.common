@@ -26,6 +26,7 @@ ULP_REVERSE = $(top_builddir)/tools/ulp_reverse
 TARGET_CFLAGS = \
   -fPIC \
   -fpatchable-function-entry=$(ULP_NOPS_LEN),$(PRE_NOPS_LEN) \
+  -fno-inline \
   $(AM_CFLAGS)
 TARGET_LDFLAGS = --build-id $(AM_LDFLAGS)
 
