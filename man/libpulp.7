@@ -133,11 +133,23 @@ recorded in the metadata file as a list of pairs of functions.
 .B Description file format
 The metadata file is created based on a description file. The description file
 is rather simple. The first line contains the absolute path to the live patch
-DSO. The second line starts with the '@' character, immediately followed by the
-absolute path to the target library DSO. Finally, all following lines provide
-the list of replacement functions, where each line starts with the name of the
-original function, followed by a colon, then by the name of the replacement
-function.
+DSO. The second line starts with the
+.I @
+character, immediately followed by the absolute path to the target library DSO.
+Subsequent lines, when not preceded by the
+.I #
+character, provide the list of replacement functions, where each line starts
+with the name of the original function, followed by a colon, then by the
+name of the replacement function. Finally, subsequent lines that do start with
+.I #
+specify the offsets that local (not-exported) variables in the target library
+have from the beginning of the library load location, as well as the offsets of
+references to those variables in the live patch object. Each line is composed
+of four items separated by colons: the name of the variable in the target
+library; the name of a reference to it in the live patch object; the offset of
+the library variable within the library DSO; the offset of the reference
+variable within the live patch DSO. These offsets are used by Libpulp to enable
+access to local variables from the live patch.
 .IP
 For example, a live patch to the math library could have a description file
 that looked like the following snippet (paths may differ across distributions):
@@ -150,6 +162,8 @@ that looked like the following snippet (paths may differ across distributions):
 hypot:hypot_v2
 gamma:new_gamma
 atan:atan_new
+#narenas:ulpr_narenas:00000000001c2720:0000000000004020
+#main_arena:ulpr_main_arena:00000000001c3a00:0000000000004060
 .EE
 .RE
 .PP

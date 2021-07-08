@@ -287,6 +287,7 @@ create_patch_metadata_file(struct ulp_metadata *ulp, char *filename)
   struct ulp_unit *unit;
   struct ulp_object *obj;
   struct ulp_dependency *dep;
+  struct ulp_reference *ref;
   uint32_t c;
   uint8_t type = 1;
 
@@ -352,6 +353,21 @@ create_patch_metadata_file(struct ulp_metadata *ulp, char *filename)
     fwrite(&dep->dep_id, sizeof(char), 32, file);
   }
 
+  fwrite(&ulp->nrefs, sizeof(uint32_t), 1, file);
+
+  for (ref = ulp->refs; ref != NULL; ref = ref->next) {
+    uint32_t len;
+    len = strlen(ref->target_name);
+    fwrite(&len, sizeof(len), 1, file);
+    fwrite(ref->target_name, sizeof(char), len, file);
+    len = strlen(ref->reference_name);
+    fwrite(&len, sizeof(len), 1, file);
+    fwrite(ref->reference_name, sizeof(char), len, file);
+    fwrite(&ref->target_offset, sizeof(ref->target_offset), 1, file);
+    fwrite(&ref->patch_offset, sizeof(ref->patch_offset), 1, file);
+    fflush(file);
+  }
+
   return 1;
 }
 
@@ -398,9 +414,11 @@ parse_description(char *filename, struct ulp_metadata *ulp)
 {
   struct ulp_unit *unit, *last_unit;
   struct ulp_dependency *dep;
+  struct ulp_reference *ref;
   FILE *file;
   char *first;
   char *second;
+  char *third;
   size_t i, len = 0;
   int n;
 
@@ -490,46 +508,85 @@ parse_description(char *filename, struct ulp_metadata *ulp)
       if (first[n - 1] == '\n')
         first[n - 1] = '\0';
 
-      /* find old/new function name separator */
-      for (i = 0; i < len; i++) {
-        if (first[i] == ':') {
-          first[i] = '\0';
-          second = &first[i + 1];
+      /* Lines starting with # are static data references */
+      if (first[0] == '#') {
+
+        ref = calloc(1, sizeof(struct ulp_reference));
+        if (!ref) {
+          WARN("Unable to allocate memory");
+          return 0;
         }
+
+        third = first + 1;
+        second = strchr(third, ':');
+        *second = '\0';
+        ref->target_name = strdup(third);
+
+        third = second + 1;
+        second = strchr(third, ':');
+        *second = '\0';
+        ref->reference_name = strdup(third);
+
+        third = second + 1;
+        second = strchr(third, ':');
+        *second = '\0';
+        ref->target_offset = (intptr_t)strtol(third, NULL, 16);
+
+        third = second + 1;
+        ref->patch_offset = (intptr_t)strtol(third, NULL, 16);
+
+        ref->next = ulp->refs;
+        ulp->refs = ref;
+        ulp->nrefs++;
       }
 
-      if (!second) {
-        WARN("Invalid input description.");
-        return 0;
-      }
-
-      /* allocate and fill patch unit */
-      unit = calloc(1, sizeof(struct ulp_unit));
-      if (!unit) {
-        WARN("Unable to allocate memory for parsing ulp units.");
-        return 0;
-      }
-
-      unit->old_fname = strdup(first);
-      if (!unit->old_fname) {
-        WARN("Unable to allocate memory for parsing ulp units.");
-        return 0;
-      }
-
-      unit->new_fname = strdup(second);
-      if (!unit->old_fname) {
-        WARN("Unable to allocate memory for parsing ulp units.");
-        return 0;
-      }
-
-      if (!last_unit) {
-        ulp->objs->units = unit;
-      }
+      /*
+       * Lines not starting with # contain the names of replacement and
+       * replaced functions.
+       */
       else {
-        last_unit->next = unit;
+
+        /* find old/new function name separator */
+        for (i = 0; i < len; i++) {
+          if (first[i] == ':') {
+            first[i] = '\0';
+            second = &first[i + 1];
+          }
+        }
+
+        if (!second) {
+          WARN("Invalid input description.");
+          return 0;
+        }
+
+        /* allocate and fill patch unit */
+        unit = calloc(1, sizeof(struct ulp_unit));
+        if (!unit) {
+          WARN("Unable to allocate memory for parsing ulp units.");
+          return 0;
+        }
+
+        unit->old_fname = strdup(first);
+        if (!unit->old_fname) {
+          WARN("Unable to allocate memory for parsing ulp units.");
+          return 0;
+        }
+
+        unit->new_fname = strdup(second);
+        if (!unit->old_fname) {
+          WARN("Unable to allocate memory for parsing ulp units.");
+          return 0;
+        }
+
+        if (!last_unit) {
+          ulp->objs->units = unit;
+        }
+        else {
+          last_unit->next = unit;
+        }
+        ulp->objs->nunits++;
+        last_unit = unit;
       }
-      ulp->objs->nunits++;
-      last_unit = unit;
     }
 
     /* get new line */

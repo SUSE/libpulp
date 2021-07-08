@@ -172,10 +172,17 @@ written with the following syntax:
 2: @<absolute path of the targeted library>
 3: <old_fname_1>:<new_fname_1>
 4: <old_fname_2>:<new_fname_2>
+5: #<var1>:<var1ref>:<var1_offset>:<var1ref_offset>
+6: #<var2>:<var2ref>:<var2_offset>:<var2ref_offset>
 ...
 ```
 
-Line 1 brings the absolute path of a .so file that contains all the functions
-which will be used to replace functions in the running process. Line 2 brings
-the absolute path for the library that will be patched and must be preceded by
-an '@'. The following lines bring pairs of replaced and replacing functions.
+Line 1 provides the absolute path of a .so file that contains all the functions
+which will be used to replace functions in the running process. Line 2 provides
+the absolute path for the library that will be patched; it must be preceded by
+'@'. Lines 3 and 4 specify pairs of replaced and replacing functions (there
+could be more lines if more functions need replacing). Lines 5 and 6 specify
+the offsets that local (not-exported) variables in the target library have from
+the beginning of the library load location, as well as the offsets of
+references to those variables in the live patch object. These offsets are used
+by Libpulp to enable access to local variables from the live patch.

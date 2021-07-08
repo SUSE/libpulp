@@ -1,0 +1,4 @@
+__ABS_BUILDDIR__/.libs/libaccess_livepatch1.so
+@__ABS_BUILDDIR__/.libs/libaccess.so.0
+banner_set:new_banner_set
+#banner:ulpr_banner:__TARGET_OFFSET__:__PATCH_OFFSET__

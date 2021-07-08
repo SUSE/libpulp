@@ -46,12 +46,15 @@ CONVENIENCE_LDFLAGS = -rpath $(libdir) $(AM_LDFLAGS)
 	$(ULP_POST) .libs/lib$*.so
 	touch $@
 
-# These rules cause the livepatch metadata to be built.  The .ulp target
-# depends on check_LTLIBRARIES, because .la targets indirectly produce
-# the .so files they need (it is impossible to have .ulp targets depend
-# directly on .so files, because libtool does not create .so targets).
-%.dsc: %.in
-	sed -e "s|__ABS_BUILDDIR__|$(abs_builddir)|" $^ > $@
+# These rules cause the livepatch metadata to be built. The .ulp and
+# .dsc targets depends on check_LTLIBRARIES, because .la targets
+# indirectly produce the .so files they need (it is impossible to have
+# .ulp and .dsc targets depend directly on .so files, because libtool
+# does not create .so targets).
+%.dsc: %.in $(check_LTLIBRARIES)
+	sed -e "s|__ABS_BUILDDIR__|$(abs_builddir)|" $< > $*.tmp
+	$(top_srcdir)/tests/offsets.py $*.tmp $@
+	rm -f $*.tmp
 
 %.ulp: %.dsc $(check_LTLIBRARIES)
 	$(ULP_PACKER) $< -o $@
