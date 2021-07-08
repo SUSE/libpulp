@@ -326,6 +326,7 @@ parse_metadata(struct ulp_metadata *ulp)
   struct ulp_object *obj;
   struct ulp_unit *unit, *prev_unit = NULL;
   struct ulp_dependency *dep, *prev_dep = NULL;
+  struct ulp_reference *ref, *prev_ref = NULL;
 
   fd = open(__ulp_path_buffer, O_RDONLY);
   if (fd == -1) {
@@ -450,6 +451,51 @@ parse_metadata(struct ulp_metadata *ulp)
     }
     prev_dep = dep;
   }
+
+  /* read number of static data items */
+  READ(fd, &ulp->nrefs, 1 * sizeof(uint32_t));
+
+  /* read all static data reference items */
+  for (i = 0; i < ulp->nrefs; i++) {
+    ref = calloc(1, sizeof(struct ulp_reference));
+    if (!ref) {
+      WARN("Unable to allocate memory for static data reference.");
+      return 0;
+    }
+
+    /* read local variable name */
+    READ(fd, &c, 1 * sizeof(uint32_t));
+    ref->target_name = calloc(c, sizeof(char));
+    if (!ref->target_name) {
+      WARN("Unable to allocate memory for static data reference name.");
+      return 0;
+    }
+    READ(fd, ref->target_name, c * sizeof(char));
+
+    /* read reference name */
+    READ(fd, &c, 1 * sizeof(uint32_t));
+    ref->reference_name = calloc(c, sizeof(char));
+    if (!ref->reference_name) {
+      WARN("Unable to allocate memory for static data reference name.");
+      return 0;
+    }
+    READ(fd, ref->reference_name, c * sizeof(char));
+
+    /* read reference offset within the target library */
+    READ(fd, &ref->target_offset, sizeof(uintptr_t));
+
+    /* read reference offset within the patch object */
+    READ(fd, &ref->patch_offset, sizeof(uintptr_t));
+
+    if (ulp->refs) {
+      prev_ref->next = ref;
+    }
+    else {
+      ulp->refs = ref;
+    }
+    prev_ref = ref;
+  }
+
 #undef READ
 
   close(fd);
@@ -609,11 +655,13 @@ push_new_root()
 int
 ulp_apply_all_units(struct ulp_metadata *ulp)
 {
+  int retcode;
   void *old_fun, *new_fun;
   void *patch_so = ulp->so_handler;
   struct ulp_object *obj = ulp->objs;
   struct ulp_unit *unit;
   struct ulp_detour_root *root;
+  struct ulp_reference *ref;
 
   __ulp_global_universe++;
 
@@ -651,6 +699,59 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
     }
 
     unit = unit->next;
+  }
+
+  /*
+   * Each live patch loads a new shared object into the target process. If the
+   * live patch references static data from the target library, the references
+   * must be fixed so that they point to the actual address where the target
+   * library has been loaded, so find the base address.
+   *
+   * XXX: The metadata file and its corresponding data structures within
+   *      libpulp seem to allow more than one live patch object per live patch.
+   *      However, the implementation is incomplete, so assume that there is a
+   *      single object, and access ulp->objs directly.
+   */
+  struct link_map map_data;
+  struct link_map *map_ptr;
+  uintptr_t target_base;
+  uintptr_t patch_base;
+
+  map_ptr = &map_data;
+  memset(map_ptr, 0, sizeof(struct link_map));
+  retcode = dlinfo(ulp->objs->dl_handler, RTLD_DI_LINKMAP, &map_ptr);
+  if (retcode == -1) {
+    WARN("Error in call to dlinfo: %s", dlerror());
+    return 0;
+  }
+  if (map_ptr->l_addr == 0) {
+    WARN("Unable to find target library load address: %s", dlerror());
+    return 0;
+  }
+  target_base = map_ptr->l_addr;
+
+  map_ptr = &map_data;
+  memset(map_ptr, 0, sizeof(struct link_map));
+  retcode = dlinfo(ulp->so_handler, RTLD_DI_LINKMAP, &map_ptr);
+  if (retcode == -1) {
+    WARN("Error in call to dlinfo: %s", dlerror());
+    return 0;
+  }
+  if (map_ptr->l_addr == 0) {
+    WARN("Unable to find target library load address: %s", dlerror());
+    return 0;
+  }
+  patch_base = map_ptr->l_addr;
+
+  /* Now patch static data references in the live patch object */
+  ref = ulp->refs;
+  while (ref) {
+    uintptr_t target_address;
+    uintptr_t patch_address;
+    target_address = target_base + ref->target_offset;
+    patch_address = patch_base + ref->patch_offset;
+    memcpy((void *)patch_address, &target_address, sizeof(void *));
+    ref = ref->next;
   }
 
   return 1;

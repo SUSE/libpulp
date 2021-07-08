@@ -48,6 +48,8 @@ struct ulp_metadata
   struct ulp_object *objs;
   uint32_t ndeps;
   struct ulp_dependency *deps;
+  uint32_t nrefs;
+  struct ulp_reference *refs;
   uint8_t type;
 };
 
@@ -76,6 +78,15 @@ struct ulp_dependency
   unsigned char dep_id[32];
   char patch_id_check;
   struct ulp_dependency *next;
+};
+
+struct ulp_reference
+{
+  char *target_name;
+  char *reference_name;
+  uintptr_t target_offset;
+  uintptr_t patch_offset;
+  struct ulp_reference *next;
 };
 
 #endif
