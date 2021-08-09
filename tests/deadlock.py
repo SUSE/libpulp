@@ -19,6 +19,8 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
+import subprocess
+
 import testsuite
 
 # Since the deadlock demonstrated by this test case does not occur
