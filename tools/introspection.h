@@ -23,6 +23,7 @@
 #define _INTROSPECTION_H_
 
 #include <link.h>
+#include <stdbool.h>
 
 #include "ptrace.h"
 #include "ulp_common.h"
@@ -56,6 +57,7 @@ extern int ulp_quiet;
 struct ulp_process
 {
   int pid;
+  bool all_threads_hijacked;
 
   Elf64_Addr load_bias;
   Elf64_Addr dyn_addr;
