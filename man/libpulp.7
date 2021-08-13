@@ -40,7 +40,7 @@ process initialization. However, since live patching operations are not
 called by the program itself (but from an external tool), there is no real
 dependency, and libpulp.so might be missing from DT_NEEDED entries (see
 ld.so(8)). To bridge this gap, processes should be started with
-LD_PRELOAD=libpulp.so.
+LD_PRELOAD=libpulp.so or LD_PRELOAD=/<full_path_to>/libpulp.so.
 .TP
 .B Target Libraries Rebuilding
 Not every library in the system is eligible for live patching, only those that
@@ -108,7 +108,7 @@ target library and functions they are meant for. The DSO is no different than a
 regular shared library, in the sense that it is built from regular source code
 into a shared object. The metadata is described below.
 .SH METADATA
-A metadata file describes a live patch. It contanis three pieces of
+A metadata file describes a live patch. It contains three pieces of
 information:
 .TP
 .B Path to live patch DSO
@@ -305,7 +305,9 @@ $ ulp_packer livepatch.dsc -o livepatch.ulp
 .PP
 Finally,
 .IR ulp_trigger (1)
-can be used to connect to the target process and apply the live patch:
+can be used to connect to the target process and apply the live patch (note the PID specification, using the
+.I -p
+option):
 .IP
 .EX
 \&
