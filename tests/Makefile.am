@@ -346,6 +346,8 @@ exception_handling_SOURCES = exception_handling.cc
 exception_handling_LDADD = libexception.la
 exception_handling_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
+critical_section_verification_SOURCES = critical_section_verification.c
+
 TESTS = \
   numserv.py \
   numserv_bsymbolic.py \
@@ -365,10 +367,12 @@ TESTS = \
   cancel.py \
   contract.py \
   exception_handling.py \
-  missing_function.py
+  missing_function.py \
+  critical_section_verification.py
 
 XFAIL_TESTS = \
   blocked.py \
+  critical_section_verification.py \
   contract.py \
   hidden.py \
   missing_function.py
