@@ -29,6 +29,9 @@
 
 #define WARN(format, ...) fprintf(stderr, "ulp: " format "\n", ##__VA_ARGS__)
 
+#define FALSE 0
+#define TRUE 1
+
 #define ULP_PATH_LEN 256
 #define RED_ZONE_LEN 128
 

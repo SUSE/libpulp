@@ -56,6 +56,7 @@ extern int ulp_quiet;
 struct ulp_process
 {
   int pid;
+  int all_threads_hijacked;
 
   Elf64_Addr load_bias;
   Elf64_Addr dyn_addr;

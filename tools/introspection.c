@@ -510,6 +510,11 @@ set_id_buffer(struct ulp_process *process, unsigned char *patch_id)
 
   DEBUG("advertising live patch ID to libpulp.");
 
+  if (!process->all_threads_hijacked) {
+    WARN("not all threads hijacked.");
+    return 1;
+  }
+
   thread = process->main_thread;
   path_addr = process->dynobj_libpulp->path_buffer;
 
@@ -534,6 +539,11 @@ set_path_buffer(struct ulp_process *process, char *path)
   Elf64_Addr path_addr;
 
   DEBUG("advertising live patch location to libpulp.");
+
+  if (!process->all_threads_hijacked) {
+    WARN("not all threads hijacked.");
+    return 1;
+  }
 
   thread = process->main_thread;
   path_addr = process->dynobj_libpulp->path_buffer;
@@ -566,6 +576,7 @@ hijack_threads(struct ulp_process *process)
   struct ulp_thread *t;
 
   DEBUG("entering the critical section (process hijacking).");
+  process->all_threads_hijacked = FALSE;
 
   /* Open /proc/<pid>/task. */
   pid = process->pid;
@@ -661,6 +672,7 @@ hijack_threads(struct ulp_process *process)
   /* Release resources and return successfully */
   if (closedir(taskdir))
     WARN("error closing %s: %s", taskname, strerror(errno));
+  process->all_threads_hijacked = TRUE;
   return 0;
 
   /*
@@ -703,6 +715,11 @@ patch_applied(struct ulp_process *process, unsigned char *id, int *result)
   ElfW(Addr) routine;
 
   DEBUG("checking if live patch is already applied.");
+
+  if (!process->all_threads_hijacked) {
+    WARN("not all threads hijacked.");
+    return 1;
+  }
 
   if (set_id_buffer(process, id)) {
     WARN("unable to write live patch ID into target process memory.");
@@ -750,6 +767,11 @@ apply_patch(struct ulp_process *process, char *metadata)
 
   DEBUG("beginning live patch application.");
 
+  if (!process->all_threads_hijacked) {
+    WARN("not all threads hijacked.");
+    return 1;
+  }
+
   if (set_path_buffer(process, metadata)) {
     WARN("unable to write live patch path into target process memory.");
     return 1;
@@ -787,6 +809,11 @@ read_global_universe(struct ulp_process *process)
   struct user_regs_struct context;
   ElfW(Addr) routine;
 
+  if (!process->all_threads_hijacked) {
+    WARN("not all threads hijacked.");
+    return 1;
+  }
+
   thread = process->main_thread;
   context = thread->context;
   routine = process->dynobj_libpulp->global;
@@ -814,6 +841,7 @@ restore_threads(struct ulp_process *process)
   struct ulp_thread *thread;
 
   DEBUG("exiting the critical section (process release).");
+  process->all_threads_hijacked = FALSE;
 
   /*
    * Restore the context of all threads, which might have been used to
