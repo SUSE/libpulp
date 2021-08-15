@@ -115,7 +115,8 @@ int check_build_id(struct ulp_metadata *ulp);
 
 void ulp_patch_addr_absolute(void *old_faddr, void *new_faddr);
 
-int ulp_patch_addr(void *old_faddr, unsigned int index);
+int ulp_patch_addr(void *old_faddr, void *new_faddr, unsigned int index,
+                   int enable);
 
 struct ulp_applied_patch *ulp_get_applied_patch(unsigned char *id);
 

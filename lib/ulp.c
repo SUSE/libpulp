@@ -26,6 +26,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <link.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,12 +46,12 @@ struct ulp_detour_root *__ulp_root = NULL;
 
 char ulp_prologue[ULP_NOPS_LEN] = {
   // Preceding nops
-  0x57,                         // push    %rdi
-  0x48, 0xc7, 0xc7, 0, 0, 0, 0, // movq    $index, %rdi
+  0x57,                         // push    %rdi           <-- Unused
+  0x48, 0xc7, 0xc7, 0, 0, 0, 0, // movq    $index, %rdi   <-- Unused
   0xff, 0x25, 0, 0, 0, 0,       // jmp     0x0(%rip)
   0, 0, 0, 0, 0, 0, 0, 0,       // <data>  &__ulp_prolog
   // Function entry is here
-  0xeb, -(PRE_NOPS_LEN + 2) // jump above
+  0xeb, -(PRE_NOPS_LEN - 8 + 2) // jump above
 };
 
 unsigned int __ulp_root_index_counter = 0;
@@ -693,7 +694,7 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
       return 0;
     }
 
-    if (!(ulp_patch_addr(old_fun, root->index))) {
+    if (!(ulp_patch_addr(old_fun, new_fun, root->index, true))) {
       WARN("error patching address %p", old_fun);
       return 0;
     }
@@ -1016,6 +1017,25 @@ ulp_patch_prologue_layout(void *old_fentry, unsigned int function_index)
   memcpy(old_fentry + 4, &function_index, 4);
 }
 
+/*
+ * When a function gets live patch, the nops at its entry point get replaced
+ * with a backwards-jump to a small segment of code that redirects execution to
+ * the new version of the function. However, when all live patches to said
+ * function are deactivated (because the live patches have been reversed), the
+ * need for the backwards-jump is gone.
+ *
+ * The following function replaces the backwards-jump with nops, thus making
+ * the target function look like it did at the beginning of execution, i.e.
+ * without live patches.
+ */
+void
+ulp_skip_prologue(void *fentry)
+{
+  /* Do not jump backwards on function entry (0x6690 is a nop on x86). */
+  memset(fentry + 0, 0x66, 1);
+  memset(fentry + 1, 0x90, 1);
+}
+
 void
 __ulp_manage_universes(unsigned long idx)
 {
@@ -1087,7 +1107,8 @@ ulp_patch_addr_absolute(void *old_fentry, void *manager)
 }
 
 int
-ulp_patch_addr(void *old_faddr, unsigned int index)
+ulp_patch_addr(void *old_faddr, void *new_faddr, unsigned int index,
+               int enable)
 {
   void *addr;
   unsigned long page_size;
@@ -1137,8 +1158,13 @@ ulp_patch_addr(void *old_faddr, unsigned int index)
   }
 
   /* Actually patch the prologue. */
-  ulp_patch_prologue_layout(addr, index);
-  ulp_patch_addr_absolute(addr, &__ulp_prologue);
+  if (enable) {
+    ulp_patch_prologue_layout(addr, index);
+    ulp_patch_addr_absolute(addr, new_faddr);
+  }
+  else {
+    ulp_skip_prologue(old_faddr);
+  }
 
   /* Restore the previous access protection. */
   if (mprotect((void *)page1, page_size, prot1)) {
@@ -1232,11 +1258,33 @@ ulp_revert_all_units(unsigned char *patch_id)
 {
   struct ulp_detour_root *r;
   struct ulp_detour *d;
+  struct ulp_detour *d2;
+  struct ulp_detour *dactive;
 
   for (r = __ulp_root; r != NULL; r = r->next)
     for (d = r->detours; d != NULL; d = d->next)
-      if (memcmp(d->patch_id, patch_id, 32) == 0)
+      if (memcmp(d->patch_id, patch_id, 32) == 0) {
+
+        /* Deactivate this patch. */
         d->active = 0;
+
+        /* Find the most recent live patch that is active. */
+        dactive = NULL;
+        for (d2 = r->detours; d2 != NULL; d2 = d2->next) {
+          if (d2->active) {
+            dactive = d2;
+            /* Newest elements of the list come first. */
+            break;
+          }
+        }
+
+        /* Update the function prologue. */
+        if (dactive == NULL)
+          ulp_patch_addr(r->patched_addr, NULL, 0, false);
+        else
+          ulp_patch_addr(r->patched_addr, dactive->target_addr, r->index,
+                         true);
+      }
 
   return 1;
 }
