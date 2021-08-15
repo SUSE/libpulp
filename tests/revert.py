@@ -38,15 +38,25 @@ child.livepatch('libhundreds_livepatch2.ulp')
 child.sendline('hundred')
 child.expect('300', reject=['100', '200'])
 
+child.livepatch('libhundreds_livepatch3.ulp')
+
+child.sendline('hundred')
+child.expect('400', reject=['100', '200', '300'])
+
 child.livepatch('libhundreds_livepatch2.rev')
 
 child.sendline('hundred')
-child.expect('200', reject=['100', '300'])
+child.expect('400', reject=['100', '200', '300'])
+
+child.livepatch('libhundreds_livepatch3.rev')
+
+child.sendline('hundred')
+child.expect('200', reject=['100', '300', '400']);
 
 child.livepatch('libhundreds_livepatch1.rev')
 
 child.sendline('hundred')
-child.expect('100', reject=['200', '300']);
+child.expect('100', reject=['200', '300', '400']);
 
 child.close(force=True)
 exit(0)

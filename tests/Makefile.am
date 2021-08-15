@@ -151,6 +151,7 @@ check_LTLIBRARIES += libdozens_livepatch1.la \
                      libdozens_livepatch99.la \
                      libhundreds_livepatch1.la \
                      libhundreds_livepatch2.la \
+                     libhundreds_livepatch3.la \
                      libdozens_bsymbolic_livepatch1.la \
                      libhundreds_bsymbolic_livepatch1.la \
                      libparameters_livepatch1.la \
@@ -173,6 +174,9 @@ libhundreds_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
 libhundreds_livepatch2_la_SOURCES = libhundreds_livepatch2.c
 libhundreds_livepatch2_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
+
+libhundreds_livepatch3_la_SOURCES = libhundreds_livepatch3.c
+libhundreds_livepatch3_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
 libdozens_bsymbolic_livepatch1_la_SOURCES = libdozens_livepatch1.c
 libdozens_bsymbolic_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
@@ -217,6 +221,9 @@ METADATA = \
   libhundreds_livepatch2.dsc \
   libhundreds_livepatch2.ulp \
   libhundreds_livepatch2.rev \
+  libhundreds_livepatch3.dsc \
+  libhundreds_livepatch3.ulp \
+  libhundreds_livepatch3.rev \
   libdozens_bsymbolic_livepatch1.dsc \
   libdozens_bsymbolic_livepatch1.ulp \
   libdozens_bsymbolic_livepatch1.rev \
@@ -253,6 +260,7 @@ EXTRA_DIST = \
   libdozens_livepatch99.in \
   libhundreds_livepatch1.in \
   libhundreds_livepatch2.in \
+  libhundreds_livepatch3.in \
   libdozens_bsymbolic_livepatch1.in \
   libhundreds_bsymbolic_livepatch1.in \
   libparameters_livepatch1.in \
