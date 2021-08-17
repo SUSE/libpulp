@@ -817,15 +817,24 @@ check_patch_dependencies(struct ulp_metadata *ulp)
   return 1;
 }
 
+void
+init_get_build_id_data(struct ulp_get_build_id_data *data)
+{
+  data->name = NULL;
+  data->build_id_ptr = NULL;
+  data->build_id_len = 0;
+}
+
+
 int
-compare_build_ids(struct dl_phdr_info *info,
+get_build_id(struct dl_phdr_info *info,
                   size_t __attribute__((unused)) size, void *data)
 {
   int i;
   char *note_ptr, *build_id_ptr, *note_sec;
   uint32_t note_type, build_id_len, name_len, sec_size, next = 0;
-  struct ulp_metadata *ulp;
-  ulp = (struct ulp_metadata *)data;
+  struct ulp_get_build_id_data *get_data;
+  get_data = (struct ulp_get_build_id_data *)data;
 
   /* algorithm goes as follows:
    * 1 - check every object inside ulp_metadata
@@ -834,13 +843,12 @@ compare_build_ids(struct dl_phdr_info *info,
    * 2 - check every phdr for loaded object and match all PT_NOTE
    * 3 - trespass PT_NOTE searching for NT_GNU_BUILD_ID
    * 3.1 - once found, match contents with ulp object build id
-   * 3.2 - if match, mark ulp object as checked
-   * 3.3 - do not mark and break dl_iterate by returning 1
+   * 3.2 - if found, add buildid and length to struct
    *
    * Algorithm assumes that objects will only have one NT_GNU_BUILD_ID entry
    */
 
-  if (strcmp(ulp->objs->name, info->dlpi_name) != 0)
+  if (strcmp(get_data->name, info->dlpi_name) != 0)
     return 0;
 
   for (i = 0; i < info->dlpi_phnum; i++) {
@@ -870,42 +878,44 @@ compare_build_ids(struct dl_phdr_info *info,
 
     build_id_len = (uint32_t) * (note_ptr + 4);
     build_id_len += build_id_len % 4;
-    if (build_id_len != ulp->objs->build_id_len)
-      return 0;
 
     /* we compute, but currently do not check note names */
     name_len = (uint32_t)*note_ptr;
     name_len += name_len % 4;
 
     build_id_ptr = note_ptr + 12 + name_len;
-    if (memcmp(ulp->objs->build_id, build_id_ptr, build_id_len) == 0) {
-      ulp->objs->build_id_check = 1;
-      return 0;
-    }
-    else {
-      return 1;
-    }
+
+    get_data->build_id_ptr = malloc(build_id_len);
+
+    memcpy(get_data->build_id_ptr, build_id_ptr, build_id_len);
+    get_data->build_id_len = build_id_len;
+
+    return 0;
   }
   return 0;
 }
 
 int
-all_build_ids_checked(struct ulp_metadata *ulp)
-{
-  if (!ulp->objs->build_id_check) {
-    WARN("Could not match patch target build id %s.", ulp->objs->name);
-    return 0;
-  }
-  return 1;
-}
-
-int
 check_build_id(struct ulp_metadata *ulp)
 {
-  dl_iterate_phdr(compare_build_ids, ulp);
-  if (!all_build_ids_checked(ulp))
-    return 0;
-  return 1;
+  struct ulp_get_build_id_data data;
+
+  init_get_build_id_data(&data);
+
+  data.name = ulp->objs->name;
+
+  dl_iterate_phdr(get_build_id, &data);
+
+  if (data.build_id_len != 0) {
+    if (data.build_id_len == ulp->objs->build_id_len) {
+      if (memcmp(ulp->objs->build_id, data.build_id_ptr, data.build_id_len) == 0) {
+        ulp->objs->build_id_check = 1;
+        return 1;
+      }
+    }
+  }
+  WARN("Could not match patch target build id %s.", ulp->objs->name);
+  return 0;
 }
 
 void

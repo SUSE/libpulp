@@ -78,4 +78,11 @@ struct ulp_dependency
   struct ulp_dependency *next;
 };
 
+struct ulp_get_build_id_data
+{
+  char *name;
+  char *build_id_ptr;
+  uint32_t build_id_len;
+};
+
 #endif

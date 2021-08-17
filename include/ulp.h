@@ -107,6 +107,11 @@ int check_patch_sanity(struct ulp_metadata *ulp);
 
 int check_patch_dependencies(struct ulp_metadata *ulp);
 
+void init_get_build_id_data(struct ulp_get_build_id_data *data);
+
+int get_build_id(struct dl_phdr_info *info,
+                 size_t __attribute__((unused)) size, void *data);
+
 int compare_build_ids(struct dl_phdr_info *info, size_t size, void *data);
 
 int all_build_ids_checked(struct ulp_metadata *ulp);
