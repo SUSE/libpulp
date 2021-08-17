@@ -97,8 +97,11 @@ struct ulp_dynobj
   Elf64_Addr trigger;
   Elf64_Addr check;
   Elf64_Addr path_buffer;
+  Elf64_Addr libpath_buffer;
   Elf64_Addr state;
   Elf64_Addr global;
+  Elf64_Addr buildid;
+  Elf64_Addr buildid_buffer;
 
   struct thread_state *thread_states;
 
@@ -109,9 +112,12 @@ struct ulp_addresses
 {
   Elf64_Addr trigger;
   Elf64_Addr path_buffer;
+  Elf64_Addr libpath_buffer;
   Elf64_Addr check;
   Elf64_Addr state;
   Elf64_Addr global;
+  Elf64_Addr buildid;
+  Elf64_Addr buildid_buffer;
 };
 
 int dig_main_link_map(struct ulp_process *process);
@@ -136,6 +142,8 @@ int set_id_buffer(struct ulp_process *process, unsigned char *patch_id);
 int set_path_buffer(struct ulp_process *process, char *path);
 
 int patch_applied(struct ulp_process *process, unsigned char *id, int *result);
+
+int buildid(struct ulp_process *process, char *metadata);
 
 int apply_patch(struct ulp_process *process, char *metadata);
 

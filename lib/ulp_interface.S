@@ -49,6 +49,12 @@ __ulp_check_patched:
     call   __ulp_check_applied_patch@PLT
     int3
 
+__ulp_get_buildid:
+    nop
+    nop
+    call   __ulp_get_lib_buildid@PLT
+    int3
+
 __ulp_get_global_universe:
     nop
     nop

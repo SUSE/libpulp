@@ -24,6 +24,7 @@ bin_PROGRAMS = \
   ulp_trigger \
   ulp_check \
   ulp_post \
+  ulp_buildid \
   ulp
 
 noinst_HEADERS = introspection.h ptrace.h packer.h md4.h
@@ -60,6 +61,13 @@ ulp_trigger_LDADD = libcommon.la
 
 ulp_check_SOURCES = check.c
 ulp_check_LDADD = libcommon.la
+
+# The buildid tool attaches to live patchable processes to
+# read the build id of a library to be patched in order to
+# determine which live patch to apply
+
+ulp_buildid_SOURCES = buildid.c
+ulp_buildid_LDADD = libcommon.la
 
 ulp_SOURCES = ulp.c
 ulp_LDADD = libcommon.la

@@ -39,7 +39,9 @@
 
 /* ulp data structures */
 struct ulp_patching_state __ulp_state = { 0, NULL };
-char __ulp_path_buffer[256] = "";
+char __ulp_path_buffer[ULP_PATH_LEN] = "";
+char __ulp_libpath_buffer[ULP_PATH_LEN] = "";
+char __ulp_buildid_buffer[ULP_PATH_LEN] = "";
 struct ulp_metadata *__ulp_metadata_ref = NULL;
 struct ulp_detour_root *__ulp_root = NULL;
 
@@ -107,6 +109,18 @@ __ulp_get_path_buffer_addr()
   return &__ulp_path_buffer;
 }
 
+void *
+__ulp_get_libpath_buffer_addr()
+{
+  return &__ulp_libpath_buffer;
+}
+
+void *
+__ulp_get_ulp_buildid_buffer()
+{
+  return &__ulp_buildid_buffer;
+}
+
 int
 __ulp_check_applied_patch()
 {
@@ -117,6 +131,32 @@ __ulp_check_applied_patch()
     return 1;
   else
     return 0;
+}
+
+int
+__ulp_get_lib_buildid()
+{
+  struct ulp_get_build_id_data build_id_data;
+
+  init_get_build_id_data(&build_id_data);
+
+  if (__ulp_libpath_buffer == NULL)
+  {
+    return 0;
+  }
+
+  build_id_data.name = __ulp_libpath_buffer;
+
+  dl_iterate_phdr(get_build_id, &build_id_data);
+
+  if (build_id_data.build_id_len < ULP_PATH_LEN)
+  {
+    id2str(__ulp_buildid_buffer, build_id_data.build_id_ptr, build_id_data.build_id_len);
+  }
+
+  free(build_id_data.build_id_ptr);
+
+  return build_id_data.build_id_len;
 }
 
 unsigned long
@@ -818,13 +858,24 @@ check_patch_dependencies(struct ulp_metadata *ulp)
 }
 
 void
+id2str(char *str, char *id, int idlen)
+{
+  int i;
+  char item[4];
+
+  for (i = 0; i < idlen; i++) {
+    snprintf(item, 4, "%02x ", (unsigned int)(*(id + i) & 0x0FF));
+    str = stpcpy(str, item);
+  }
+}
+
+void
 init_get_build_id_data(struct ulp_get_build_id_data *data)
 {
   data->name = NULL;
   data->build_id_ptr = NULL;
   data->build_id_len = 0;
 }
-
 
 int
 get_build_id(struct dl_phdr_info *info,

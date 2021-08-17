@@ -75,6 +75,8 @@ int __ulp_apply_patch();
 void __ulp_print();
 
 void *__ulp_get_path_buffer_addr();
+void *__ulp_get_libpath_buffer_addr();
+void *__ulp_get_ulp_buildid_buffer();
 
 /* functions */
 void free_metadata(struct ulp_metadata *ulp);
@@ -106,6 +108,8 @@ struct ulp_applied_patch *ulp_state_update(struct ulp_metadata *ulp);
 int check_patch_sanity(struct ulp_metadata *ulp);
 
 int check_patch_dependencies(struct ulp_metadata *ulp);
+
+void id2str(char *str, char *id, int idlen);
 
 void init_get_build_id_data(struct ulp_get_build_id_data *data);
 

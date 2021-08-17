@@ -408,20 +408,23 @@ parse_lib_dynobj(struct ulp_process *process, struct link_map *link_map_addr)
   obj->link_map = *link_map;
   obj->trigger = get_loaded_symbol_addr(obj, "__ulp_trigger");
   obj->path_buffer = get_loaded_symbol_addr(obj, "__ulp_path_buffer");
+  obj->libpath_buffer = get_loaded_symbol_addr(obj, "__ulp_libpath_buffer");
   obj->check = get_loaded_symbol_addr(obj, "__ulp_check_patched");
   obj->state = get_loaded_symbol_addr(obj, "__ulp_state");
   obj->global = get_loaded_symbol_addr(obj, "__ulp_get_global_universe");
+  obj->buildid = get_loaded_symbol_addr(obj, "__ulp_get_lib_buildid");
+  obj->buildid_buffer = get_loaded_symbol_addr(obj, "__ulp_buildid_buffer");
 
   /* libpulp must expose all these symbols. */
-  if (obj->trigger && obj->path_buffer && obj->check && obj->state &&
-      obj->global) {
+  if (obj->trigger && obj->path_buffer &&  obj->libpath_buffer && obj->check &&
+      obj->state && obj->global && obj->buildid && obj->buildid_buffer) {
     obj->next = NULL;
     process->dynobj_libpulp = obj;
     DEBUG("(libpulp found)");
   }
   /* No other library should expose these symbols. */
-  else if (obj->trigger || obj->path_buffer || obj->check || obj->state ||
-           obj->global)
+  else if (obj->trigger || obj->path_buffer || obj->libpath_buffer || obj->check || obj->state ||
+           obj->global || obj->buildid || obj->buildid_buffer)
     WARN("unexpected subset of libpulp symbols exposed by %s.", libname);
   /* Live patch objects. */
   /* XXX: Searching for the '_livepatch' substring in the filename of
@@ -539,6 +542,27 @@ set_path_buffer(struct ulp_process *process, char *path)
   path_addr = process->dynobj_libpulp->path_buffer;
 
   if (write_string(path, thread->tid, path_addr, ULP_PATH_LEN))
+    return 1;
+
+  return 0;
+}
+
+/*
+ * Writes LIBPATH into libpulp's '__ulp_libpath_buffer'. This operation is a
+ * pre-condition to apply a new live patch. On success, returns 0.
+ */
+int
+set_libpath_buffer(struct ulp_process *process, char *libpath)
+{
+  struct ulp_thread *thread;
+  Elf64_Addr libpath_addr;
+
+  DEBUG("advertising update lib location to libpulp.");
+
+  thread = process->main_thread;
+  libpath_addr = process->dynobj_libpulp->libpath_buffer;
+
+  if (write_string(libpath, thread->tid, libpath_addr, ULP_PATH_LEN))
     return 1;
 
   return 0;
@@ -727,6 +751,41 @@ patch_applied(struct ulp_process *process, unsigned char *id, int *result)
 
   *result = context.rax;
   return 0;
+}
+
+/*
+ * Jacks into PROCESS and checks the build id of the relevant library.
+ * On success, writes the result to libpulps buffer and returns 0.
+ * On error, returns 1, and leaves RESULT untouched.
+ *
+ * WARNING: this function is in the critical section, so it can only be
+ * called after successful thread hijacking.
+ */
+int
+buildid(struct ulp_process *process, char *libpath)
+{
+  int ret;
+  struct ulp_thread *thread;
+  struct user_regs_struct context;
+  ElfW(Addr) routine;
+
+  if (set_libpath_buffer(process, libpath)) {
+    WARN("unable to write the libpath into target process memory.");
+    return 1;
+  }
+
+  thread = process->main_thread;
+  context = thread->context;
+  routine = process->dynobj_libpulp->buildid;
+
+  DEBUG(">>> running libpulp functions within target process...");
+  ret = run_and_redirect(thread->tid, &context, routine);
+  if (ret == -1) {
+    WARN("fatal error during live patch buildid check.");
+    return -1;
+  };
+
+  return ret;
 }
 
 /*

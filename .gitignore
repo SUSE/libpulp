@@ -16,6 +16,7 @@ dev/
 */.libs/
 Makefile
 tools/ulp
+tools/ulp_buildid
 tools/ulp_check
 tools/ulp_dump
 tools/ulp_packer

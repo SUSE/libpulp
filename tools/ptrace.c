@@ -142,9 +142,11 @@ read_string(char **buffer, int pid, Elf64_Addr addr)
     return 1;
   }
 
-  for (i = 0; i < len; i++)
-    if (read_byte((*buffer + i), pid, addr + i))
+  for (i = 0; i < len; i++) {
+    if (read_byte((*buffer + i), pid, addr + i)) {
       return 1;
+    }
+  }
   *(*buffer + i) = '\0';
 
   if (detach(pid)) {
