@@ -394,9 +394,6 @@ parse_lib_dynobj(struct ulp_process *process, struct link_map *link_map_addr)
     return NULL;
   }
 
-  if (libname[0] != '/')
-    return link_map;
-
   DEBUG("reading in-memory information about %s.", libname);
 
   obj->filename = libname;
