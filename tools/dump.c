@@ -19,11 +19,65 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <argp.h>
 #include <stdio.h>
 
 #include "introspection.h"
 
 extern struct ulp_metadata ulp;
+
+struct arguments
+{
+  char *args[1];
+  int buildid_only;
+};
+
+static char doc[] = "Prints the content of the METADATA file\n"
+                    "in human readable form.";
+
+static char args_doc[] = "METADATA";
+
+static struct argp_option options[] = { { 0, 0, 0, 0, "Options:", 0 },
+                                        { "buildid", 'b', 0, 0,
+                                          "Only print the build id", 0 },
+                                        { 0 } };
+
+static error_t
+parser(int key, char *arg, struct argp_state *state)
+{
+  int path_length;
+  struct arguments *arguments;
+
+  arguments = state->input;
+
+  switch (key) {
+    case 'b':
+      arguments->buildid_only = 1;
+      break;
+    case ARGP_KEY_ARG:
+      if (state->arg_num >= 1) {
+        argp_error(state, "Too many arguments.");
+      }
+      if (state->arg_num == 0) {
+        /* Path to live patch metadata file. */
+        path_length = strlen(arg);
+        if (path_length > ULP_PATH_LEN)
+          argp_error(state,
+                     "METADATA path must be shorter than %d bytes; got %d.",
+                     ULP_PATH_LEN, path_length);
+      }
+      arguments->args[state->arg_num] = arg;
+      break;
+    case ARGP_KEY_END:
+      if (state->arg_num < 1)
+        argp_error(state, "Too few arguments.");
+      break;
+    default:
+      return ARGP_ERR_UNKNOWN;
+  }
+
+  return 0;
+}
 
 void
 id2str(char *str, char *id, int idlen)
@@ -38,28 +92,37 @@ id2str(char *str, char *id, int idlen)
 }
 
 void
-dump_metadata(struct ulp_metadata *ulp)
+dump_metadata(struct ulp_metadata *ulp, int buildid_only)
 {
   char buffer[128];
   struct ulp_object *obj;
   struct ulp_unit *unit;
   if (ulp) {
-    id2str(buffer, (char *)ulp->patch_id, 32);
-    fprintf(stderr, "patch id: %s\n", buffer);
-    fprintf(stderr, "so filename: %s\n", ulp->so_filename);
+    if (!buildid_only) {
+      id2str(buffer, (char *)ulp->patch_id, 32);
+      fprintf(stderr, "patch id: %s\n", buffer);
+      fprintf(stderr, "so filename: %s\n", ulp->so_filename);
+    }
     obj = ulp->objs;
     if (obj) {
       id2str(buffer, obj->build_id, obj->build_id_len);
-      fprintf(stderr, "\n* build id: %s\n", buffer);
-      if (obj->name) {
-        fprintf(stderr, "* name: %s\n", obj->name);
+      if (!buildid_only) {
+        fprintf(stderr, "\n* build id: %s\n", buffer);
       }
       else {
+        fprintf(stderr, "%s\n", buffer);
+      }
+      if (obj->name && !buildid_only) {
+        fprintf(stderr, "* name: %s\n", obj->name);
+      }
+      else if (!buildid_only) {
         fprintf(stderr, "* name: \n");
       }
-      fprintf(stderr, "* units: %d\n", obj->nunits);
+      if (!buildid_only) {
+        fprintf(stderr, "* units: %d\n", obj->nunits);
+      }
       unit = obj->units;
-      while (unit) {
+      while (unit && !buildid_only) {
         fprintf(stderr, "\n** old_fname: %s\n", unit->old_fname);
         fprintf(stderr, "** new_fname: %s\n", unit->new_fname);
         fprintf(stderr, "** old_faddr: %p\n", unit->old_faddr);
@@ -72,9 +135,13 @@ dump_metadata(struct ulp_metadata *ulp)
 int
 main(int argc, char **argv)
 {
-  if (argc != 2)
-    return 1;
-  load_patch_info(argv[1]);
-  dump_metadata(&ulp);
+  struct argp argp = { options, parser, args_doc, doc, NULL, NULL, NULL };
+  struct arguments arguments;
+
+  arguments.buildid_only = 0;
+  argp_parse(&argp, argc, argv, 0, 0, &arguments);
+
+  load_patch_info(arguments.args[0]);
+  dump_metadata(&ulp, arguments.buildid_only);
   return 0;
 }
