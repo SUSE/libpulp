@@ -100,32 +100,32 @@ dump_metadata(struct ulp_metadata *ulp, int buildid_only)
   if (ulp) {
     if (!buildid_only) {
       id2str(buffer, (char *)ulp->patch_id, 32);
-      fprintf(stderr, "patch id: %s\n", buffer);
-      fprintf(stderr, "so filename: %s\n", ulp->so_filename);
+      fprintf(stdout, "patch id: %s\n", buffer);
+      fprintf(stdout, "so filename: %s\n", ulp->so_filename);
     }
     obj = ulp->objs;
     if (obj) {
       id2str(buffer, obj->build_id, obj->build_id_len);
       if (!buildid_only) {
-        fprintf(stderr, "\n* build id: %s\n", buffer);
+        fprintf(stdout, "\n* build id: %s\n", buffer);
       }
       else {
-        fprintf(stderr, "%s\n", buffer);
+        fprintf(stdout, "%s\n", buffer);
       }
       if (obj->name && !buildid_only) {
-        fprintf(stderr, "* name: %s\n", obj->name);
+        fprintf(stdout, "* name: %s\n", obj->name);
       }
       else if (!buildid_only) {
-        fprintf(stderr, "* name: \n");
+        fprintf(stdout, "* name: \n");
       }
       if (!buildid_only) {
-        fprintf(stderr, "* units: %d\n", obj->nunits);
+        fprintf(stdout, "* units: %d\n", obj->nunits);
       }
       unit = obj->units;
       while (unit && !buildid_only) {
-        fprintf(stderr, "\n** old_fname: %s\n", unit->old_fname);
-        fprintf(stderr, "** new_fname: %s\n", unit->new_fname);
-        fprintf(stderr, "** old_faddr: %p\n", unit->old_faddr);
+        fprintf(stdout, "\n** old_fname: %s\n", unit->old_fname);
+        fprintf(stdout, "** new_fname: %s\n", unit->new_fname);
+        fprintf(stdout, "** old_faddr: %p\n", unit->old_faddr);
         unit = unit->next;
       }
     }
