@@ -1,5 +1,39 @@
 #!/bin/sh
 
+#Colors for colored print messages.
+RED='\033[0;31m'
+RESET='\033[0m'
+
+
+# Abort program with message.
+abort()
+{
+    echo -e "${RED}ERROR: $@${RESET}"
+    exit 1
+}
+
+
+# Check the folowing commands is available to this shell.
+check_existence()
+{
+    local tool_available
+    local tools='libtoolize aclocal autoheader automake autoconf'
+
+    for tool in $tools; do
+        $tool --version > /dev/null
+        tool_available=$?
+
+        if [ $tool_available -ne 0 ]; then
+            abort "$tool not found, but is required by bootstrap"
+        fi
+    done
+}
+
+# Check existence of commands. On failure, user must install the missing
+# packages.
+check_existence
+
+# Run the bootstrap process
 libtoolize -c
 aclocal
 autoheader
