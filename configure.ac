@@ -88,6 +88,14 @@ AX_PYTHON_MODULE([psutil], [fatal])
 AC_SUBST([AM_CFLAGS], ["-Wall -Wextra -Werror"])
 AC_SUBST([AM_CCASFLAGS], ["-Wa,--fatal-warnings"])
 
+# Use the glibc versions installed on path
+# "-Wl,--dynamic-linker=$enableval/lib64/ld-linux-x86-64.so.2 -Wl,--rpath=$enableval/lib64/"
+AC_ARG_WITH([glibc],
+AC_HELP_STRING([--with-glibc=GLIBC_PATH],
+[Use the glibc installed on GLIBC_PATH, where the .so file is present]),
+[AC_SUBST([AM_LDFLAGS], ["-Wl,--dynamic-linker=$with_glibc/ld-linux-x86-64.so.2 -Wl,--rpath=$with_glibc/"])],
+[])
+
 # Checking the call stack of all threads enables libpulp to only apply a live
 # patch when no threads sit within the target library.
 AC_ARG_ENABLE(stack-check,
