@@ -53,6 +53,23 @@ AC_PROG_CC
 AC_PROG_CXX
 AM_PROG_AS
 
+# On issue #41: configure AC_PROG_CXX set the C++ compiler to g++ even
+# if wasn't found. Therefore, a safe way to check if there is a working
+# C++ compiler is to compile a simple program.
+
+AC_LANG_PUSH([C++])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
+  [[#ifndef __cplusplus
+    #error
+    #endif]])],
+  [cxx_works=yes],
+  [cxx_works=no])
+AC_LANG_POP([C++])
+
+AS_IF([test "x$cxx_works" == "xno"],
+AC_MSG_ERROR(
+[Your C++ compiler seems to not be working.]))
+
 # Check if the compiler provides the -fpatchable-function-entry option,
 # needed to create the nop paddings in function entries.
 AX_CHECK_COMPILE_FLAG([-fpatchable-function-entry=1],, AC_MSG_ERROR([\
