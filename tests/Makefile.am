@@ -146,6 +146,15 @@ libaccess_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
 POST_PROCESS += .libs/libaccess.post
 
+# Target libraries to test static data access
+check_LTLIBRARIES += libbuildid.la
+
+libbuildid_la_SOURCES = libbuildid.c
+libbuildid_la_CFLAGS = $(TARGET_CFLAGS)
+libbuildid_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
+
+POST_PROCESS += .libs/libbuildid.post
+
 # Live patches
 check_LTLIBRARIES += libdozens_livepatch1.la \
                      libdozens_livepatch99.la \
@@ -160,7 +169,8 @@ check_LTLIBRARIES += libdozens_livepatch1.la \
                      libpagecross_livepatch1.la \
                      libaddress_livepatch1.la \
                      libcontract_livepatch1.la \
-                     libaccess_livepatch1.la
+                     libaccess_livepatch1.la \
+                     libbuildid_livepatch1.la
 
 libdozens_livepatch1_la_SOURCES = libdozens_livepatch1.c
 libdozens_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
@@ -204,6 +214,9 @@ libcontract_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 libaccess_livepatch1_la_SOURCES = libaccess_livepatch1.c
 libaccess_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
+libbuildid_livepatch1_la_SOURCES = libbuildid_livepatch1.c
+libbuildid_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
+
 METADATA = \
   libdozens_livepatch1.dsc \
   libdozens_livepatch1.ulp \
@@ -246,7 +259,10 @@ METADATA = \
   libcontract_livepatch1.rev \
   libaccess_livepatch1.dsc \
   libaccess_livepatch1.ulp \
-  libaccess_livepatch1.rev
+  libaccess_livepatch1.rev \
+  libbuildid_livepatch1.dsc \
+  libbuildid_livepatch1.ulp \
+  libbuildid_livepatch1.rev
 
 EXTRA_DIST = \
   libdozens_livepatch1.in \
@@ -262,7 +278,8 @@ EXTRA_DIST = \
   libpagecross_livepatch1.in \
   libaddress_livepatch1.in \
   libcontract_livepatch1.in \
-  libaccess_livepatch1.in
+  libaccess_livepatch1.in \
+  libbuildid_livepatch1.in
 
 clean-local:
 	rm -f $(METADATA)
@@ -286,7 +303,8 @@ check_PROGRAMS = \
   cancel \
   contract \
   exception_handling \
-  access
+  access \
+  buildid
 
 numserv_SOURCES = numserv.c
 numserv_LDADD = libdozens.la libhundreds.la
@@ -369,6 +387,10 @@ access_SOURCES = access.c
 access_LDADD = libaccess.la
 access_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
+buildid_SOURCES = buildid.c
+buildid_LDADD = libbuildid.la
+buildid_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
+
 TESTS = \
   numserv.py \
   numserv_bsymbolic.py \
@@ -389,7 +411,8 @@ TESTS = \
   contract.py \
   exception_handling.py \
   missing_function.py \
-  access.py
+  access.py \
+  buildid.py
 
 XFAIL_TESTS = \
   blocked.py \
@@ -406,3 +429,19 @@ EXTRA_DIST += $(TESTS)
 EXTRA_DIST += \
   testsuite.py \
   offsets.py
+
+# Custom rule for libbuild_livepatch1.ulp. This tests if the build id
+# is correct before applying the patch. A trivial way of testing it
+# would be editing the build id from the metadata file, however, that
+# would rely on implementation details of the metadata file, which is
+# yet to change.
+#
+# Therefore, instead of modifying the metadata build id, we recompile
+# the target test library with a macro that would result in diferent
+# code being output, and as consequence, a distinct build id.
+libbuildid_livepatch1.ulp: libbuildid_livepatch1.dsc $(check_LTLIBRARIES)
+	rm -f $(libbuildid_la_OBJECTS) # Clean up objects
+	$(MAKE) libbuildid.la # Force compile libbuildid.la
+	$(ULP_PACKER) $< -o $@
+	rm -f $(libbuildid_la_OBJECTS) # Clean up object again
+	$(MAKE) CFLAGS="$(CFLAGS) -DRETVAL=1338" libbuildid.la # Compile new libbuildid.
