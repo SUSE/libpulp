@@ -1,0 +1,3 @@
+__ABS_BUILDDIR__/.libs/libbuildid_livepatch1.so
+@__ABS_BUILDDIR__/.libs/libbuildid.so.0
+retval:new_retval
