@@ -936,14 +936,11 @@ compare_build_ids(struct dl_phdr_info *info,
    * 2 - check every phdr for loaded object and match all PT_NOTE
    * 3 - trespass PT_NOTE searching for NT_GNU_BUILD_ID
    * 3.1 - once found, match contents with ulp object build id
-   * 3.2 - if match, mark ulp object as checked
-   * 3.3 - do not mark and break dl_iterate by returning 1
+   * 3.2 - if match, mark ulp object as checked and break dl_iterate (return 1)
+   * 3.3 - else, continue looking for the library by returning 0
    *
    * Algorithm assumes that objects will only have one NT_GNU_BUILD_ID entry
    */
-
-  if (strcmp(ulp->objs->name, info->dlpi_name) != 0)
-    return 0;
 
   for (i = 0; i < info->dlpi_phnum; i++) {
     if (info->dlpi_phdr[i].p_type != PT_NOTE)
@@ -982,10 +979,10 @@ compare_build_ids(struct dl_phdr_info *info,
     build_id_ptr = note_ptr + 12 + name_len;
     if (memcmp(ulp->objs->build_id, build_id_ptr, build_id_len) == 0) {
       ulp->objs->build_id_check = 1;
-      return 0;
+      return 1;
     }
     else {
-      return 1;
+      return 0;
     }
   }
   return 0;
