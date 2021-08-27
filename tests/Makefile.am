@@ -425,8 +425,7 @@ TESTS = \
 XFAIL_TESTS = \
   blocked.py \
   contract.py \
-  hidden.py \
-  missing_function.py
+  hidden.py
 
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON) -B

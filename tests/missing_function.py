@@ -20,19 +20,21 @@
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
 import subprocess
-
 import testsuite
+
+livepatch_metadata  = 'libparameters_livepatch2.ulp'
+livepatch_container = 'libparameters_livepatch2.so'
 
 child = testsuite.spawn('parameters')
 
 child.expect('Waiting for input.')
 
-errors = 0
+errors = 1
 try:
-  child.livepatch('libparameters_livepatch2.ulp')
+  child.livepatch(livepatch_metadata)
 except subprocess.CalledProcessError:
-  child.expect('Unable to load function')
-  raise
+  if not child.is_so_loaded(livepatch_container):
+    errors = 0
 
 child.close(force=True)
 exit(errors)

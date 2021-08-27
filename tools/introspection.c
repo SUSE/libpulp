@@ -1030,6 +1030,51 @@ load_patch_info(char *livepatch)
 }
 
 /*
+ * Checks if the livepatch container .so file contains the functions
+ * specified in the global 'ulp' units. Returns 0 if every function is
+ * present in the container file, and 1 otherwise.
+ *
+ * Before calling this function, the global variable 'ulp' should have
+ * been initialized, typically by calling load_patch_info().
+ */
+static int
+check_livepatch_functions_matches_metadata(void)
+{
+  const char *so_filename = ulp.so_filename;
+  const struct ulp_unit *curr_unit;
+  void *container_handle;
+
+  int ret = 0;
+
+  /* Open livepatch container .so file temporarly.  */
+  container_handle = dlopen(so_filename, RTLD_LOCAL | RTLD_LAZY);
+
+  if (!container_handle) {
+    WARN("failed to load container livepatch file in %s.", so_filename);
+    return 1;
+  }
+
+  /* Iterate over all unit objects in the metadata file.  */
+  for (curr_unit = ulp.objs->units; curr_unit != NULL;
+       curr_unit = curr_unit->next) {
+    const char *new_fname = curr_unit->new_fname;
+    void *symbol;
+
+    /* Check if symbol exists.  If not, return error.  */
+    symbol = dlsym(container_handle, new_fname);
+
+    if (!symbol) {
+      WARN("symbol %s is not present in the livepatch container.", new_fname);
+      ret = 1;
+      break;
+    }
+  }
+
+  dlclose(container_handle);
+  return ret;
+}
+
+/*
  * Checks if the livepatch parsed into the global variable 'ulp' is
  * suitable to be applied to PROCESS. Returns 0 if it is. Otherwise,
  * prints warning messages and returns 1.
@@ -1049,6 +1094,12 @@ check_patch_sanity(struct ulp_process *process)
     WARN("metadata has not been properly parsed.");
     return 1;
   }
+
+  if (check_livepatch_functions_matches_metadata()) {
+    WARN("metadata contain functions that are not present in the livepatch.");
+    return 1;
+  }
+
   target = ulp.objs->name;
 
   /* check if the affected library is present in the process. */
