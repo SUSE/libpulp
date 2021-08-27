@@ -245,3 +245,12 @@ class spawn(pexpect.spawn):
     # Whereas on failure, the checker tool returns something different,
     # usually -1, so raise CalledProcessError.
     raise subprocess.CalledProcessError
+
+  def is_so_loaded(self, fname_so):
+    mapsf = open('/proc/' + str(self.pid) + '/maps', 'r')
+    maps = mapsf.read()
+    mapsf.close()
+
+    if maps.find(fname_so) == -1:
+      return False
+    return True
