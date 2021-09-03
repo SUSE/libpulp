@@ -23,7 +23,6 @@ libpulp_la_SOURCES = ulp.c interpose.c ulp_prologue.S ulp_interface.S
 libpulp_la_DEPENDENCIES= libpulp.versions
 libpulp_la_LDFLAGS = \
   -ldl \
-  -lelf \
   -Wl,--version-script=$(srcdir)/libpulp.versions \
   $(AM_LDFLAGS)
 
