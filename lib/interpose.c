@@ -22,10 +22,11 @@
 #define _GNU_SOURCE
 #include <assert.h>
 #include <dlfcn.h>
+#include <elf.h>
 #include <err.h>
 #include <fcntl.h>
-#include <libelf.h>
 #include <limits.h>
+#include <link.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -56,172 +57,191 @@ static int (*real_dladdr)(const void *, Dl_info *) = NULL;
 static int (*real_dladdr1)(const void *, Dl_info *, void **, int) = NULL;
 static int (*real_dlinfo)(void *, int, void *) = NULL;
 
-static Elf *elf;
-
-/*
- * Finds and returns the section identified by NAME. Returns NULL if no
- * such section is found. Exits in error if the string table containing
- * sections names is not found.
+/* Get symbol by its name
+ *
+ * Example: calling this function with name = 'printf' will return
+ * the ELF symbol referring to the printf function.
+ *
+ * @param dynsym: The symbol table.
+ * @param dynstr: The symbol string table.
+ * @param len: The length of dynsym
+ * @param name: Name of the symbol to search.
+ *
+ * @return a pointer to the wanted symbol in the symbol table.
  */
-Elf_Scn *
-find_section_by_name(char *name)
+static Elf64_Sym *
+get_symbol_by_name(Elf64_Sym dynsym[], const char *dynstr, int len,
+                   const char *name)
 {
-  char *str;
-  size_t string_table;
-
-  Elf_Scn *result;
-  Elf_Scn *section;
-  Elf64_Shdr *shdr;
-
-  if (elf_getshdrstrndx(elf, &string_table) == -1)
-    errx(1, "Unable to find the string table.\n");
-
-  /* Iterate over all sections */
-  result = NULL;
-  section = NULL;
-  while ((section = elf_nextscn(elf, section)) != NULL) {
-    shdr = elf64_getshdr(section);
-
-    str = elf_strptr(elf, string_table, shdr->sh_name);
-    if (strcmp(name, str) == 0) {
-      result = section;
-      break;
-    }
+  int i;
+  for (i = 0; i < len; i++) {
+    /* st_name contains the offset of the symbol's name on the dynstr table. */
+    if (!strcmp(dynstr + dynsym[i].st_name, name))
+      return &dynsym[i];
   }
 
-  return result;
-}
-
-/*
- * Searches for a symbol named NAME. Returns a pointer to the Elf64_Sym
- * record that represents that symbol, or NULL if the symbol has not
- * been found.
- */
-Elf64_Sym *
-find_symbol_by_name(char *name)
-{
-  char *str;
-  size_t entry_size;
-  Elf_Scn *scn;
-  Elf_Data *data;
-  Elf64_Shdr *shdr;
-  Elf64_Sym *sym;
-
-  /* Use the .symtab if available, otherwise fallback to the .dynsym. */
-  scn = find_section_by_name(".symtab");
-  if (scn == NULL)
-    scn = find_section_by_name(".dynsym");
-  assert(scn);
-
-  /* Iterate over the entries in the selected symbol table. */
-  data = elf_getdata(scn, NULL);
-  shdr = elf64_getshdr(scn);
-  assert(data);
-  assert(shdr);
-  entry_size = sizeof(Elf64_Sym);
-  for (size_t i = 0; i < shdr->sh_size; i += entry_size) {
-    sym = (Elf64_Sym *)(data->d_buf + i);
-    str = elf_strptr(elf, shdr->sh_link, sym->st_name);
-    if (strcmp(name, str) == 0) {
-      return sym;
-    }
-  }
-
-  /* Symbol not found, return NULL. */
+  /* Symbol not found.  */
   return NULL;
 }
 
-/*
- * Searches for a symbol named NAME. Returns its address or zero if the
- * symbols is not found.
- */
-Elf64_Addr
-find_symbol_addr_by_name(char *name)
+/* struct containing the parameters that will be passed to dl_find_symbol.  */
+struct dl_iterate_arg
 {
-  Elf64_Sym *sym;
+  const char *library; /* Name of the .so file to find the symbol. */
+  const char *symbol;  /* The name of the wanted symbol. */
 
-  sym = find_symbol_by_name(name);
+  void *symbol_addr; /* The address of the symbol in the program. */
+};
 
-  if (sym == NULL)
+/* dl_iterate_phdr callback.
+ *
+ * This function do the hard work into gathering the necessary informations
+ * about the symbols in the process. It works by being a callback to
+ * dl_iterate_phdr (read its manpage), which pass into "info" the ELF program
+ * headers (phdr) of:
+ *  1. The current binary.
+ *  2. Each dynamic library (.so) loaded with the program.
+ *
+ * Then it parses the structures there to find the .dynsym, .dynstr, and .hash
+ * sections containing respectively:
+ *
+ *  1. The dynamic symbol table.
+ *  2. The symbol string table with the name of each symbol.
+ *  3. The hash table (only used to find the number of symbol in .dynsym).
+ *
+ * The library name which we want to find its symbol, and the wanted symbol
+ * is passed on struct dl_iterate_arg, which is passed on the "data" argument.
+ * If library name is NULL, this function will find the first occurence of
+ * "symbol" in the entire program. The output of this function is also written
+ * on the struct pointed by "data", and it is a pointer to the symbol in the
+ * program.
+ *
+ * Good references to understeand how to parse the ELF program headers are:
+ *  1. The elf.h header.
+ *  2. 'dl_iterate_phdr' manpage.
+ *  3. 'Learing Linux Binary Analysis' (Elfmaster, 2016).
+ *  4. 'Linkers and Loaders' (Levine, 1999).
+ *
+ * @param info: Program header infos (see dl_iterate_phdr).
+ * @param size: sizeof(dl_phdr_info).
+ * @param data: Data to this function. Also used as return value.
+ *
+ * @return 1 when done; 0 to request next library.
+ */
+static int
+dl_find_symbol(struct dl_phdr_info *info, size_t size, void *data)
+{
+  /* We call the symbol table as dynsym because that is most likely to be the
+   * section in DT_SYMTAB.  However, this is not necessary true in all cases.
+   */
+  Elf64_Sym *dynsym = NULL;
+  const char *dynstr = NULL;
+  int *hash_addr;
+
+  int i;
+  int num_symbols = 0;
+  struct dl_iterate_arg *args = (struct dl_iterate_arg *)data;
+
+  /* Sanity check if size matches the size of the struct.  */
+  if (size != sizeof(*info))
+    errx(EXIT_FAILURE, "dl_phdr_info size is unexpected");
+
+  /* Initialize output value as being NULL (symbol not found).  */
+  args->symbol_addr = NULL;
+
+  /* Check if the current info is the library we want to find the symbols.  */
+  if (args->library && !strstr(info->dlpi_name, args->library))
     return 0;
 
-  return sym->st_value;
-}
+  /* Pointers to linux-vdso.so are invalid, so skip this library.  */
+  if (!strcmp(info->dlpi_name, "linux-vdso.so.1"))
+    return 0;
 
-void *
-get_dlsym_offset(char *path)
-{
-  int fd;
-  Elf64_Addr result;
+  /* Iterate each program headers to find the information we need. */
+  for (i = 0; i < info->dlpi_phnum; i++) {
+    const Elf64_Phdr *phdr_addr = &info->dlpi_phdr[i];
 
-  fd = open(path, O_RDONLY);
-  if (fd == -1)
-    errx(EXIT_FAILURE, "Unable to open file '%s'.\n", path);
+    /* We are interested in symbols, so look for the dynamic symbols in the
+     * PT_DYNAMIC tag. */
+    if (phdr_addr->p_type == PT_DYNAMIC) {
 
-  elf_version(EV_CURRENT);
-  elf = elf_begin(fd, ELF_C_READ, NULL);
+      /* The address in p_paddr is relative to the .so header, so we need to
+       * add the base address where the .so was mapped in the process. In case
+       * it is the binary itself, dlpi_addr is zero.  */
+      Elf64_Dyn *dyn = (Elf64_Dyn *)(info->dlpi_addr + phdr_addr->p_paddr);
 
-  result = find_symbol_addr_by_name("dlsym");
+      /* Iterate over each tag in this section.  */
+      for (; dyn->d_tag != DT_NULL; dyn++) {
+        switch (dyn->d_tag) {
+          case DT_SYMTAB:
+            dynsym = (Elf64_Sym *)dyn->d_un.d_ptr;
+            break;
 
-  elf_end(elf);
-  close(fd);
+          case DT_STRTAB:
+            dynstr = (const char *)dyn->d_un.d_ptr;
+            break;
 
-  if (result == 0)
-    return NULL;
-  return (void *)result;
-}
+          case DT_SYMENT:
+            /* This section stores the size of a symbol entry. So compare it
+             * with the size of Elf64_Sym as a sanity check.  */
+            if (dyn->d_un.d_val != sizeof(Elf64_Sym))
+              errx(EXIT_FAILURE, "DT_SYMENT value of %s is unexpected",
+                   info->dlpi_name);
+            break;
 
-static void *
-get_dlsym_addr(void)
-{
-  FILE *fp;
-  char line[PATH_MAX];
-  char path[PATH_MAX];
-  char *found;
-  char *retcode;
-  void *result;
-  size_t length;
-  long long base;
-
-  fp = fopen("/proc/self/maps", "r");
-  assert(fp);
-
-  /* Look for libdl*.so in /proc/self/maps. */
-  found = NULL;
-  do {
-    retcode = fgets(line, sizeof(line), fp);
-    if (retcode == NULL)
-      break;
-    found = strstr(line, "libdl.so");
-    if (found)
-      break;
-    found = strstr(line, "libdl-");
-    if (found)
-      break;
+          case DT_HASH:
+            /* Look at the hash section for the number of the symbols in the
+             * symbol table.  This section structure in memory is:
+             *
+             * hash_t nbuckets;
+             * hash_t nchains;
+             * hash_t buckets[nbuckets];
+             * hash_t chain[nchains];
+             *
+             * hash_t is either int32_t or int64_t according to the arch.
+             * On x86_64 it is 32-bits.
+             * */
+            hash_addr = (int *)dyn->d_un.d_ptr;
+            num_symbols = hash_addr[1]; /* Get nchains.  */
+            break;
+        }
+      }
+    }
   }
-  while (line[0]);
 
-  if (found == NULL)
-    return NULL;
+  /* With the symbol table identified, find the wanted symbol.  */
+  if (dynstr && dynsym) {
+    Elf64_Sym *sym;
 
-  /* Copy the full path of libdl.so into PATH. */
-  found = strstr(line, "/");
-  if (found == NULL)
-    return NULL;
-  retcode = strncpy(path, found, sizeof(path) - 1);
-  length = strnlen(path, sizeof(path));
-  if (path[length - 1] == '\n')
-    path[length - 1] = '\0';
+    sym = get_symbol_by_name(dynsym, dynstr, num_symbols, args->symbol);
+    args->symbol_addr = (void *)(info->dlpi_addr + sym->st_value);
 
-  /* Find the in-file offset that dlsym has in libdl.so. */
-  result = get_dlsym_offset(path);
+    /* Alert dl_iterate_phdr that we are finished.  */
+    return 1;
+  }
+  return 0;
+}
 
-  /* Add the in-memory base address of libdl to the in-file offset. */
-  base = strtoll(line, NULL, 16);
-  result += base;
+/* Get the address of a loaded symbol from library.
+ *
+ * This function will return the address where the symbol with the name
+ * "symbol" from the library "library" was allocated in memory.
+ *
+ * Example: calling this function with symbol = "printf" will return
+ * the address where the printf function is.
+ *
+ * @param library: name of the library where the symbol is from.
+ * @param symbol: name of the wanted symbol
+ *
+ * @return the address where the symbol was allocated nn the program.
+ */
+void *
+get_loaded_symbol_addr(const char *library, const char *symbol)
+{
+  struct dl_iterate_arg arg = { .library = library, .symbol = symbol };
+  dl_iterate_phdr(dl_find_symbol, &arg);
 
-  fclose(fp);
-  return result;
+  return arg.symbol_addr;
 }
 
 __attribute__((constructor)) void
@@ -236,15 +256,12 @@ __ulp_asunsafe_begin(void)
     return;
 
   /*
-   * Calling dlsym to interpose dlsym itself is not possible, so take
-   * advantage of the fact that, during process start up, DSOs are
-   * available in-disk, find the file for libdl.so, open and parse it
-   * with libelf, then find the in-memory address of dlsym. Doing this
-   * from a constructor work even if the in-disk file changes or gets
-   * deleted afterwards.
+   * Calling dlsym to interpose dlsym itself is not possible, so look
+   * at the loaded dynamic symbols from "libdl.so" for the "dlsym" function.
    */
-  real_dlsym = (typeof(real_dlsym))get_dlsym_addr();
-  assert(real_dlsym);
+  real_dlsym = (typeof(real_dlsym))get_loaded_symbol_addr("libdl.so", "dlsym");
+  if (!real_dlsym)
+    errx(EXIT_FAILURE, "Unable to find dlsym in libdl.so");
 
   real_dlopen = dlsym(RTLD_NEXT, "dlopen");
   real_dlmopen = dlsym(RTLD_NEXT, "dlmopen");
