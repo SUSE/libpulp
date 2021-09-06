@@ -99,6 +99,7 @@ struct ulp_dynobj
   Elf64_Addr path_buffer;
   Elf64_Addr state;
   Elf64_Addr global;
+  Elf64_Addr msg_queue;
 
   struct thread_state *thread_states;
 

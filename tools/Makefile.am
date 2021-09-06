@@ -30,7 +30,8 @@ noinst_HEADERS = \
   patches.h \
   dump.h \
   post.h \
-  revert.h
+  revert.h \
+  messages.h
 
 # Static library shared among the tools.
 
@@ -48,8 +49,8 @@ ulp_SOURCES = \
   md4.c \
   trigger.c \
   post.c \
-  revert.c
-
+  revert.c \
+  messages.c
 ulp_LDADD = libcommon.la
 
 # Ensure access to the include directory

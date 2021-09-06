@@ -413,10 +413,11 @@ parse_lib_dynobj(struct ulp_process *process, struct link_map *link_map_addr)
   obj->check = get_loaded_symbol_addr(obj, "__ulp_check_patched");
   obj->state = get_loaded_symbol_addr(obj, "__ulp_state");
   obj->global = get_loaded_symbol_addr(obj, "__ulp_get_global_universe");
+  obj->msg_queue = get_loaded_symbol_addr(obj, "__ulp_msg_queue");
 
   /* libpulp must expose all these symbols. */
   if (obj->trigger && obj->path_buffer && obj->check && obj->state &&
-      obj->global) {
+      obj->global && obj->msg_queue) {
     obj->next = NULL;
     process->dynobj_libpulp = obj;
     DEBUG("(libpulp found)");
