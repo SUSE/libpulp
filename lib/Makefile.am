@@ -19,7 +19,7 @@
 
 lib_LTLIBRARIES = libpulp.la
 
-libpulp_la_SOURCES = ulp.c interpose.c ulp_prologue.S ulp_interface.S
+libpulp_la_SOURCES = ulp.c interpose.c msg_queue.c ulp_prologue.S ulp_interface.S
 libpulp_la_DEPENDENCIES= libpulp.versions
 libpulp_la_LDFLAGS = \
   -ldl \

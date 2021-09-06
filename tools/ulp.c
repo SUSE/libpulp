@@ -32,6 +32,7 @@
 #include "config.h"
 #include "dump.h"
 #include "introspection.h"
+#include "messages.h"
 #include "packer.h"
 #include "patches.h"
 #include "post.h"
@@ -63,7 +64,8 @@ static const char doc[] =
 "   trigger                   Applies the live patch in ARG1 to the process\n"
 "                             with PID\n"
 "   post                      Post process patch container (.so file) in ARG1.\n"
-"   reverse                   Create reverse livepatch from metadata in ARG1.\n";
+"   reverse                   Create reverse livepatch from metadata in ARG1.\n"
+"   messages                  Print livepatch information contained in libpulp.\n";
 
 /* clang-format on */
 
@@ -113,7 +115,7 @@ command_from_string(const char *str)
     { "patches", ULP_PATCHES }, { "check", ULP_CHECK },
     { "dump", ULP_DUMP },       { "packer", ULP_PACKER },
     { "trigger", ULP_TRIGGER }, { "post", ULP_POST },
-    { "reverse", ULP_REVERSE },
+    { "reverse", ULP_REVERSE }, { "messages", ULP_MESSAGES },
   };
 
   size_t i;
@@ -168,6 +170,11 @@ handle_end_of_arguments(const struct argp_state *state)
         argp_error(state,
                    "METADATA path must be shorter than %d bytes; got %d.",
                    ULP_PATH_LEN, path_length);
+      break;
+
+    case ULP_MESSAGES:
+      if (arguments->pid == 0)
+        argp_error(state, "pid is mandatory in 'messages' comamnd.");
       break;
   }
 }
@@ -279,6 +286,10 @@ main(int argc, char **argv)
 
     case ULP_REVERSE:
       ret = run_reverse(&arguments);
+      break;
+
+    case ULP_MESSAGES:
+      ret = run_messages(&arguments);
       break;
   }
 
