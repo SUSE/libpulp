@@ -252,3 +252,18 @@ class spawn(pexpect.spawn):
     if maps.find(fname_so) == -1:
       return False
     return True
+
+  # Get libpulp messages, currently by calling ulp_messages and parsing
+  # its stdout.
+  def get_libpulp_messages(self):
+    self.sanity(pid=self.pid)
+    command = [ulptool, 'messages', '-p', str(self.pid)]
+
+    try:
+      self.print('Checking libpulp.so messages.')
+      tool = subprocess.run(command, timeout=10, stdout=subprocess.PIPE)
+    except:
+      raise
+
+    msgs = tool.stdout.decode()
+    return str(msgs)
