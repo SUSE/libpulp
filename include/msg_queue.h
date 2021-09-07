@@ -71,4 +71,8 @@ extern struct msg_queue __ulp_msg_queue;
 
 void msgq_push(const char *format, ...);
 
+/* Warn message using the message queue.  */
+
+#define MSGQ_WARN(fmt, ...) msgq_push("ulp: " fmt "\n", ##__VA_ARGS__)
+
 #endif /* MSGQ_H */
