@@ -420,7 +420,8 @@ TESTS = \
   exception_handling.py \
   missing_function.py \
   access.py \
-  buildid.py
+  buildid.py \
+  libpulp_messages.py
 
 XFAIL_TESTS = \
   blocked.py \
