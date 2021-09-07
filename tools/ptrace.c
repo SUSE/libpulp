@@ -84,35 +84,72 @@ write_string(const char *buffer, int pid, Elf64_Addr addr, int length)
   return 0;
 }
 
-int
-read_byte(char *byte, int pid, Elf64_Addr addr)
+static int
+ptrace_peekdata(long *value, int pid, Elf64_Addr addr)
 {
-  Elf64_Addr value;
-
   errno = 0;
-  value = ptrace(PTRACE_PEEKDATA, pid, addr, 0);
+  *value = ptrace(PTRACE_PEEKDATA, pid, addr, 0);
   if (errno) {
     DEBUG("unable to read byte: %s\n", strerror(errno));
     return 1;
   }
-  *byte = value & 0xff;
 
   return 0;
+}
+
+/* Read the content of size `long`.  This should increase the ptrace bandwidth
+   when compared to read_bytes.  */
+int
+read_long(long *word, int pid, Elf64_Addr addr)
+{
+  long value;
+  int ret = ptrace_peekdata(&value, pid, addr);
+  if (!ret)
+    *word = value;
+
+  return ret;
+}
+
+int
+read_byte(char *byte, int pid, Elf64_Addr addr)
+{
+  long value;
+  int ret = ptrace_peekdata(&value, pid, addr);
+  if (!ret)
+    *byte = value & 0xff;
+
+  return ret;
 }
 
 int
 read_memory(char *byte, size_t len, int pid, Elf64_Addr addr)
 {
   size_t i;
+  size_t len_word = len / sizeof(long);
+  size_t len_remaining = len % sizeof(long);
+
+  long *word = (long *)byte;
 
   if (attach(pid)) {
     DEBUG("unable to attach to %d to read data.\n", pid);
     return 1;
   };
 
-  for (i = 0; i < len; i++)
-    if (read_byte(byte + i, pid, addr + i))
+  /* Read as much as we can using longs, since it has larger bandwith when
+     compared to bytes.  */
+  for (i = 0; i < len_word; i++) {
+    if (read_long(&word[i], pid, addr + i * sizeof(long)))
       return 1;
+  }
+
+  /* In case the size of long does not divide len, then we must also read the
+     remainder.  */
+  byte = byte + len_word * sizeof(long);
+  addr = addr + len_word * sizeof(long);
+  for (i = 0; i < len_remaining; i++) {
+    if (read_byte(&byte[i], pid, addr + i))
+      return 1;
+  }
 
   if (detach(pid)) {
     DEBUG("unable to detach from %d after reading data.\n", pid);
