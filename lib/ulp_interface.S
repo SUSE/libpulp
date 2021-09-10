@@ -37,6 +37,13 @@
  * executed, without side-effects).
  */
 
+.global __ulp_revert_all
+__ulp_revert_all:
+    nop
+    nop
+    call    __ulp_revert_patches_from_lib@PLT
+    int3
+
 .global __ulp_trigger
 __ulp_trigger:
     nop

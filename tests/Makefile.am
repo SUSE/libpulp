@@ -430,7 +430,9 @@ TESTS = \
   access.py \
   buildid.py \
   libpulp_messages.py \
-  relative_path.py
+  relative_path.py \
+  revert_all.py \
+  revert_and_patch.py
 
 XFAIL_TESTS = \
   blocked.py \

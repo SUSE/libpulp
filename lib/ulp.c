@@ -71,6 +71,97 @@ begin(void)
   msgq_push("libpulp loaded...\n");
 }
 
+/*FIXME: Move this function to a common library. Tools also have a copy of
+ * this.  */
+static const char *
+get_basename(const char *name)
+{
+  const char *base = strrchr(name, '/');
+
+  /* If strrchr returned non-null, it means that it found the last '/' in the
+   * path, so add one to get the base name.  */
+  if (base)
+    return base + 1;
+
+  return name;
+}
+
+/** @brief Revert all live patches associated with library `lib_name`
+ *
+ * The user may have applied a series of live patches on a library named
+ * `lib_name` in the program. This function will revert every patch so
+ * that all functions are reverted into their original state.
+ *
+ * @param lib_name Base name of the library.
+ * @return 0 on success, anything else on failure.
+ */
+static int
+revert_all_patches_from_lib(const char *lib_name)
+{
+  struct ulp_applied_patch *patch = __ulp_state.patches;
+  struct ulp_applied_patch *next;
+
+  const char *lib_basename = get_basename(lib_name);
+
+  int ret = 0;
+
+  /* Paranoid: check if the path buffer didn't overflow.  */
+  if ((ptrdiff_t)(lib_basename - lib_name) >= ULP_PATH_LEN) {
+    MSGQ_WARN("Path buffer overflow, aborting revert...");
+    return 1;
+  }
+
+  while (patch) {
+    next = patch->next;
+    if (!strncmp(lib_basename, patch->lib_name, ULP_PATH_LEN)) {
+      if (!ulp_can_revert_patch(patch->patch_id)) {
+        ret = 1;
+        break;
+      }
+
+      if (!ulp_revert_patch(patch->patch_id))
+        ret = 1;
+    }
+
+    patch = next;
+  }
+
+  return ret;
+}
+
+/** @brief Entry point for libulp -- remove all patches associated with lib.
+ *
+ * This function is called from ulp_interface.S `__ulp_revert_all` assembly
+ * routine that is called from the `trigger` ulp tool, which have set the
+ * library name parameter in the path buffer.
+ *
+ * @return 0 on success, anything else on failure.
+ */
+int
+__ulp_revert_patches_from_lib()
+{
+  int result;
+
+  /*
+   * If the target process is busy within functions from the malloc or
+   * dlopen implementations, applying a live patch could lead to a
+   * deadlock, thus give up.
+   */
+  if (__ulp_asunsafe_trylock())
+    return EAGAIN;
+  __ulp_asunsafe_unlock();
+
+  /* Otherwise, try to apply the live patch. */
+  result = revert_all_patches_from_lib(__ulp_get_path_buffer_addr());
+
+  /*
+   * Live patching could fail for a couple of different reasons, thus
+   * check the result and return either zero for success or one for
+   * failures (except for EAGAIN above).
+   */
+  return result;
+}
+
 /* libpulp interfaces for livepatch trigger */
 int
 __ulp_apply_patch()
@@ -556,7 +647,7 @@ load_patch()
       goto load_patch_success;
 
     case 2: /* revert patch */
-      if (!ulp_can_revert_patch(ulp))
+      if (!ulp_can_revert_patch(ulp->patch_id))
         break;
       if (!ulp_revert_patch(ulp->patch_id)) {
         MSGQ_WARN("Unable to revert patch.");
@@ -579,9 +670,8 @@ load_patch_success:
 }
 
 int
-ulp_can_revert_patch(struct ulp_metadata *ulp)
+ulp_can_revert_patch(const unsigned char *id)
 {
-  unsigned char *id = ulp->patch_id;
   int i;
   struct ulp_applied_patch *patch, *applied_patch;
   struct ulp_dependency *dep;
@@ -779,7 +869,14 @@ ulp_state_update(struct ulp_metadata *ulp)
     MSGQ_WARN("Unable to allocate memory to update ulp state.");
     return 0;
   }
+
   memcpy(a_patch->patch_id, ulp->patch_id, 32);
+
+  a_patch->lib_name = strndup(get_basename(ulp->objs->name), ULP_PATH_LEN);
+  if (!a_patch->lib_name) {
+    WARN("Unable to allocate filename buffer state.");
+    return 0;
+  }
 
   for (dep = ulp->deps; dep != NULL; dep = dep->next) {
     a_dep = calloc(1, sizeof(struct ulp_dependency));
@@ -1191,7 +1288,7 @@ ulp_patch_addr(void *old_faddr, void *new_faddr, int enable)
 }
 
 struct ulp_applied_patch *
-ulp_get_applied_patch(unsigned char *id)
+ulp_get_applied_patch(const unsigned char *id)
 {
   struct ulp_applied_patch *patch;
 
@@ -1257,6 +1354,8 @@ ulp_state_remove(struct ulp_applied_patch *rm_patch)
     next_dep = dep->next;
     free(dep);
   }
+
+  free((void *)rm_patch->lib_name);
 
   /* free it */
   free(rm_patch);
