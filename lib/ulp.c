@@ -777,7 +777,13 @@ ulp_state_update(struct ulp_metadata *ulp)
     MSGQ_WARN("Unable to allocate memory to update ulp state.");
     return 0;
   }
+  a_patch->lib_name = calloc(ULP_PATH_LEN + 1, sizeof(char));
+  if (!a_patch->lib_name) {
+    WARN("Unable to allocate filename buffer state.");
+    return 0;
+  }
   memcpy(a_patch->patch_id, ulp->patch_id, 32);
+  strncpy(a_patch->lib_name, ulp->objs->name, ULP_PATH_LEN);
 
   for (dep = ulp->deps; dep != NULL; dep = dep->next) {
     a_dep = calloc(1, sizeof(struct ulp_dependency));
@@ -1255,6 +1261,8 @@ ulp_state_remove(struct ulp_applied_patch *rm_patch)
     next_dep = dep->next;
     free(dep);
   }
+
+  free (rm_patch->lib_name);
 
   /* free it */
   free(rm_patch);

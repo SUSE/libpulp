@@ -32,6 +32,7 @@
 struct ulp_applied_patch
 {
   unsigned char patch_id[32];
+  char *lib_name;
   struct ulp_applied_unit *units;
   struct ulp_applied_patch *next;
   struct ulp_dependency *deps;
