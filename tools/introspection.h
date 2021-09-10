@@ -125,6 +125,7 @@ struct ulp_dynobj
   Elf64_Addr state;
   Elf64_Addr global;
   Elf64_Addr msg_queue;
+  Elf64_Addr revert_all;
   /* end FIXME.  */
 
   struct thread_state *thread_states;
@@ -172,6 +173,8 @@ int set_path_buffer(struct ulp_process *process, const char *path);
 int patch_applied(struct ulp_process *process, unsigned char *id, int *result);
 
 int apply_patch(struct ulp_process *process, const char *metadata);
+
+int revert_patches_from_lib(struct ulp_process *, const char *);
 
 int restore_threads(struct ulp_process *process);
 

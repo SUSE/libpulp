@@ -41,6 +41,7 @@ int
 run_trigger(struct arguments *arguments)
 {
   const char *livepatch;
+  const char *revert_library;
   int result;
   int ret;
   int retry;
@@ -52,8 +53,9 @@ run_trigger(struct arguments *arguments)
   ulp_quiet = arguments->quiet;
 
   livepatch = arguments->args[0];
+  revert_library = arguments->library;
 
-  if (load_patch_info(livepatch)) {
+  if (livepatch && load_patch_info(livepatch)) {
     WARN("error parsing the metadata file (%s).", livepatch);
     return 1;
   }
@@ -66,7 +68,7 @@ run_trigger(struct arguments *arguments)
     goto target_clean;
   }
 
-  if (check_patch_sanity(target)) {
+  if (livepatch && check_patch_sanity(target)) {
     WARN("error checking live patch sanity.");
     ret = 1;
     goto target_clean;
@@ -105,16 +107,32 @@ run_trigger(struct arguments *arguments)
       }
     }
 #endif
-    result = apply_patch(target, livepatch);
-    if (result == -1) {
-      FATAL("fatal error during live patch application (hijacked execution).");
-      retry = 0;
+    if (revert_library) {
+      result = revert_patches_from_lib(target, revert_library);
+      if (result == -1) {
+        FATAL("fatal error reverting livepatches (hijacked execution).");
+        retry = 0;
+      }
+      if (result)
+        DEBUG("live patching revert %d failed (attempt #%d).", target->pid,
+              (arguments->retries - retry));
+      else
+        retry = 0;
     }
-    if (result)
-      DEBUG("live patching %d failed (attempt #%d).", target->pid,
-            (arguments->retries - retry));
-    else
-      retry = 0;
+
+    if (livepatch) {
+      result = apply_patch(target, livepatch);
+      if (result == -1) {
+        FATAL(
+            "fatal error during live patch application (hijacked execution).");
+        retry = 0;
+      }
+      if (result)
+        DEBUG("live patching %d failed (attempt #%d).", target->pid,
+              (arguments->retries - retry));
+      else
+        retry = 0;
+    }
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
   range_check_failed:
 #endif

@@ -32,6 +32,7 @@
 struct ulp_applied_patch
 {
   unsigned char patch_id[32];
+  const char *lib_name;
   struct ulp_applied_unit *units;
   struct ulp_applied_patch *next;
   struct ulp_dependency *deps;
@@ -95,7 +96,7 @@ void *load_so(char *obj);
 
 int load_patch();
 
-int ulp_can_revert_patch(struct ulp_metadata *ulp);
+int ulp_can_revert_patch(const unsigned char *id);
 
 int is_object_consistent(struct ulp_object *obj);
 
@@ -117,7 +118,7 @@ void ulp_patch_addr_absolute(void *old_faddr, void *new_faddr);
 
 int ulp_patch_addr(void *old_faddr, void *new_faddr, int enable);
 
-struct ulp_applied_patch *ulp_get_applied_patch(unsigned char *id);
+struct ulp_applied_patch *ulp_get_applied_patch(const unsigned char *id);
 
 int ulp_revert_patch(unsigned char *id);
 

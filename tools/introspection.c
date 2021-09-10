@@ -795,17 +795,18 @@ parse_lib_dynobj(struct ulp_process *process, struct link_map *link_map_addr)
     obj->global =
         get_loaded_symbol_addr(obj, pid, "__ulp_get_global_universe");
     obj->msg_queue = get_loaded_symbol_addr(obj, pid, "__ulp_msg_queue");
+    obj->revert_all = get_loaded_symbol_addr(obj, pid, "__ulp_revert_all");
 
     /* libpulp must expose all these symbols. */
     if (obj->trigger && obj->path_buffer && obj->check && obj->state &&
-        obj->global) {
+        obj->global && obj->revert_all) {
       obj->next = NULL;
       process->dynobj_libpulp = obj;
       DEBUG("(libpulp found)");
     }
     /* No other library should expose these symbols. */
     else if (obj->trigger || obj->path_buffer || obj->check || obj->state ||
-             obj->global)
+             obj->global || obj->revert_all)
       WARN("unexpected subset of libpulp symbols exposed by %s.", libname);
   }
 
@@ -923,8 +924,6 @@ set_path_buffer(struct ulp_process *process, const char *path)
 {
   struct ulp_thread *thread;
   Elf64_Addr path_addr;
-  char full_path[PATH_MAX];
-  unsigned full_path_size;
 
   DEBUG("advertising live patch location to libpulp.");
 
@@ -936,21 +935,7 @@ set_path_buffer(struct ulp_process *process, const char *path)
   thread = process->main_thread;
   path_addr = process->dynobj_libpulp->path_buffer;
 
-  /* The target program can be running in other directory where CWD is,
-     therefore it is a good idea to pass the full path to the metadata
-     info to avoid potential problems.  */
-  if (!realpath(path, full_path)) {
-    WARN("unable to retrieve full path to %s", path);
-    return 1;
-  }
-
-  full_path_size = strlen(full_path) + 1; /* Include '\0'.  */
-  if (full_path_size >= ULP_PATH_LEN) {
-    WARN("full path to metadata file is too large");
-    return 1;
-  }
-
-  if (write_string(full_path, thread->tid, path_addr, full_path_size))
+  if (write_string(path, thread->tid, path_addr, ULP_PATH_LEN))
     return 1;
 
   return 0;
@@ -1172,6 +1157,9 @@ apply_patch(struct ulp_process *process, const char *metadata)
   struct user_regs_struct context;
   ElfW(Addr) routine;
 
+  char full_path[PATH_MAX];
+  unsigned full_path_size;
+
   DEBUG("beginning live patch application.");
 
   if (!process->all_threads_hijacked) {
@@ -1179,7 +1167,21 @@ apply_patch(struct ulp_process *process, const char *metadata)
     return 1;
   }
 
-  if (set_path_buffer(process, metadata)) {
+  /* The target program can be running in other directory where CWD is,
+     therefore it is a good idea to pass the full path to the metadata
+     info to avoid potential problems.  */
+  if (!realpath(metadata, full_path)) {
+    WARN("unable to retrieve full path to %s", metadata);
+    return 1;
+  }
+
+  full_path_size = strlen(full_path) + 1; /* Include '\0'.  */
+  if (full_path_size >= ULP_PATH_LEN) {
+    WARN("full path to metadata file is too large");
+    return 1;
+  }
+
+  if (set_path_buffer(process, full_path)) {
     WARN("unable to write live patch path into target process memory.");
     return 1;
   }
@@ -1202,6 +1204,48 @@ apply_patch(struct ulp_process *process, const char *metadata)
 
   if (context.rax == EAGAIN)
     DEBUG("libc/libdl locks were busy: patch not applied.");
+
+  return context.rax;
+}
+
+int
+revert_patches_from_lib(struct ulp_process *process, const char *lib_name)
+{
+  int ret;
+  struct ulp_thread *thread;
+  struct user_regs_struct context;
+  ElfW(Addr) routine;
+
+  DEBUG("beginning patches removal.");
+
+  if (!process->all_threads_hijacked) {
+    WARN("not all threads hijacked.");
+    return 1;
+  }
+
+  if (set_path_buffer(process, lib_name)) {
+    WARN("unable to write library name into target process memory.");
+    return 1;
+  }
+
+  thread = process->main_thread;
+  context = thread->context;
+  routine = process->dynobj_libpulp->revert_all;
+
+  DEBUG(">>> running libpulp functions within target process...");
+  ret = run_and_redirect(thread->tid, &context, routine);
+  if (ret == -1) {
+    WARN("fatal error during live patch revert.");
+  };
+  if (ret) {
+    WARN("error during live patch revert.");
+  }
+  DEBUG(">>> done.");
+  if (ret)
+    return ret;
+
+  if (context.rax == EAGAIN)
+    DEBUG("libc/libdl locks were busy: patches not reversed.");
 
   return context.rax;
 }

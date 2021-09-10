@@ -69,6 +69,9 @@ static const char doc[] =
 
 /* clang-format on */
 
+/* switches that don't have a shorthand.  */
+#define ULP_OP_REVERT_ALL 256
+
 static struct argp_option options[] = {
   { 0, 0, 0, 0, "Options:", 0 },
   { "verbose", 'v', 0, 0, "Produce verbose output", 0 },
@@ -79,6 +82,8 @@ static struct argp_option options[] = {
   { "buildid", 'b', 0, 0, "Print the build id", 0 },
   { 0, 0, 0, 0, "trigger command only:", 0 },
   { "retries", 'r', "N", 0, "Retry N times if process busy", 0 },
+  { "revert-all", ULP_OP_REVERT_ALL, "LIB", 0, "Revert all patches from LIB",
+    0 },
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
   { "check-stack", 'c', 0, 0, "Check the call stack before live patching", 0 },
 #endif
@@ -128,6 +133,19 @@ command_from_string(const char *str)
   return ULP_NONE;
 }
 
+static const char *
+get_basename(const char *name)
+{
+  const char *base = strrchr(name, '/');
+
+  /* If strrchr returned non-null, it means that it found the last '/' in the
+   * path, so add one to get the base name.  */
+  if (base)
+    return base + 1;
+
+  return name;
+}
+
 /* This function is called when all arguments have been parsed.  */
 static void
 handle_end_of_arguments(const struct argp_state *state)
@@ -157,10 +175,35 @@ handle_end_of_arguments(const struct argp_state *state)
         argp_error(state, "Too few arguments.");
       break;
 
-    /* Currently, ULP_TRIGGER, DUMP POST & REVERT does the same checks.  */
+    case ULP_TRIGGER:
+      if (arguments->library) {
+        /* revert-all was passed to trigger.  */
+        if (state->arg_num < 1)
+          argp_error(state, "Too few arguments.");
+
+        path_length = strlen(arguments->library);
+        if (path_length > ULP_PATH_LEN)
+          argp_error(state, "LIB name must be shorter than %d bytes; got %d.",
+                     ULP_PATH_LEN, path_length);
+      }
+      else {
+        /* revert-all was not passed to trigger. Metadata file is required.  */
+        if (state->arg_num < 2)
+          argp_error(state, "Too few arguments.");
+      }
+
+      if (state->arg_num >= 2) {
+        path_length = strlen(arguments->args[0]);
+        if (path_length > ULP_PATH_LEN)
+          argp_error(state,
+                     "METADATA path must be shorter than %d bytes; got %d.",
+                     ULP_PATH_LEN, path_length);
+      }
+      break;
+
+    /* Currently, DUMP, POST & REVERT does the same checks.  */
     case ULP_REVERSE:
     case ULP_POST:
-    case ULP_TRIGGER:
     case ULP_DUMP:
       if (state->arg_num < 2)
         argp_error(state, "Too few arguments.");
@@ -215,6 +258,9 @@ parser(int key, char *arg, struct argp_state *state)
         argp_error(state,
                    "The argument to '-r' must be greater than zero; got %d.",
                    arguments->retries);
+      break;
+    case ULP_OP_REVERT_ALL:
+      arguments->library = get_basename(arg);
       break;
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
     case 'c':

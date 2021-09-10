@@ -19,6 +19,7 @@
     dladdr;
     dladdr1;
     dlinfo;
+    __ulp_revert_all;
     __ulp_trigger;
     __ulp_path_buffer;
     __ulp_check_patched;

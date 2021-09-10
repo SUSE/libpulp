@@ -163,7 +163,7 @@ class spawn(pexpect.spawn):
         raise ValueError('Process ' + str(pid) + ' not found')
 
     # Check if the live patch file exists
-    if not filename == Ellipsis:
+    if not filename == Ellipsis and filename is not None:
       file = pathlib.Path(filename)
       if not file.is_file():
         raise FileNotFoundError('File ' + filename + ' not found')
@@ -172,15 +172,20 @@ class spawn(pexpect.spawn):
   # metadata must be passed through 'filename'. The remaining parameters, which
   # are optional, are the same that the Trigger tool provides (see its --help
   # output for more information).
-  def livepatch(self, filename, timeout=10, retries=1,
-                verbose=True, quiet=False):
+  def livepatch(self, filename=None, timeout=10, retries=1,
+                verbose=True, quiet=False, revert_lib=None):
 
     # Check sanity of command-line arguments
     self.sanity(pid=self.pid)
     self.sanity(filename=filename)
 
     # Build command-line from arguments
-    command = [ulptool, "trigger", '-p', str(self.pid), filename]
+    command = [ulptool, "trigger", '-p', str(self.pid)]
+    if revert_lib is not None:
+      command.append("--revert-all")
+      command.append(revert_lib)
+    if filename is not None:
+      command.append(filename)
     if verbose:
       command.append('-v')
     if quiet:
@@ -191,7 +196,7 @@ class spawn(pexpect.spawn):
 
     # Apply the live patch and check for common errors
     try:
-      self.print('Applying live patch.')
+      self.print('Applying/reverting live patch.')
       tool = subprocess.run(command, timeout=timeout)
     except subprocess.TimeoutExpired:
       self.print('Live patching timed out.')
@@ -201,7 +206,7 @@ class spawn(pexpect.spawn):
     # which asserts that, and raises CalledProcessError otherwise.
     tool.check_returncode()
 
-    self.print('Live patch applied successfully.')
+    self.print('Live patch applied/reverted successfully.')
 
   # Check if a live patch is already applied. The path to the live patch
   # metadata must be passed through 'filename'. The remaining parameters, which
