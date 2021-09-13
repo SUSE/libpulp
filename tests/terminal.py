@@ -24,7 +24,7 @@ import subprocess
 import time
 
 import testsuite
-from testsuite import checker
+from testsuite import ulptool
 
 parent = testsuite.spawn('./terminal ./loop')
 
@@ -52,7 +52,8 @@ for i in range(32):
   # started by the testing framework. Rather, it has been forked from
   # its parent (terminal.c), thus, child.is_patch_applied and
   # child.livepatch cannot be used.
-  ret = subprocess.run([checker, '-q', '-p', pid, 'libblocked_livepatch1.ulp'])
+  ret = subprocess.run([ulptool, '-q', '-p', pid, "check",
+      'libblocked_livepatch1.ulp'])
   # The Check tool returns 0 when the given live patch has not been
   # applied, which is the expected output here. Anything else is treated
   # as a hard error (99), because detecting errors in the Check tool

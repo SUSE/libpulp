@@ -32,6 +32,8 @@
 #define ULP_PATH_LEN 256
 #define RED_ZONE_LEN 128
 
+#define ARRAY_LENGTH(v) (sizeof(v) / sizeof(*(v)))
+
 extern __thread int __ulp_pending;
 
 struct ulp_patching_state

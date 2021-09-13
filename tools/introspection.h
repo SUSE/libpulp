@@ -143,7 +143,7 @@ int restore_threads(struct ulp_process *process);
 
 int read_global_universe(struct ulp_process *process);
 
-int load_patch_info(char *livepatch);
+int load_patch_info(const char *livepatch);
 
 int check_patch_sanity();
 
