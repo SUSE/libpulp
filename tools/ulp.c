@@ -27,172 +27,104 @@
 #include <string.h>
 #include <sys/types.h>
 
+#include "arguments.h"
+#include "check.h"
 #include "config.h"
 #include "introspection.h"
+#include "patches.h"
 
-/* Returns 0 if libpulp.so has been loaded by the process with memory map
- * (/proc/<pid>/maps) opened in MAP. Otherwise, returns 1.
- */
-int
-libpulp_loaded(FILE *map)
-{
-  int retcode = 0;
+static error_t parser(int, char *, struct argp_state *);
 
-  char *line = NULL;
-  size_t len = 0;
-
-  /* Read all lines of MAP and look for the 'libpulp.so' substring. */
-  rewind(map);
-  while (getline(&line, &len, map) != -1) {
-    if (strstr(line, "libpulp.so")) {
-      retcode = 1;
-      break;
-    }
-  }
-
-  /* Free structures allocated by getline() and return. */
-  free(line);
-  return retcode;
-}
-
-/* Attaches to PROCESS multiple times and collect information about its
- * applied live patches and loaded libraries. Returns 0 on
- * success; 1 if process information was not properly parsed; and -1 if
- * process hijacking went wrong, which also means that PROCESS was
- * probably put into an inconsistent state and should be killed.
- */
-int
-get_process_universes(struct ulp_process *process)
-{
-  if (initialize_data_structures(process))
-    return 1;
-
-  if (hijack_threads(process))
-    return -1;
-
-  read_global_universe(process);
-
-  if (restore_threads(process))
-    return -1;
-
-  return 0;
-}
-
-/* Inserts a new process structure into LIST if the process identified
- * by PID is live-patchable.
- */
-void
-insert_target_process(int pid, struct ulp_process **list)
-{
-  char mapname[PATH_MAX];
-  FILE *map;
-
-  struct ulp_process *new = NULL;
-
-  snprintf(mapname, PATH_MAX, "/proc/%d/maps", pid);
-  if ((map = fopen(mapname, "r")) == NULL) {
-    /* EACESS error happens when the tool is executed by a regular user.
-       This is not a hard error. */
-    if (errno != EACCES)
-      perror("Unable to open memory map for process");
-    return;
-  }
-
-  /* If the process identified by PID is live patchable, add to LIST. */
-  if (libpulp_loaded(map)) {
-    new = malloc(sizeof(struct ulp_process));
-    memset(new, 0, sizeof(struct ulp_process));
-
-    new->pid = pid;
-    if (get_process_universes(new)) {
-      printf("Failed to parsed data for live-patchable process %d... "
-             "Skipping.\n",
-             pid);
-    }
-    else {
-      new->next = *list;
-      *list = new;
-    }
-  }
-
-  fclose(map);
-}
-
-/* Iterates over /proc and builds a list of live-patchable processes.
- * Returns said list.
- */
-struct ulp_process *
-build_process_list(void)
-{
-  long int pid;
-
-  DIR *slashproc;
-  struct dirent *subdir;
-
-  struct ulp_process *list = NULL;
-
-  /* Build a list of all processes that have libpulp.so loaded. */
-  slashproc = opendir("/proc");
-  if (slashproc == NULL) {
-    perror("Is /proc mounted?");
-    return NULL;
-  }
-
-  while ((subdir = readdir(slashproc))) {
-    /* Skip non-numeric directories in /proc. */
-    if ((pid = strtol(subdir->d_name, NULL, 10)) == 0)
-      continue;
-    /* Add live patchable process. */
-    insert_target_process(pid, &list);
-  }
-  closedir(slashproc);
-
-  return list;
-}
-
-/* Prints all the info collected about the processes in PROCESS_LIST. */
-void
-print_process_list(struct ulp_process *process_list)
-{
-  struct ulp_process *process_item;
-  struct ulp_dynobj *object_item;
-
-  process_item = process_list;
-  while (process_item) {
-
-    printf("PID: %d\n", process_item->pid);
-
-    printf("  Global universe: %ld\n", process_item->global_universe);
-
-    printf("  Live patches:\n");
-    object_item = process_item->dynobj_patches;
-    if (!object_item)
-      printf("    (none)\n");
-    while (object_item) {
-      printf("    %s\n", object_item->filename);
-      object_item = object_item->next;
-    }
-
-    printf("  Loaded libraries:\n");
-    object_item = process_item->dynobj_targets;
-    if (!object_item)
-      printf("    (none)\n");
-    while (object_item) {
-      printf("    in %s:\n", object_item->filename);
-      object_item = object_item->next;
-    }
-    process_item = process_item->next;
-    printf("\n");
-  }
-}
+/* These variables are used by ARGP.  */
 
 const char *argp_program_version = PACKAGE_STRING;
 
-struct arguments
-{
-  pid_t pid;
+static const char args_doc[] = "COMMAND [ARG1 ARG2 ...]";
+
+static const char doc[] =
+    "ulp: Userspace Live Patch tool.\n"
+    "\n"
+    " This tool executes a COMMAND passed in the argument list.\n"
+    " Possible COMMANDs are:\n"
+    "\n"
+    "   patches                   List active patches\n"
+    "   check                     Check if patch in ARG1 is applied on "
+    "process\n"
+    "                             with -p=PID\n";
+
+static struct argp_option options[] = {
+  { 0, 0, 0, 0, "Options:", 0 },
+  { "verbose", 'v', 0, 0, "Produce verbose output", 0 },
+  { "quiet", 'q', 0, 0, "Don't produce any output", 0 },
+  { 0, 0, 0, 0, "patches command only:", 0 },
+  { "pid", 'p', "PID", 0, "Target process with PID", 0 },
+  { 0 }
 };
 
+static struct argp argp = { options, parser, args_doc, doc, NULL, NULL, NULL };
+
+/* End of variables used by argp.  */
+
+/* Get command string and return an command code for it.
+ *
+ * @param str - String representation of command.
+ * @return code of command.
+ */
+
+static command_t
+command_from_string(const char *str)
+{
+  struct entry
+  {
+    const char *string;
+    command_t command;
+  };
+
+  static const struct entry entries[] = {
+    { "patches", ULP_PATCHES },
+    { "check", ULP_CHECK },
+  };
+
+  size_t i;
+
+  for (i = 0; i < ARRAY_LENGTH(entries); i++) {
+    if (!strcmp(entries[i].string, str))
+      return entries[i].command;
+  }
+
+  return ULP_NONE;
+}
+
+/* This function is called when all arguments have been parsed.  */
+static void
+handle_end_of_arguments(const struct argp_state *state)
+{
+  const struct arguments *arguments = state->input;
+
+  if (state->arg_num < 1)
+    argp_error(state, "Too few arguments.");
+
+  if (arguments->quiet && arguments->verbose)
+    argp_error(state, "You must specify either '-v' or '-q' or none.");
+
+  switch (arguments->command) {
+    case ULP_NONE:
+      argp_error(state, "Invalid command.");
+      break;
+
+    case ULP_PATCHES:
+      if (state->arg_num > 1)
+        argp_error(state, "Too many arguments.");
+      break;
+
+    case ULP_CHECK:
+      if (state->arg_num < 2)
+        argp_error(state, "Too few arguments.");
+      break;
+  }
+}
+
+/* Parse the arguments in command line.  */
 static error_t
 parser(int key, char *arg, struct argp_state *state)
 {
@@ -201,9 +133,31 @@ parser(int key, char *arg, struct argp_state *state)
   arguments = state->input;
 
   switch (key) {
+    case 'v':
+      arguments->verbose = 1;
+      break;
+    case 'q':
+      arguments->quiet = 1;
+      break;
     case 'p':
       arguments->pid = atoi(arg);
       break;
+    case ARGP_KEY_ARG:
+      if (state->arg_num == 0) {
+        arguments->command = command_from_string(arg);
+        if (arguments->command == ULP_NONE)
+          argp_error(state, "Invalid command: %s.", arg);
+      }
+      else if (state->arg_num <= ARGS_MAX)
+        arguments->args[state->arg_num - 1] = arg;
+      else
+        argp_error(state, "Too many arguments.");
+      break;
+
+    case ARGP_KEY_END:
+      handle_end_of_arguments(state);
+      break;
+
     default:
       return ARGP_ERR_UNKNOWN;
   }
@@ -214,33 +168,24 @@ parser(int key, char *arg, struct argp_state *state)
 int
 main(int argc, char **argv)
 {
-  static struct argp_option options[] = {
-    { "pid", 'p', "PID", 0,
-      "Only gather status from process with id == PID"
-      "\t(when not provided, checks all processes)",
-      0 },
-    { 0 }
-  };
-  static struct argp argp = { options, parser, NULL, NULL, NULL, NULL, NULL };
+  struct arguments arguments = { 0 };
+  int ret = 0;
 
-  struct arguments arguments;
-  struct ulp_process *process_list;
-
-  arguments.pid = 0;
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
-  /*
-   * If the PID argument has not been provided, check all live patchable
-   * processes; otherwise, just the request process.
-   */
-  if (arguments.pid == 0)
-    process_list = build_process_list();
-  else {
-    process_list = NULL;
-    insert_target_process(arguments.pid, &process_list);
+  switch (arguments.command) {
+    case ULP_NONE:
+      ret = 1;
+      break;
+
+    case ULP_PATCHES:
+      ret = run_patches(&arguments);
+      break;
+
+    case ULP_CHECK:
+      ret = run_check(&arguments);
+      break;
   }
 
-  print_process_list(process_list);
-
-  return 0;
+  return ret;
 }

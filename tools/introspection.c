@@ -844,7 +844,7 @@ restore_threads(struct ulp_process *process)
  * returns 0.
  */
 int
-load_patch_info(char *livepatch)
+load_patch_info(const char *livepatch)
 {
   uint32_t c;
   uint32_t i, j;

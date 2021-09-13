@@ -39,7 +39,6 @@ testname = os.path.basename(testname[0])
 # Libpulp definitions
 builddir = os.getcwd()
 trigger = builddir + '/../tools/ulp_trigger'
-checker = builddir + '/../tools/ulp_check'
 ulptool = builddir + '/../tools/ulp'
 
 # Wrapper around pexpect.spawn that automatically sets userspace livepatching
@@ -216,7 +215,7 @@ class spawn(pexpect.spawn):
     self.sanity(filename=filename)
 
     # Build command-line from arguments
-    command = [checker, '-p', str(self.pid), filename]
+    command = [ulptool, '-p', str(self.pid), "check",  filename]
     if verbose:
       command.append('-v')
     if quiet:

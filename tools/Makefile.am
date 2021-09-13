@@ -22,11 +22,10 @@ bin_PROGRAMS = \
   ulp_reverse \
   ulp_dump \
   ulp_trigger \
-  ulp_check \
   ulp_post \
   ulp
 
-noinst_HEADERS = introspection.h ptrace.h packer.h md4.h
+noinst_HEADERS = arguments.h introspection.h ptrace.h packer.h md4.h check.h patches.h
 
 # Static library shared among the tools.
 
@@ -58,10 +57,7 @@ ulp_dump_LDADD = libcommon.la
 ulp_trigger_SOURCES = trigger.c
 ulp_trigger_LDADD = libcommon.la
 
-ulp_check_SOURCES = check.c
-ulp_check_LDADD = libcommon.la
-
-ulp_SOURCES = ulp.c
+ulp_SOURCES = ulp.c check.c patches.c
 ulp_LDADD = libcommon.la
 
 # Ensure access to the include directory
