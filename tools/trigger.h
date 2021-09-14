@@ -19,38 +19,11 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef ARGUMENTS_H
-#define ARGUMENTS_H
+#ifndef TRIGGER_H
+#define TRIGGER_H
 
-#include "config.h"
+struct arguments;
 
-#define ARGS_MAX 1
+int run_trigger(struct arguments *);
 
-typedef enum
-{
-  ULP_NONE,
-  ULP_PATCHES,
-  ULP_CHECK,
-  ULP_DUMP,
-  ULP_PACKER,
-  ULP_TRIGGER,
-} command_t;
-
-struct arguments
-{
-  const char *args[ARGS_MAX];
-  const char *livepatch;
-  const char *library;
-  const char *metadata;
-  pid_t pid;
-  command_t command;
-  int retries;
-  int quiet;
-  int verbose;
-  int buildid_only;
-#if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
-  int check_stack;
-#endif
-};
-
-#endif
+#endif /* TRIGGER_H */

@@ -30,7 +30,7 @@
 
 #include "packer.h"
 
-void
+static void
 usage(char *name)
 {
   fprintf(stderr, "Usage: %s <ulp metadata file> [output filename]\n", name);

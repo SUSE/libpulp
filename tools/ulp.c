@@ -34,6 +34,7 @@
 #include "introspection.h"
 #include "packer.h"
 #include "patches.h"
+#include "trigger.h"
 
 static error_t parser(int, char *, struct argp_state *);
 
@@ -56,7 +57,9 @@ static const char doc[] =
 "   dump                      Print the content of metadata file on ARG1 in\n"
 "                             human readable form.\n"
 "   packer                    Creates a livepatch METADATA file based on a\n"
-"                             live patch description on ARG1.\n";
+"                             live patch description on ARG1.\n"
+"   trigger                   Applies the live patch in ARG1 to the process\n"
+"                             with PID\n";
 /* clang-format on */
 
 static struct argp_option options[] = {
@@ -67,13 +70,18 @@ static struct argp_option options[] = {
   { "pid", 'p', "PID", 0, "Target process with PID", 0 },
   { 0, 0, 0, 0, "dump command only:", 0 },
   { "buildid", 'b', 0, 0, "Only print the build id (dump only.)", 0 },
+  { 0, 0, 0, 0, "trigger command only:", 0 },
+  { "retries", 'r', "N", 0, "Retry N times if process busy", 0 },
+#if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
+  { "check-stack", 'c', 0, 0, "Check the call stack before live patching", 0 },
+#endif
   { 0, 0, 0, 0, "packer command only:", 0 },
   { "output", 'o', "METADATA", 0,
-    "Write output to METADATA\nDefaults to the standard output", 2 },
+    "Write output to METADATA\nDefaults to the standard output", 0 },
   { "livepatch", 'l', "LIVEPATCH", 0,
-    "Use this livepatch file\nDefaults to the one described in ARG1", 2 },
+    "Use this livepatch file\nDefaults to the one described in ARG1", 0 },
   { "target", 't', "LIBRARY", 0,
-    "Use this target library\nDefaults to the one described in ARG1", 2 },
+    "Use this target library\nDefaults to the one described in ARG1", 0 },
   { 0 }
 };
 
@@ -97,10 +105,9 @@ command_from_string(const char *str)
   };
 
   static const struct entry entries[] = {
-    { "patches", ULP_PATCHES },
-    { "check", ULP_CHECK },
-    { "dump", ULP_DUMP },
-    { "packer", ULP_PACKER },
+    { "patches", ULP_PATCHES }, { "check", ULP_CHECK },
+    { "dump", ULP_DUMP },       { "packer", ULP_PACKER },
+    { "trigger", ULP_TRIGGER },
   };
 
   size_t i;
@@ -142,6 +149,8 @@ handle_end_of_arguments(const struct argp_state *state)
         argp_error(state, "Too few arguments.");
       break;
 
+    /* Currently, ULP_TRIGGER and DUMP does the same checks.  */
+    case ULP_TRIGGER:
     case ULP_DUMP:
       if (state->arg_num < 2)
         argp_error(state, "Too few arguments.");
@@ -185,6 +194,18 @@ parser(int key, char *arg, struct argp_state *state)
     case 't':
       arguments->library = arg;
       break;
+    case 'r':
+      arguments->retries = atoi(arg);
+      if (arguments->retries < 1)
+        argp_error(state,
+                   "The argument to '-r' must be greater than zero; got %d.",
+                   arguments->retries);
+      break;
+#if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
+    case 'c':
+      arguments->check_stack = 1;
+      break;
+#endif
     case ARGP_KEY_ARG:
       if (state->arg_num == 0) {
         arguments->command = command_from_string(arg);
@@ -214,6 +235,9 @@ main(int argc, char **argv)
   struct arguments arguments = { 0 };
   int ret = 0;
 
+  /* Initialize retries correctly.  */
+  arguments.retries = 1;
+
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
   switch (arguments.command) {
@@ -235,6 +259,10 @@ main(int argc, char **argv)
 
     case ULP_PACKER:
       ret = run_packer(&arguments);
+      break;
+
+    case ULP_TRIGGER:
+      ret = run_trigger(&arguments);
       break;
   }
 

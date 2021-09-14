@@ -68,7 +68,7 @@ write_byte(char byte, int pid, Elf64_Addr addr)
  * Returns 0 if the operation succeeds; 1 otherwise.
  */
 int
-write_string(char *buffer, int pid, Elf64_Addr addr, int length)
+write_string(const char *buffer, int pid, Elf64_Addr addr, int length)
 {
   int i;
 

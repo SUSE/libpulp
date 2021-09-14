@@ -530,7 +530,7 @@ set_id_buffer(struct ulp_process *process, unsigned char *patch_id)
  * pre-condition to apply a new live patch. On success, returns 0.
  */
 int
-set_path_buffer(struct ulp_process *process, char *path)
+set_path_buffer(struct ulp_process *process, const char *path)
 {
   struct ulp_thread *thread;
   Elf64_Addr path_addr;
@@ -743,7 +743,7 @@ patch_applied(struct ulp_process *process, unsigned char *id, int *result)
  * called after successful thread hijacking.
  */
 int
-apply_patch(struct ulp_process *process, char *metadata)
+apply_patch(struct ulp_process *process, const char *metadata)
 {
   int ret;
   struct ulp_thread *thread;
