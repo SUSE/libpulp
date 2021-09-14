@@ -32,6 +32,7 @@
 #include "config.h"
 #include "dump.h"
 #include "introspection.h"
+#include "packer.h"
 #include "patches.h"
 
 static error_t parser(int, char *, struct argp_state *);
@@ -53,7 +54,9 @@ static const char doc[] =
 "   check                     Check if patch in ARG1 is applied on process\n"
 "                             with -p PID.\n"
 "   dump                      Print the content of metadata file on ARG1 in\n"
-"                             human readable form.\n";
+"                             human readable form.\n"
+"   packer                    Creates a livepatch METADATA file based on a\n"
+"                             live patch description on ARG1.\n";
 /* clang-format on */
 
 static struct argp_option options[] = {
@@ -64,6 +67,13 @@ static struct argp_option options[] = {
   { "pid", 'p', "PID", 0, "Target process with PID", 0 },
   { 0, 0, 0, 0, "dump command only:", 0 },
   { "buildid", 'b', 0, 0, "Only print the build id (dump only.)", 0 },
+  { 0, 0, 0, 0, "packer command only:", 0 },
+  { "output", 'o', "METADATA", 0,
+    "Write output to METADATA\nDefaults to the standard output", 2 },
+  { "livepatch", 'l', "LIVEPATCH", 0,
+    "Use this livepatch file\nDefaults to the one described in ARG1", 2 },
+  { "target", 't', "LIBRARY", 0,
+    "Use this target library\nDefaults to the one described in ARG1", 2 },
   { 0 }
 };
 
@@ -90,6 +100,7 @@ command_from_string(const char *str)
     { "patches", ULP_PATCHES },
     { "check", ULP_CHECK },
     { "dump", ULP_DUMP },
+    { "packer", ULP_PACKER },
   };
 
   size_t i;
@@ -125,6 +136,7 @@ handle_end_of_arguments(const struct argp_state *state)
         argp_error(state, "Too many arguments.");
       break;
 
+    case ULP_PACKER:
     case ULP_CHECK:
       if (state->arg_num < 2)
         argp_error(state, "Too few arguments.");
@@ -163,6 +175,15 @@ parser(int key, char *arg, struct argp_state *state)
       break;
     case 'b':
       arguments->buildid_only = 1;
+      break;
+    case 'o':
+      arguments->metadata = arg;
+      break;
+    case 'l':
+      arguments->livepatch = arg;
+      break;
+    case 't':
+      arguments->library = arg;
       break;
     case ARGP_KEY_ARG:
       if (state->arg_num == 0) {
@@ -210,6 +231,10 @@ main(int argc, char **argv)
 
     case ULP_DUMP:
       ret = run_dump(&arguments);
+      break;
+
+    case ULP_PACKER:
+      ret = run_packer(&arguments);
       break;
   }
 

@@ -19,7 +19,6 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <argp.h>
 #include <err.h>
 #include <fcntl.h>
 #include <gelf.h>
@@ -29,84 +28,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "arguments.h"
 #include "config.h"
 #include "introspection.h"
 #include "md4.h"
-#include "ulp_common.h"
-
 #include "packer.h"
-
-const char *argp_program_version = PACKAGE_STRING;
-
-struct arguments
-{
-  char *description;
-  char *livepatch;
-  char *library;
-  char *metadata;
-  int quiet;
-  int verbose;
-};
-
-static char doc[] =
-    "Creates a livepatch METADATA file based on a live patch DESCRIPTION file";
-
-static char args_doc[] = "DESCRIPTION";
-
-static struct argp_option options[] = {
-  { 0, 0, 0, 0, "Options:", 0 },
-  { "output", 'o', "METADATA", 0,
-    "Write output to METADATA\nDefaults to the standard output", 1 },
-  { "livepatch", 'p', "LIVEPATCH", 0,
-    "Use this livepatch file\nDefaults to the one in DESCRIPTION", 2 },
-  { "target", 't', "LIBRARY", 0,
-    "Use this target library\nDefaults to the one in DESCRIPTION", 2 },
-  { "verbose", 'v', 0, 0, "Produce verbose output", 3 },
-  { "quiet", 'q', 0, 0, "Don't produce any output", 3 },
-  { 0 }
-};
-
-static error_t
-parser(int key, char *arg, struct argp_state *state)
-{
-  struct arguments *arguments;
-
-  arguments = state->input;
-
-  switch (key) {
-    case 'v':
-      arguments->verbose = 1;
-      break;
-    case 'q':
-      arguments->quiet = 1;
-      break;
-    case 'o':
-      arguments->metadata = arg;
-      break;
-    case 'p':
-      arguments->livepatch = arg;
-      break;
-    case 't':
-      arguments->library = arg;
-      break;
-    case ARGP_KEY_ARG:
-      if (state->arg_num >= 1) {
-        argp_error(state, "Too many arguments.");
-      }
-      arguments->description = arg;
-      break;
-    case ARGP_KEY_END:
-      if (state->arg_num < 1)
-        argp_error(state, "Too few arguments.");
-      if (arguments->quiet && arguments->verbose)
-        argp_error(state, "You must specify either '-v' or '-q' or none.");
-      break;
-    default:
-      return ARGP_ERR_UNKNOWN;
-  }
-
-  return 0;
-}
+#include "ulp_common.h"
 
 void
 free_metadata(struct ulp_metadata *ulp)
@@ -143,7 +70,7 @@ unload_elf(Elf **elf, int *fd)
 }
 
 Elf *
-load_elf(char *obj, int *fd)
+load_elf(const char *obj, int *fd)
 {
   Elf *elf;
 
@@ -219,7 +146,7 @@ get_build_id_note(Elf *elf)
 }
 
 int
-get_ulp_elf_metadata(char *filename, struct ulp_object *obj)
+get_ulp_elf_metadata(const char *filename, struct ulp_object *obj)
 {
   int fd;
   Elf *elf;
@@ -281,7 +208,7 @@ get_elf_tgt_addrs(Elf *elf, struct ulp_object *obj, Elf_Scn *st)
 }
 
 int
-create_patch_metadata_file(struct ulp_metadata *ulp, char *filename)
+create_patch_metadata_file(struct ulp_metadata *ulp, const char *filename)
 {
   FILE *file;
   struct ulp_unit *unit;
@@ -373,7 +300,7 @@ create_patch_metadata_file(struct ulp_metadata *ulp, char *filename)
 
 int
 add_dependency(struct ulp_metadata *ulp, struct ulp_dependency *dep,
-               char *filename)
+               const char *filename)
 {
   FILE *file;
   uint8_t patch_type;
@@ -410,7 +337,7 @@ add_dependency(struct ulp_metadata *ulp, struct ulp_dependency *dep,
 }
 
 int
-parse_description(char *filename, struct ulp_metadata *ulp)
+parse_description(const char *filename, struct ulp_metadata *ulp)
 {
   struct ulp_unit *unit, *last_unit;
   struct ulp_dependency *dep;
@@ -672,7 +599,7 @@ parse_build_id(Elf_Scn *s, char **result, int *length)
 }
 
 void *
-get_symbol_addr(Elf *elf, Elf_Scn *s, char *search)
+get_symbol_addr(Elf *elf, Elf_Scn *s, const char *search)
 {
   int nsyms, i;
   char *sym_name;
@@ -699,7 +626,8 @@ get_symbol_addr(Elf *elf, Elf_Scn *s, char *search)
 }
 
 int
-write_patch_id(struct ulp_metadata *ulp, char *description, char *livepatch)
+write_patch_id(struct ulp_metadata *ulp, const char *description,
+               const char *livepatch)
 {
   int half;
   int total;
@@ -793,59 +721,55 @@ write_patch_id(struct ulp_metadata *ulp, char *description, char *livepatch)
 }
 
 int
-main(int argc, char **argv)
+run_packer(struct arguments *arguments)
 {
   struct ulp_metadata ulp;
-
-  struct argp argp = { options, parser, args_doc, doc, NULL, NULL, NULL };
-  struct arguments arguments = { 0 };
-
-  argp_parse(&argp, argc, argv, 0, 0, &arguments);
+  const char *description = arguments->args[0];
 
   /* Set the verbosity level in the common introspection infrastructure. */
-  ulp_verbose = arguments.verbose;
-  ulp_quiet = arguments.quiet;
+  ulp_verbose = arguments->verbose;
+  ulp_quiet = arguments->quiet;
 
   memset(&ulp, 0, sizeof(ulp));
 
   elf_version(EV_CURRENT);
 
-  DEBUG("parsing the description file (%s).", arguments.description);
-  if (!parse_description(arguments.description, &ulp)) {
-    WARN("unable to parse description file (%s).", arguments.description);
+  DEBUG("parsing the description file (%s).", description);
+  if (!parse_description(description, &ulp)) {
+    WARN("unable to parse description file (%s).", description);
     goto main_error;
   }
 
   /* Select source of the target library filename. */
-  if (arguments.library == NULL) {
-    arguments.library = ulp.objs->name;
+  if (arguments->library == NULL) {
+    arguments->library = ulp.objs->name;
     DEBUG("path to target library taken from the description file.");
   }
   else {
     DEBUG("path to target library taken from the command-line.");
   }
-  DEBUG("target library: %s.", arguments.library);
+  DEBUG("target library: %s.", arguments->library);
 
-  if (!get_ulp_elf_metadata(arguments.library, ulp.objs)) {
+  if (!get_ulp_elf_metadata(arguments->library, ulp.objs)) {
     WARN("unable to parse target library.");
     goto main_error;
   }
 
-  if (arguments.livepatch == NULL) {
-    arguments.livepatch = ulp.so_filename;
+  if (arguments->livepatch == NULL) {
+    arguments->livepatch = ulp.so_filename;
     DEBUG("path to live patch taken from the description file.");
   }
   else {
     DEBUG("path to live patch taken from the command-line.");
   }
-  DEBUG("live patch: %s.", arguments.livepatch);
+  DEBUG("live patch: %s.", arguments->livepatch);
 
-  if (write_patch_id(&ulp, arguments.description, arguments.livepatch)) {
+  if (write_patch_id(&ulp, description, arguments->livepatch)) {
     WARN("unable to generate live patch ID.");
     goto main_error;
   }
 
-  if (!create_patch_metadata_file(&ulp, arguments.metadata))
+  if (!create_patch_metadata_file(&ulp, arguments->metadata))
     goto main_error;
 
   free_metadata(&ulp);
