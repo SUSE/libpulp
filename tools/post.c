@@ -31,17 +31,19 @@
 
 #include <libelf.h>
 
+#include "arguments.h"
 #include "config.h"
+#include "post.h"
 
-Elf *elf;
+static Elf *elf;
 
 /*
  * Finds and returns the section identified by NAME. Returns NULL if no
  * such section is found. Exits in error if the string table containing
  * sections names is not found.
  */
-Elf_Scn *
-find_section_by_name(char *name)
+static Elf_Scn *
+find_section_by_name(const char *name)
 {
   char *str;
   size_t string_table;
@@ -70,67 +72,11 @@ find_section_by_name(char *name)
 }
 
 /*
- * Searches for a symbol named NAME. Returns a pointer to the Elf64_Sym
- * record that represents that symbol, or NULL if the symbol has not
- * been found.
- */
-Elf64_Sym *
-find_symbol_by_name(char *name)
-{
-  char *str;
-  size_t entry_size;
-  Elf_Scn *scn;
-  Elf_Data *data;
-  Elf64_Shdr *shdr;
-  Elf64_Sym *sym;
-
-  /* Use the .symtab if available, otherwise fallback to the .dynsym. */
-  scn = find_section_by_name(".symtab");
-  if (scn == NULL)
-    scn = find_section_by_name(".dynsym");
-  assert(scn);
-
-  /* Iterate over the entries in the selected symbol table. */
-  data = elf_getdata(scn, NULL);
-  shdr = elf64_getshdr(scn);
-  assert(data);
-  assert(shdr);
-  entry_size = sizeof(Elf64_Sym);
-  for (size_t i = 0; i < shdr->sh_size; i += entry_size) {
-    sym = (Elf64_Sym *)(data->d_buf + i);
-    str = elf_strptr(elf, shdr->sh_link, sym->st_name);
-    if (strcmp(name, str) == 0) {
-      return sym;
-    }
-  }
-
-  /* Symbol not found, return NULL. */
-  return NULL;
-}
-
-/*
- * Searches for a symbol named NAME. Returns its address. Exits the
- * program in error if the symbol has not been found.
- */
-Elf64_Addr
-find_symbol_addr_by_name(char *name)
-{
-  Elf64_Sym *sym;
-
-  sym = find_symbol_by_name(name);
-
-  if (sym == NULL)
-    errx(EXIT_FAILURE, "Unable to find symbol '%s'.\n", name);
-
-  return sym->st_value;
-}
-
-/*
  * Merges AMOUNT nop instruction at the function at ADDR.
  *
  * NOTE: This is an x86_64 specific function.
  */
-void
+static void
 merge_nops_at_addr(Elf64_Addr addr, size_t amount)
 {
   Elf_Scn *scn;
@@ -182,49 +128,12 @@ merge_nops_at_addr(Elf64_Addr addr, size_t amount)
   }
 }
 
-int
-is_patchable(Elf64_Sym *sym)
-{
-  Elf_Scn *scn;
-  Elf_Data *data;
-  Elf64_Addr addr;
-  Elf64_Addr entry;
-  size_t entry_size;
-  int bind, type;
-
-  /* Only FUNCTIONS, either GLOBAL or WEAK, are patchable. */
-  bind = ELF64_ST_BIND(sym->st_info);
-  type = ELF64_ST_TYPE(sym->st_info);
-  if (!(type == STT_FUNC && (bind == STB_GLOBAL || bind == STB_WEAK)))
-    return 0;
-
-  /* Start of the nop padding area for SYM. */
-  addr = sym->st_value - PRE_NOPS_LEN;
-
-  /*
-   * SYM has padding nops *only if* ADDR is an entry in
-   * __patchable_function_entries.
-   */
-  scn = find_section_by_name("__patchable_function_entries");
-  assert(scn);
-  data = elf_getdata(scn, NULL);
-  assert(data);
-  entry_size = sizeof(Elf64_Addr);
-  for (size_t i = 0; i < data->d_size; i += entry_size) {
-    entry = *(Elf64_Addr *)(data->d_buf + i);
-    if (addr == entry)
-      return 1;
-  }
-
-  return 0;
-}
-
 /*
  * Iterates over all entries in the __patchable_function_entries
  * section, finds the entry points of the functions they refer to, then
  * replaces sequences of multiple nop instruction with multi-byte nops.
  */
-void
+static void
 nops_fixup(void)
 {
   Elf_Scn *scn;
@@ -258,17 +167,14 @@ nops_fixup(void)
 }
 
 int
-main(int argc, char **argv)
+run_post(struct arguments *arguments)
 {
   int fd;
   Elf_Scn *scn;
 
-  if (argc != 2)
-    errx(EXIT_FAILURE, "Usage: %s <library.so>", argv[0]);
-
-  fd = open(argv[1], O_RDWR);
+  fd = open(arguments->args[0], O_RDWR);
   if (fd == -1)
-    errx(EXIT_FAILURE, "Unable to open file '%s'.\n", argv[1]);
+    errx(EXIT_FAILURE, "Unable to open file '%s'.\n", arguments->args[0]);
 
   elf_version(EV_CURRENT);
   elf = elf_begin(fd, ELF_C_RDWR, NULL);

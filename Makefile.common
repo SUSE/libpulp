@@ -19,7 +19,7 @@
 
 # ULP tools location.
 ULP = $(top_builddir)/tools/ulp
-ULP_POST = $(top_builddir)/tools/ulp_post
+ULP_POST = $(ULP) post
 ULP_PACKER = $(ULP) packer
 ULP_REVERSE = $(top_builddir)/tools/ulp_reverse
 
