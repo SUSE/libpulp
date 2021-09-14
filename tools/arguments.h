@@ -32,11 +32,15 @@ typedef enum
   ULP_PATCHES,
   ULP_CHECK,
   ULP_DUMP,
+  ULP_PACKER,
 } command_t;
 
 struct arguments
 {
   const char *args[ARGS_MAX];
+  const char *livepatch;
+  const char *library;
+  const char *metadata;
   pid_t pid;
   command_t command;
   int quiet;

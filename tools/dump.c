@@ -20,6 +20,7 @@
  */
 
 #include <stdio.h>
+#include <sys/types.h>
 
 #include "arguments.h"
 #include "dump.h"

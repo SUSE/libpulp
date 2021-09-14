@@ -19,37 +19,44 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef PACKER_H
+#define PACKER_H
+
 #include <gelf.h>
 #include <stdio.h>
 #include <unistd.h>
 
 #include "ulp_common.h"
 
-void usage(char *name);
+struct arguments;
 
 void free_metadata(struct ulp_metadata *ulp);
 
 void unload_elf(Elf **elf, int *fd);
 
-Elf *load_elf(char *obj, int *fd);
+Elf *load_elf(const char *obj, int *fd);
 
 Elf_Scn *get_dynsym(Elf *elf);
 
 Elf_Scn *get_build_id_note(Elf *elf);
 
-int get_ulp_elf_metadata(char *filename, struct ulp_object *obj);
+int get_ulp_elf_metadata(const char *filename, struct ulp_object *obj);
 
 int get_object_metadata(Elf *elf, struct ulp_object *obj);
 
 int get_elf_tgt_addrs(Elf *elf, struct ulp_object *obj, Elf_Scn *st);
 
-int create_patch_metadata_file(struct ulp_metadata *ulp, char *filename);
+int create_patch_metadata_file(struct ulp_metadata *ulp, const char *filename);
 
 int add_dependency(struct ulp_metadata *ulp, struct ulp_dependency *dep,
-                   char *filename);
+                   const char *filename);
 
-int parse_description(char *filename, struct ulp_metadata *ulp);
+int parse_description(const char *filename, struct ulp_metadata *ulp);
 
 int get_build_id(Elf_Scn *s, struct ulp_object *obj);
 
-void *get_symbol_addr(Elf *elf, Elf_Scn *s, char *search);
+void *get_symbol_addr(Elf *elf, Elf_Scn *s, const char *search);
+
+int run_packer(struct arguments *);
+
+#endif /* PACKER_H */

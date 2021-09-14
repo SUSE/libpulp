@@ -18,7 +18,6 @@
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
 bin_PROGRAMS = \
-  ulp_packer \
   ulp_reverse \
   ulp_trigger \
   ulp_post \
@@ -46,12 +45,6 @@ libcommon_la_LIBADD = -lelf -ldl $(LIBUNWIND_LIBS)
 ulp_post_SOURCES = post.c
 ulp_post_LDADD = -lelf
 
-# The packer and reverse tools create metadata files for live patches,
-# whereas the dump tool dumps their content in human-readable format.
-
-ulp_packer_SOURCES = packer.c md4.c
-ulp_packer_LDADD = libcommon.la -lelf
-
 ulp_reverse_SOURCES = revert.c
 
 # The trigger and check tools attach to live patchable processes to
@@ -61,7 +54,7 @@ ulp_reverse_SOURCES = revert.c
 ulp_trigger_SOURCES = trigger.c
 ulp_trigger_LDADD = libcommon.la
 
-ulp_SOURCES = ulp.c check.c patches.c dump.c
+ulp_SOURCES = ulp.c check.c patches.c dump.c packer.c md4.c
 ulp_LDADD = libcommon.la
 
 # Ensure access to the include directory
