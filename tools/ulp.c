@@ -30,6 +30,7 @@
 #include "arguments.h"
 #include "check.h"
 #include "config.h"
+#include "dump.h"
 #include "introspection.h"
 #include "patches.h"
 
@@ -41,23 +42,28 @@ const char *argp_program_version = PACKAGE_STRING;
 
 static const char args_doc[] = "COMMAND [ARG1 ARG2 ...]";
 
+/* clang-format off */
 static const char doc[] =
-    "ulp: Userspace Live Patch tool.\n"
-    "\n"
-    " This tool executes a COMMAND passed in the argument list.\n"
-    " Possible COMMANDs are:\n"
-    "\n"
-    "   patches                   List active patches\n"
-    "   check                     Check if patch in ARG1 is applied on "
-    "process\n"
-    "                             with -p=PID\n";
+"ulp: Userspace Live Patch tool.\n"
+"\n"
+" This tool executes a COMMAND passed in the argument list.\n"
+" Possible COMMANDs are:\n"
+"\n"
+"   patches                   List active patches.\n"
+"   check                     Check if patch in ARG1 is applied on process\n"
+"                             with -p PID.\n"
+"   dump                      Print the content of metadata file on ARG1 in\n"
+"                             human readable form.\n";
+/* clang-format on */
 
 static struct argp_option options[] = {
   { 0, 0, 0, 0, "Options:", 0 },
   { "verbose", 'v', 0, 0, "Produce verbose output", 0 },
   { "quiet", 'q', 0, 0, "Don't produce any output", 0 },
-  { 0, 0, 0, 0, "patches command only:", 0 },
+  { 0, 0, 0, 0, "patches & check commands only:", 0 },
   { "pid", 'p', "PID", 0, "Target process with PID", 0 },
+  { 0, 0, 0, 0, "dump command only:", 0 },
+  { "buildid", 'b', 0, 0, "Only print the build id (dump only.)", 0 },
   { 0 }
 };
 
@@ -83,6 +89,7 @@ command_from_string(const char *str)
   static const struct entry entries[] = {
     { "patches", ULP_PATCHES },
     { "check", ULP_CHECK },
+    { "dump", ULP_DUMP },
   };
 
   size_t i;
@@ -100,6 +107,7 @@ static void
 handle_end_of_arguments(const struct argp_state *state)
 {
   const struct arguments *arguments = state->input;
+  int path_length;
 
   if (state->arg_num < 1)
     argp_error(state, "Too few arguments.");
@@ -121,6 +129,17 @@ handle_end_of_arguments(const struct argp_state *state)
       if (state->arg_num < 2)
         argp_error(state, "Too few arguments.");
       break;
+
+    case ULP_DUMP:
+      if (state->arg_num < 2)
+        argp_error(state, "Too few arguments.");
+
+      path_length = strlen(arguments->args[0]);
+      if (path_length > ULP_PATH_LEN)
+        argp_error(state,
+                   "METADATA path must be shorter than %d bytes; got %d.",
+                   ULP_PATH_LEN, path_length);
+      break;
   }
 }
 
@@ -141,6 +160,9 @@ parser(int key, char *arg, struct argp_state *state)
       break;
     case 'p':
       arguments->pid = atoi(arg);
+      break;
+    case 'b':
+      arguments->buildid_only = 1;
       break;
     case ARGP_KEY_ARG:
       if (state->arg_num == 0) {
@@ -184,6 +206,10 @@ main(int argc, char **argv)
 
     case ULP_CHECK:
       ret = run_check(&arguments);
+      break;
+
+    case ULP_DUMP:
+      ret = run_dump(&arguments);
       break;
   }
 

@@ -19,67 +19,15 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <argp.h>
 #include <stdio.h>
 
+#include "arguments.h"
+#include "dump.h"
 #include "introspection.h"
 
 extern struct ulp_metadata ulp;
 
-struct arguments
-{
-  char *args[1];
-  int buildid_only;
-};
-
-static char doc[] = "Prints the content of the METADATA file\n"
-                    "in human readable form.";
-
-static char args_doc[] = "METADATA";
-
-static struct argp_option options[] = { { 0, 0, 0, 0, "Options:", 0 },
-                                        { "buildid", 'b', 0, 0,
-                                          "Only print the build id", 0 },
-                                        { 0 } };
-
-static error_t
-parser(int key, char *arg, struct argp_state *state)
-{
-  int path_length;
-  struct arguments *arguments;
-
-  arguments = state->input;
-
-  switch (key) {
-    case 'b':
-      arguments->buildid_only = 1;
-      break;
-    case ARGP_KEY_ARG:
-      if (state->arg_num >= 1) {
-        argp_error(state, "Too many arguments.");
-      }
-      if (state->arg_num == 0) {
-        /* Path to live patch metadata file. */
-        path_length = strlen(arg);
-        if (path_length > ULP_PATH_LEN)
-          argp_error(state,
-                     "METADATA path must be shorter than %d bytes; got %d.",
-                     ULP_PATH_LEN, path_length);
-      }
-      arguments->args[state->arg_num] = arg;
-      break;
-    case ARGP_KEY_END:
-      if (state->arg_num < 1)
-        argp_error(state, "Too few arguments.");
-      break;
-    default:
-      return ARGP_ERR_UNKNOWN;
-  }
-
-  return 0;
-}
-
-void
+static void
 id2str(char *str, char *id, int idlen)
 {
   int i;
@@ -91,7 +39,7 @@ id2str(char *str, char *id, int idlen)
   }
 }
 
-void
+static void
 dump_metadata(struct ulp_metadata *ulp, int buildid_only)
 {
   char buffer[128];
@@ -133,15 +81,12 @@ dump_metadata(struct ulp_metadata *ulp, int buildid_only)
 }
 
 int
-main(int argc, char **argv)
+run_dump(struct arguments *arguments)
 {
-  struct argp argp = { options, parser, args_doc, doc, NULL, NULL, NULL };
-  struct arguments arguments;
-
-  arguments.buildid_only = 0;
-  argp_parse(&argp, argc, argv, 0, 0, &arguments);
-
-  load_patch_info(arguments.args[0]);
-  dump_metadata(&ulp, arguments.buildid_only);
+  if (load_patch_info(arguments->args[0])) {
+    WARN("error parsing the metadata file (%s).", arguments->args[0]);
+    return 1;
+  }
+  dump_metadata(&ulp, arguments->buildid_only);
   return 0;
 }
