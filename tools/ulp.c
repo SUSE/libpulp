@@ -35,6 +35,7 @@
 #include "packer.h"
 #include "patches.h"
 #include "post.h"
+#include "revert.h"
 #include "trigger.h"
 
 static error_t parser(int, char *, struct argp_state *);
@@ -61,7 +62,9 @@ static const char doc[] =
 "                             live patch description on ARG1.\n"
 "   trigger                   Applies the live patch in ARG1 to the process\n"
 "                             with PID\n"
-"   post                      Post process patch container (.so file) in ARG1.\n";
+"   post                      Post process patch container (.so file) in ARG1.\n"
+"   reverse                   Create reverse livepatch from metadata in ARG1.\n";
+
 /* clang-format on */
 
 static struct argp_option options[] = {
@@ -77,9 +80,9 @@ static struct argp_option options[] = {
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
   { "check-stack", 'c', 0, 0, "Check the call stack before live patching", 0 },
 #endif
+  { 0, 0, 0, 0, "packer & reverse commands only:", 0 },
+  { "output", 'o', "FILE", 0, "Write output to FILE", 0 },
   { 0, 0, 0, 0, "packer command only:", 0 },
-  { "output", 'o', "METADATA", 0,
-    "Write output to METADATA\nDefaults to the standard output", 0 },
   { "livepatch", 'l', "LIVEPATCH", 0,
     "Use this livepatch file\nDefaults to the one described in ARG1", 0 },
   { "target", 't', "LIBRARY", 0,
@@ -110,6 +113,7 @@ command_from_string(const char *str)
     { "patches", ULP_PATCHES }, { "check", ULP_CHECK },
     { "dump", ULP_DUMP },       { "packer", ULP_PACKER },
     { "trigger", ULP_TRIGGER }, { "post", ULP_POST },
+    { "reverse", ULP_REVERSE },
   };
 
   size_t i;
@@ -151,7 +155,8 @@ handle_end_of_arguments(const struct argp_state *state)
         argp_error(state, "Too few arguments.");
       break;
 
-    /* Currently, ULP_TRIGGER, DUMP & POST does the same checks.  */
+    /* Currently, ULP_TRIGGER, DUMP POST & REVERT does the same checks.  */
+    case ULP_REVERSE:
     case ULP_POST:
     case ULP_TRIGGER:
     case ULP_DUMP:
@@ -270,6 +275,10 @@ main(int argc, char **argv)
 
     case ULP_POST:
       ret = run_post(&arguments);
+      break;
+
+    case ULP_REVERSE:
+      ret = run_reverse(&arguments);
       break;
   }
 

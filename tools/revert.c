@@ -28,16 +28,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "arguments.h"
 #include "packer.h"
+#include "revert.h"
 
-static void
-usage(char *name)
-{
-  fprintf(stderr, "Usage: %s <ulp metadata file> [output filename]\n", name);
-}
-
-int
-write_reverse_patch(struct ulp_metadata *ulp, char *filename)
+static int
+write_reverse_patch(struct ulp_metadata *ulp, const char *filename)
 {
   FILE *file;
   char type = 2;
@@ -85,8 +81,8 @@ write_reverse_patch(struct ulp_metadata *ulp, char *filename)
   return 1;
 }
 
-struct ulp_metadata *
-parse_metadata(char *filename, struct ulp_metadata *ulp)
+static struct ulp_metadata *
+parse_metadata(const char *filename, struct ulp_metadata *ulp)
 {
   FILE *file;
   struct ulp_object *obj;
@@ -172,21 +168,14 @@ parse_metadata(char *filename, struct ulp_metadata *ulp)
 }
 
 int
-main(int argc, char **argv)
+run_reverse(struct arguments *arguments)
 {
   struct ulp_metadata ulp;
-  char *filename = NULL;
+  /* .metadata is passed in .o from packer.  */
+  const char *filename = arguments->metadata;
+  const char *metadata = arguments->args[0];
 
-  if (argc < 2) {
-    usage(argv[0]);
-    return 1;
-  }
-
-  if (argc > 2) {
-    filename = strndup(argv[2], NAME_MAX);
-  }
-
-  if (!parse_metadata(argv[1], &ulp)) {
+  if (!parse_metadata(metadata, &ulp)) {
     WARN("Error parsing ulp metadata.\n");
     return 1;
   }

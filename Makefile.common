@@ -21,7 +21,7 @@
 ULP = $(top_builddir)/tools/ulp
 ULP_POST = $(ULP) post
 ULP_PACKER = $(ULP) packer
-ULP_REVERSE = $(top_builddir)/tools/ulp_reverse
+ULP_REVERSE = $(ULP) reverse
 
 # Build and link requirements for live-patchable (target) libraries.
 TARGET_CFLAGS = \
@@ -61,4 +61,4 @@ CONVENIENCE_LDFLAGS = -rpath $(libdir) $(AM_LDFLAGS)
 	$(ULP_PACKER) $< -o $@
 
 %.rev: %.ulp
-	$(ULP_REVERSE) $< $@
+	$(ULP_REVERSE) $< -o $@
