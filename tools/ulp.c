@@ -34,6 +34,7 @@
 #include "introspection.h"
 #include "packer.h"
 #include "patches.h"
+#include "post.h"
 #include "trigger.h"
 
 static error_t parser(int, char *, struct argp_state *);
@@ -59,7 +60,8 @@ static const char doc[] =
 "   packer                    Creates a livepatch METADATA file based on a\n"
 "                             live patch description on ARG1.\n"
 "   trigger                   Applies the live patch in ARG1 to the process\n"
-"                             with PID\n";
+"                             with PID\n"
+"   post                      Post process patch container (.so file) in ARG1.\n";
 /* clang-format on */
 
 static struct argp_option options[] = {
@@ -107,7 +109,7 @@ command_from_string(const char *str)
   static const struct entry entries[] = {
     { "patches", ULP_PATCHES }, { "check", ULP_CHECK },
     { "dump", ULP_DUMP },       { "packer", ULP_PACKER },
-    { "trigger", ULP_TRIGGER },
+    { "trigger", ULP_TRIGGER }, { "post", ULP_POST },
   };
 
   size_t i;
@@ -149,7 +151,8 @@ handle_end_of_arguments(const struct argp_state *state)
         argp_error(state, "Too few arguments.");
       break;
 
-    /* Currently, ULP_TRIGGER and DUMP does the same checks.  */
+    /* Currently, ULP_TRIGGER, DUMP & POST does the same checks.  */
+    case ULP_POST:
     case ULP_TRIGGER:
     case ULP_DUMP:
       if (state->arg_num < 2)
@@ -263,6 +266,10 @@ main(int argc, char **argv)
 
     case ULP_TRIGGER:
       ret = run_trigger(&arguments);
+      break;
+
+    case ULP_POST:
+      ret = run_post(&arguments);
       break;
   }
 

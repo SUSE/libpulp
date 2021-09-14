@@ -19,7 +19,6 @@
 
 bin_PROGRAMS = \
   ulp_reverse \
-  ulp_post \
   ulp
 
 noinst_HEADERS = \
@@ -31,7 +30,8 @@ noinst_HEADERS = \
   md4.h \
   check.h \
   patches.h \
-  dump.h
+  dump.h \
+  post.h
 
 # Static library shared among the tools.
 
@@ -40,14 +40,9 @@ noinst_LTLIBRARIES = libcommon.la
 libcommon_la_SOURCES = introspection.c ptrace.c
 libcommon_la_LIBADD = -lelf -ldl $(LIBUNWIND_LIBS)
 
-# The post tool replaces one-byte nops with multi-byte nop instructions.
-
-ulp_post_SOURCES = post.c
-ulp_post_LDADD = -lelf
-
 ulp_reverse_SOURCES = revert.c
 
-ulp_SOURCES = ulp.c check.c patches.c dump.c packer.c md4.c trigger.c
+ulp_SOURCES = ulp.c check.c patches.c dump.c packer.c md4.c trigger.c post.c
 ulp_LDADD = libcommon.la
 
 # Ensure access to the include directory
