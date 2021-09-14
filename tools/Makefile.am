@@ -19,11 +19,11 @@
 
 bin_PROGRAMS = \
   ulp_reverse \
-  ulp_trigger \
   ulp_post \
   ulp
 
 noinst_HEADERS = \
+  trigger.h \
   arguments.h \
   introspection.h \
   ptrace.h \
@@ -47,14 +47,7 @@ ulp_post_LDADD = -lelf
 
 ulp_reverse_SOURCES = revert.c
 
-# The trigger and check tools attach to live patchable processes to
-# apply or check live patches, respectively. The ulp tool searches the
-# whole system for live patchable processes and report their state.
-
-ulp_trigger_SOURCES = trigger.c
-ulp_trigger_LDADD = libcommon.la
-
-ulp_SOURCES = ulp.c check.c patches.c dump.c packer.c md4.c
+ulp_SOURCES = ulp.c check.c patches.c dump.c packer.c md4.c trigger.c
 ulp_LDADD = libcommon.la
 
 # Ensure access to the include directory

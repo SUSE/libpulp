@@ -133,11 +133,11 @@ int hijack_threads(struct ulp_process *process);
 
 int set_id_buffer(struct ulp_process *process, unsigned char *patch_id);
 
-int set_path_buffer(struct ulp_process *process, char *path);
+int set_path_buffer(struct ulp_process *process, const char *path);
 
 int patch_applied(struct ulp_process *process, unsigned char *id, int *result);
 
-int apply_patch(struct ulp_process *process, char *metadata);
+int apply_patch(struct ulp_process *process, const char *metadata);
 
 int restore_threads(struct ulp_process *process);
 

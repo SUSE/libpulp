@@ -31,129 +31,27 @@
 #include <sys/user.h>
 #include <unistd.h>
 
+#include "arguments.h"
 #include "config.h"
 #include "introspection.h"
+#include "trigger.h"
 #include "ulp_common.h"
 
-const char *argp_program_version = PACKAGE_STRING;
-
-struct arguments
-{
-  char *args[1];
-  pid_t pid;
-  int retries;
-#if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
-  int check_stack;
-#endif
-  int quiet;
-  int verbose;
-};
-
-static char doc[] =
-    "Applies the live patch in METADATA to the process with PID.";
-
-static char args_doc[] = "-p PID METADATA";
-
-static struct argp_option options[] = {
-  { "pid", 'p', "PID", 0, "Apply the patch to process with PID", 0 },
-  { 0, 0, 0, 0, "Options:", 0 },
-  { "retries", 'r', "N", 0, "Retry N times if process busy", 0 },
-#if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
-  { "check-stack", 'c', 0, 0, "Check the call stack before live patching", 0 },
-#endif
-  { "verbose", 'v', 0, 0, "Produce verbose output", 0 },
-  { "quiet", 'q', 0, 0, "Don't produce any output", 0 },
-  { 0 }
-};
-
-static error_t
-parser(int key, char *arg, struct argp_state *state)
-{
-  int path_length;
-  struct arguments *arguments;
-
-  arguments = state->input;
-
-  switch (key) {
-    case 'v':
-      arguments->verbose = 1;
-      break;
-    case 'q':
-      arguments->quiet = 1;
-      break;
-    case 'p':
-      arguments->pid = atoi(arg);
-      if (arguments->pid < 1)
-        argp_error(state,
-                   "The argument to '-p' must be greater than zero; got %d.",
-                   arguments->pid);
-      break;
-    case 'r':
-      arguments->retries = atoi(arg);
-      if (arguments->retries < 1)
-        argp_error(state,
-                   "The argument to '-r' must be greater than zero; got %d.",
-                   arguments->retries);
-      break;
-#if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
-    case 'c':
-      arguments->check_stack = 1;
-      break;
-#endif
-    case ARGP_KEY_ARG:
-      if (state->arg_num >= 1) {
-        argp_error(state, "Too many arguments.");
-      }
-      if (state->arg_num == 0) {
-        /* Path to live patch metadata file. */
-        path_length = strlen(arg);
-        if (path_length > ULP_PATH_LEN)
-          argp_error(state,
-                     "METADATA path must be shorter than %d bytes; got %d.",
-                     ULP_PATH_LEN, path_length);
-      }
-      arguments->args[state->arg_num] = arg;
-      break;
-    case ARGP_KEY_END:
-      if (state->arg_num < 1)
-        argp_error(state, "Too few arguments.");
-      if (arguments->quiet && arguments->verbose)
-        argp_error(state, "You must specify either '-v' or '-q' or none.");
-      break;
-    default:
-      return ARGP_ERR_UNKNOWN;
-  }
-
-  return 0;
-}
-
 int
-main(int argc, char **argv)
+run_trigger(struct arguments *arguments)
 {
-  char *livepatch;
+  const char *livepatch;
   int result;
   int ret;
   int retry;
 
   struct ulp_process target;
 
-  struct argp argp = { options, parser, args_doc, doc, NULL, NULL, NULL };
-  struct arguments arguments;
-
-  arguments.pid = 0;
-  arguments.verbose = 0;
-  arguments.quiet = 0;
-  arguments.retries = 1;
-#if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
-  arguments.check_stack = 0;
-#endif
-  argp_parse(&argp, argc, argv, 0, 0, &arguments);
-
   /* Set the verbosity level in the common introspection infrastructure. */
-  ulp_verbose = arguments.verbose;
-  ulp_quiet = arguments.quiet;
+  ulp_verbose = arguments->verbose;
+  ulp_quiet = arguments->quiet;
 
-  livepatch = arguments.args[0];
+  livepatch = arguments->args[0];
 
   if (load_patch_info(livepatch)) {
     WARN("error parsing the metadata file (%s).", livepatch);
@@ -161,7 +59,7 @@ main(int argc, char **argv)
   }
 
   memset(&target, 0, sizeof(target));
-  target.pid = arguments.pid;
+  target.pid = arguments->pid;
   ret = initialize_data_structures(&target);
   if (ret) {
     WARN("error gathering target process information.");
@@ -181,7 +79,7 @@ main(int argc, char **argv)
    * so retry in a finite loop.
    */
   result = -1;
-  retry = arguments.retries;
+  retry = arguments->retries;
   while (retry) {
     retry--;
 
@@ -196,7 +94,7 @@ main(int argc, char **argv)
     }
 
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
-    if (arguments.check_stack) {
+    if (arguments->check_stack) {
       ret = coarse_library_range_check(&target, NULL);
       if (ret) {
         DEBUG("range check failed");
@@ -211,7 +109,7 @@ main(int argc, char **argv)
     }
     if (result)
       DEBUG("live patching %d failed (attempt #%d).", target.pid,
-            (arguments.retries - retry));
+            (arguments->retries - retry));
     else
       retry = 0;
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
