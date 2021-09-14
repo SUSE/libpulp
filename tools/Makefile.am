@@ -17,9 +17,7 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-bin_PROGRAMS = \
-  ulp_reverse \
-  ulp
+bin_PROGRAMS = ulp
 
 noinst_HEADERS = \
   trigger.h \
@@ -31,7 +29,8 @@ noinst_HEADERS = \
   check.h \
   patches.h \
   dump.h \
-  post.h
+  post.h \
+  revert.h
 
 # Static library shared among the tools.
 
@@ -40,9 +39,17 @@ noinst_LTLIBRARIES = libcommon.la
 libcommon_la_SOURCES = introspection.c ptrace.c
 libcommon_la_LIBADD = -lelf -ldl $(LIBUNWIND_LIBS)
 
-ulp_reverse_SOURCES = revert.c
+ulp_SOURCES = \
+  ulp.c \
+  check.c \
+  patches.c \
+  dump.c \
+  packer.c \
+  md4.c \
+  trigger.c \
+  post.c \
+  revert.c
 
-ulp_SOURCES = ulp.c check.c patches.c dump.c packer.c md4.c trigger.c post.c
 ulp_LDADD = libcommon.la
 
 # Ensure access to the include directory
