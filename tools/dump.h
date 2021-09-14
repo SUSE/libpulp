@@ -19,29 +19,11 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef ARGUMENTS_H
-#define ARGUMENTS_H
+#ifndef DUMP_H
+#define DUMP_H
 
-#include "config.h"
+struct arguments;
 
-#define ARGS_MAX 1
+int run_dump(struct arguments *);
 
-typedef enum
-{
-  ULP_NONE,
-  ULP_PATCHES,
-  ULP_CHECK,
-  ULP_DUMP,
-} command_t;
-
-struct arguments
-{
-  const char *args[ARGS_MAX];
-  pid_t pid;
-  command_t command;
-  int quiet;
-  int verbose;
-  int buildid_only;
-};
-
-#endif
+#endif /* DUMP_H */
