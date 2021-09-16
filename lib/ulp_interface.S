@@ -37,18 +37,21 @@
  * executed, without side-effects).
  */
 
+.global __ulp_trigger
 __ulp_trigger:
     nop
     nop
     call    __ulp_apply_patch@PLT
     int3
 
+.global __ulp_check_patched
 __ulp_check_patched:
     nop
     nop
     call   __ulp_check_applied_patch@PLT
     int3
 
+.global __ulp_get_global_universe
 __ulp_get_global_universe:
     nop
     nop
