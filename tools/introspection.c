@@ -117,11 +117,197 @@ dig_main_link_map(struct ulp_process *process)
   return 0;
 }
 
-/* Looks for a symbol named SYM in OBJ. If the symbols gets found,
- * returns its address. Otherwise, returns 0.
+/* Get symbol by its name, but with extra complexity of reading it in a remote
+ * process.
+ */
+static ElfW(Addr)
+    get_symbol_by_name(int pid, ElfW(Addr) dynsym_addr, ElfW(Addr) dynstr_addr,
+                       int len, const char *name)
+{
+  int i, ret;
+  for (i = 0; i < len; i++) {
+    ElfW(Sym) sym;
+    char *remote_name;
+
+    ret = read_memory((char *)&sym, sizeof(sym), pid, dynsym_addr);
+    if (ret) {
+      WARN("Unable to read dynamic symbol");
+      /* Exit point 1: Either memory was not allocated or released by (*).  */
+      return 0;
+    }
+
+    /* WARNING: remote name has to be released.  */
+    ret = read_string(&remote_name, pid, dynstr_addr + sym.st_name);
+    if (ret) {
+      WARN("Unable to read dynamic symbol name");
+      /* Exit point 2: Memory may leak in case of error when detaching.  */
+      return 0;
+    }
+
+    if (!strcmp(remote_name, name)) {
+      free(remote_name);
+      /* Exit point 3: memory released in previous line.  */
+      return sym.st_value;
+    }
+
+    dynsym_addr += sizeof(sym);
+    free(remote_name); /* (*).  */
+  }
+
+  /* Exit point 4: memory released by (*).  */
+  return 0;
+}
+
+/* Looks for a symbol named SYM in OBJ on the process with pid. If the symbols
+ * gets found, returns its address. Otherwise, returns 0.
+ *
+ * The algorithm here is the same implemented in interpose.c, but with extra
+ * complexity of reading memory in a remote process. For better understanding
+ * of the algorithm, please check interpose.c comments.
  */
 Elf64_Addr
-get_loaded_symbol_addr(struct ulp_dynobj *obj, char *sym)
+get_loaded_symbol_addr(struct ulp_dynobj *obj, int pid, const char *sym_name)
+{
+  ElfW(Addr) ehdr_addr = 0;
+  ElfW(Ehdr) ehdr;
+  ElfW(Addr) phdr_addr = 0;
+
+  ElfW(Addr) dynsym_addr = 0;
+  ElfW(Addr) dynstr_addr = 0;
+  ElfW(Addr) hash_addr = 0;
+
+  int i, num_symbols = 0, ret;
+
+  /* Pointers to linux-vdso.so are invalid, so skip this library.  */
+  if (!strcmp(obj->filename, "linux-vdso.so.1")) {
+    return 0;
+  }
+
+  /* If object has no link map attached to it, there is nothing we can do.  */
+  if (!obj->link_map.l_addr) {
+    DEBUG("no link map object found");
+    return 0;
+  }
+
+  /* l_addr holds the pointer to the ELF header.  */
+  ehdr_addr = obj->link_map.l_addr;
+
+  /* Read ELF header from remote process.  */
+  ret = read_memory((char *)&ehdr, sizeof(ehdr), pid, ehdr_addr);
+  if (ret != 0) {
+    WARN("Unable to read ELF header from process %d\n", pid);
+    return 0;
+  }
+
+  /* Sanity check if process header size is valid.  */
+  if (ehdr.e_phentsize != sizeof(ElfW(Phdr))) {
+    WARN("Invalid phdr readed");
+    return 0;
+  }
+
+  /* Get first process header address.  */
+  phdr_addr = ehdr_addr + ehdr.e_phoff;
+
+  /* Iterate over each process header.  */
+  for (i = 0; i < ehdr.e_phnum; i++) {
+    ElfW(Phdr) phdr;
+    ElfW(Addr) curr_phdr_addr = phdr_addr + i * sizeof(ElfW(Phdr));
+
+    /* Get first process header from remote process.  */
+    ret = read_memory((char *)&phdr, sizeof(phdr), pid, curr_phdr_addr);
+    if (ret != 0) {
+      WARN("Unable to read process header from process %d\n", pid);
+      return 0;
+    }
+
+    /* Look for the dynamic section.  */
+    if (phdr.p_type == PT_DYNAMIC) {
+      ElfW(Dyn) dyn;
+      ElfW(Addr) dyn_addr = ehdr_addr + phdr.p_paddr;
+
+      /* Iterate over each tag in this section.  */
+      do {
+        /* Get the dynamic symbol in remote process.  */
+        ret = read_memory((char *)&dyn, sizeof(dyn), pid, dyn_addr);
+        if (ret != 0) {
+          WARN("Unable to read process header from process %d\n", pid);
+          return 0;
+        }
+
+        switch (dyn.d_tag) {
+          case DT_SYMTAB:
+            dynsym_addr = dyn.d_un.d_ptr;
+            break;
+
+          case DT_STRTAB:
+            dynstr_addr = dyn.d_un.d_ptr;
+            break;
+
+          case DT_SYMENT:
+            /* This section stores the size of a symbol entry. So compare it
+             * with the size of Elf64_Sym as a sanity check.  */
+            if (dyn.d_un.d_val != sizeof(ElfW(Sym)))
+              WARN("DT_SYMENT value of %s is unexpected", obj->filename);
+            break;
+
+          case DT_HASH:
+            hash_addr = dyn.d_un.d_ptr;
+            if (!hash_addr)
+              DEBUG("hash section found, but is empty");
+            break;
+        }
+        dyn_addr += sizeof(dyn);
+      }
+      while (dyn.d_tag != DT_NULL);
+    }
+  }
+
+  if (!hash_addr) {
+    WARN("hash table not found in %s", obj->filename);
+    return 0;
+  }
+
+  /* Look at the hash section for the number of the symbols in the
+   * symbol table.  This section structure in memory is:
+   *
+   * hash_t nbuckets;
+   * hash_t nchains;
+   * hash_t buckets[nbuckets];
+   * hash_t chain[nchains];
+   *
+   * hash_t is either int32_t or int64_t according to the arch.
+   * On x86_64 it is 32-bits.
+   */
+
+  /* Get nchains.  */
+  ret = read_memory((char *)&num_symbols, sizeof(int), pid,
+                    hash_addr + sizeof(int));
+  if (ret != 0) {
+    WARN("Unable to read hash table");
+    return 0;
+  }
+
+  /* With the symbol table identified, find the wanted symbol.  */
+  if (dynsym_addr && dynstr_addr) {
+    ElfW(Addr) sym_addr;
+
+    sym_addr = get_symbol_by_name(pid, dynsym_addr, dynstr_addr, num_symbols,
+                                  sym_name);
+
+    if (sym_addr)
+      return ehdr_addr + sym_addr;
+  }
+
+  return 0;
+}
+
+/* Same as get_loaded_symbol_addr, but use the file in disk instead of parsing
+ * the in-memory content of the remote process. This have the advantage of
+ * finding non-exported symbols whose names aren't loaded in the process, but
+ * may be unsafe because the file could have been changed in meanwhile.
+ */
+Elf64_Addr
+get_loaded_symbol_addr_from_disk(struct ulp_dynobj *obj, const char *sym)
 {
   char *str;
   int i;
@@ -377,19 +563,20 @@ parse_lib_dynobj(struct ulp_process *process, struct link_map *link_map_addr)
   struct ulp_dynobj *obj;
   struct link_map *link_map;
   char *libname;
+  int pid = process->pid;
 
   /* calloc initializes all to zero */
   obj = calloc(sizeof(struct ulp_dynobj), 1);
   link_map = calloc(sizeof(struct link_map), 1);
 
-  if (read_memory((char *)link_map, sizeof(struct link_map), process->pid,
+  if (read_memory((char *)link_map, sizeof(struct link_map), pid,
                   (Elf64_Addr)link_map_addr)) {
     WARN("error reading link_map address.");
     return NULL;
   }
 
   libname = calloc(PATH_MAX, 1);
-  if (read_string(&libname, process->pid, (Elf64_Addr)link_map->l_name)) {
+  if (read_string(&libname, pid, (Elf64_Addr)link_map->l_name)) {
     WARN("error reading link_map string.");
     return NULL;
   }
@@ -408,31 +595,39 @@ parse_lib_dynobj(struct ulp_process *process, struct link_map *link_map_addr)
    * some by the target library.
    */
   obj->link_map = *link_map;
-  obj->trigger = get_loaded_symbol_addr(obj, "__ulp_trigger");
-  obj->path_buffer = get_loaded_symbol_addr(obj, "__ulp_path_buffer");
-  obj->check = get_loaded_symbol_addr(obj, "__ulp_check_patched");
-  obj->state = get_loaded_symbol_addr(obj, "__ulp_state");
-  obj->global = get_loaded_symbol_addr(obj, "__ulp_get_global_universe");
-  obj->msg_queue = get_loaded_symbol_addr(obj, "__ulp_msg_queue");
 
-  /* libpulp must expose all these symbols. */
-  if (obj->trigger && obj->path_buffer && obj->check && obj->state &&
-      obj->global && obj->msg_queue) {
-    obj->next = NULL;
-    process->dynobj_libpulp = obj;
-    DEBUG("(libpulp found)");
+  /* Only libpulp.so should have those symbols exported.  */
+  if (strstr(libname, "libpulp.so")) {
+    DEBUG("Potential libpulp found");
+
+    obj->trigger = get_loaded_symbol_addr(obj, pid, "__ulp_trigger");
+    obj->path_buffer = get_loaded_symbol_addr(obj, pid, "__ulp_path_buffer");
+    obj->check = get_loaded_symbol_addr(obj, pid, "__ulp_check_patched");
+    obj->state = get_loaded_symbol_addr(obj, pid, "__ulp_state");
+    obj->global =
+        get_loaded_symbol_addr(obj, pid, "__ulp_get_global_universe");
+    obj->msg_queue = get_loaded_symbol_addr(obj, pid, "__ulp_msg_queue");
+
+    /* libpulp must expose all these symbols. */
+    if (obj->trigger && obj->path_buffer && obj->check && obj->state &&
+        obj->global) {
+      obj->next = NULL;
+      process->dynobj_libpulp = obj;
+      DEBUG("(libpulp found)");
+    }
+    /* No other library should expose these symbols. */
+    else if (obj->trigger || obj->path_buffer || obj->check || obj->state ||
+             obj->global)
+      WARN("unexpected subset of libpulp symbols exposed by %s.", libname);
   }
-  /* No other library should expose these symbols. */
-  else if (obj->trigger || obj->path_buffer || obj->check || obj->state ||
-           obj->global)
-    WARN("unexpected subset of libpulp symbols exposed by %s.", libname);
+
   /* Live patch objects. */
   /* XXX: Searching for the '_livepatch' substring in the filename of
    * a dynamically loaded object is rather frail. Alternatives:
    *   A. Have live patch DSOs expose some predefined symbol.
    *   B. Have libpulp mmap a .ulp or .rev file into memory.
    */
-  else if (strstr(obj->filename, "_livepatch")) {
+  if (strstr(obj->filename, "_livepatch")) {
     obj->next = process->dynobj_patches;
     process->dynobj_patches = obj;
   }

@@ -94,12 +94,14 @@ struct ulp_dynobj
   char *filename;
   struct link_map link_map;
 
+  /* FIXME: only libpulp objects should have those symbols.  */
   Elf64_Addr trigger;
   Elf64_Addr check;
   Elf64_Addr path_buffer;
   Elf64_Addr state;
   Elf64_Addr global;
   Elf64_Addr msg_queue;
+  /* end FIXME.  */
 
   struct thread_state *thread_states;
 
@@ -117,7 +119,11 @@ struct ulp_addresses
 
 int dig_main_link_map(struct ulp_process *process);
 
-Elf64_Addr get_loaded_symbol_addr(struct ulp_dynobj *obj, char *sym);
+Elf64_Addr get_loaded_symbol_addr_on_disk(struct ulp_dynobj *obj,
+                                          const char *sym);
+
+Elf64_Addr get_loaded_symbol_addr(struct ulp_dynobj *obj, int pid,
+                                  const char *sym);
 
 int dig_load_bias(struct ulp_process *process);
 

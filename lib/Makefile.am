@@ -24,7 +24,8 @@ libpulp_la_DEPENDENCIES= libpulp.versions
 libpulp_la_LDFLAGS = \
   -ldl \
   -Wl,--version-script=$(srcdir)/libpulp.versions \
-  $(AM_LDFLAGS)
+  -Wl,--hash-style=sysv \ # Ubuntu seems to default to gnu, so be clear we ...
+  $(AM_LDFLAGS) # ... want old style hash sections, else DT_HASH is empty.
 
 AM_CFLAGS += -I$(top_srcdir)/include
 
