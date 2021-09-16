@@ -202,13 +202,29 @@ attach(int pid)
     return 1;
   }
 
-  usleep(1000);
-  if (waitpid(-1, &status, __WALL) == -1) {
-    DEBUG("waitpid error (pid %d): %s.\n", pid, strerror(errno));
-    return 1;
-  }
+  while (1) {
+    if (waitpid(pid, &status, __WALL) == -1) {
+      DEBUG("waitpid error (pid %d): %s.\n", pid, strerror(errno));
+      return 1;
+    }
 
-  return 0;
+    if (WIFSTOPPED(status)) {
+      /* Everything went as expected.  */
+      return 0;
+    }
+
+    if (WIFEXITED(status)) {
+      WARN("Process %d exited while waiting for stop signal.", pid);
+      return 1;
+    }
+
+    if (WIFSIGNALED(status)) {
+      WARN("Process %d terminated by a signal while waiting for stop signal.",
+           pid);
+      return 1;
+    }
+  }
+  __builtin_unreachable();
 }
 
 int
