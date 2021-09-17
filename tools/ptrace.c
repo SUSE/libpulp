@@ -162,33 +162,39 @@ read_memory(char *byte, size_t len, int pid, Elf64_Addr addr)
 int
 read_string(char **buffer, int pid, Elf64_Addr addr)
 {
-  int len = 0, i;
-  char byte;
+  int i = 0;
+  char *string;
+  int buffer_len;
 
   if (attach(pid)) {
     DEBUG("unable to attach to %d to read string.", pid);
     return 1;
   }
 
-  while (!read_byte(&byte, pid, addr + len) && byte)
-    len++;
+  buffer_len = 32;
+  string = (char *)malloc(buffer_len);
 
-  *buffer = malloc(len + 1);
-  if (!buffer) {
-    DEBUG("unable to allocate memory (%d bytes).", len);
-    return 1;
-  }
+  do {
+    /* Grow the buffer if the string won't fit in it.  */
+    if (i >= buffer_len) {
+      buffer_len *= 2;
+      string = realloc(string, buffer_len);
+    }
 
-  for (i = 0; i < len; i++)
-    if (read_byte((*buffer + i), pid, addr + i))
+    if (read_byte(&string[i], pid, addr + i)) {
+      WARN("Unable to read string at address 0x%lx", addr + i);
+      free(string);
       return 1;
-  *(*buffer + i) = '\0';
+    }
+  }
+  while (string[i++] != '\0');
 
   if (detach(pid)) {
     DEBUG("unable to detach from %d after reading string.", pid);
     return 1;
   };
 
+  *buffer = string;
   return 0;
 }
 
