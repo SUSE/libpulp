@@ -38,11 +38,19 @@
  */
 #define RESTART_SYSCALL_SIZE 2
 
+/* Translation Lookaside Buffer of size 1.  This is enough to reduce calls to
+ * ptrace when calling read_byte because often it is used to read sequential
+ * number of bytes.  */
+static ElfW(Addr) tlb = 0;
+
 /* Memory read/write helper functions */
 int
 write_byte(char byte, int pid, Elf64_Addr addr)
 {
   Elf64_Addr value;
+
+  /* Invalidate tlb because we are commiting changes to memory.  */
+  tlb = 0;
 
   errno = 0;
   value = ptrace(PTRACE_PEEKDATA, pid, addr, 0);
@@ -71,6 +79,9 @@ int
 write_string(const char *buffer, int pid, Elf64_Addr addr, int length)
 {
   int i;
+
+  /* Invalidate tlb because we are commiting changes to memory.  */
+  tlb = 0;
 
   for (i = 0; i < length && buffer[i] != '\0'; i++) {
     if (write_byte(buffer[i], pid, addr + i))
@@ -113,10 +124,27 @@ read_long(long *word, int pid, Elf64_Addr addr)
 int
 read_byte(char *byte, int pid, Elf64_Addr addr)
 {
+  /* Hold last ptrace_peekdata.  */
+  static char tlb_value[sizeof(long)];
+
   long value;
-  int ret = ptrace_peekdata(&value, pid, addr);
-  if (!ret)
-    *byte = value & 0xff;
+  int ret;
+
+  /* In case the requested data is cached, access the cache
+   * and return the value there.
+   */
+  if (tlb <= addr && addr < tlb + sizeof(long)) {
+    *byte = tlb_value[addr - tlb];
+    return 0;
+  }
+
+  ret = ptrace_peekdata(&value, pid, addr);
+  if (!ret) {
+    /* Update the tlb structure with the last ptrace_peekdata.  */
+    tlb = addr;
+    memcpy(tlb_value, &value, sizeof(long));
+    *byte = tlb_value[0];
+  }
 
   return ret;
 }
@@ -240,6 +268,9 @@ detach(int pid)
     DEBUG("PTRACE_DETACH error: %s.\n", strerror(errno));
     return 1;
   }
+
+  /* Invalidate tlb because we are returning control to the process.  */
+  tlb = 0;
   return 0;
 }
 
