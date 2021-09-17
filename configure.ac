@@ -110,6 +110,34 @@ AC_SUBST([LIBUNWIND_LIBS], ["-lunwind-generic -lunwind-ptrace -lunwind"])
 AC_DEFINE(ENABLE_STACK_CHECK, 1, [Enable stack checking routines]),
 AC_DEFINE(ENABLE_STACK_CHECK, 0, [Disable stack checking routines]))
 
+# Check if Doxygen is present.
+AC_CHECK_PROGS([DOXYGEN], [doxygen])
+AC_CHECK_PROGS([DOT], [dot])
+AC_CHECK_PROGS([PDFLATEX], [pdflatex])
+
+# Use Doxygen to create documentation files. Use YES/NO because Doxygen
+# expects the YES/NO to be in all caps.
+AC_ARG_ENABLE(docs-generation,
+AS_HELP_STRING([--enable-docs-generation],
+[create documentation files using Doxygen [default=no]]),
+[enable_docs_generation=yes],
+[enable_docs_generation=no; break])
+AS_IF([test "$enable_docs_generation" = "yes"],
+[AS_IF([test "x$DOXYGEN" != "x"],
+       [AS_IF([test "x$DOT" != "x"],
+              [AS_IF([test "x$PDFLATEX" != "x"],
+                     [AC_SUBST([HAVE_PDFLATEX_YESNO], ["YES"])],
+                     [AC_SUBST([HAVE_PDFLATEX_YESNO], ["NO"])])]
+              [AC_SUBST([HAVE_DOXYGEN], ["yes"])]
+              [AC_CONFIG_FILES([docs/Doxyfile])],
+              [AC_MSG_ERROR([dot is required for document generation])])],
+      [AC_MSG_ERROR([doxygen is required for document generation])])], [])
+
+# Automake require that those variables are always defined, so they can't be
+# inside the above if.
+AM_CONDITIONAL([HAVE_DOXYGEN], [test "$HAVE_DOXYGEN" == "yes"])
+AM_CONDITIONAL([HAVE_PDFLATEX], [test "$HAVE_PDFLATEX_YESNO" == "YES"])
+
 # The test suite covers patching of functions near page boundaries, so
 # try to detect the size of a page in the system, using getconf. If
 # getconf is not available, set the page size to a large power of two,
@@ -137,6 +165,7 @@ AC_CONFIG_FILES([Makefile
 		 lib/Makefile
 		 man/Makefile
 		 tests/Makefile
-		 tools/Makefile])
+		 tools/Makefile
+		 docs/Makefile])
 
 AC_OUTPUT
