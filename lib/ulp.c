@@ -45,15 +45,19 @@ char __ulp_path_buffer[256] = "";
 struct ulp_metadata *__ulp_metadata_ref = NULL;
 struct ulp_detour_root *__ulp_root = NULL;
 
-char ulp_prologue[ULP_NOPS_LEN] = {
-  // Preceding nops
-  0x57,                         // push    %rdi           <-- Unused
-  0x48, 0xc7, 0xc7, 0, 0, 0, 0, // movq    $index, %rdi   <-- Unused
-  0xff, 0x25, 0, 0, 0, 0,       // jmp     0x0(%rip)
-  0, 0, 0, 0, 0, 0, 0, 0,       // <data>  &__ulp_prolog
-  // Function entry is here
-  0xeb, -(PRE_NOPS_LEN - 8 + 2) // jump above
+/* clang-format off */
+/** Offset of the data entry in the ulp_prologue.  */
+#define ULP_DATA_OFFSET 6           // ------------------------------+
+                                    //                               |
+char ulp_prologue[ULP_NOPS_LEN] = { //                               |
+  // Preceding nops                                                  |
+  0xff, 0x25, 0, 0, 0, 0,           // jmp     0x0(%rip) <-------+   |
+  0, 0, 0, 0, 0, 0, 0, 0,           // <data>  &__ulp_prolog     | <-+
+  // Function entry is here                                      |
+  0xeb, -(PRE_NOPS_LEN + 2)         // jmp ----------------------+
+  // (+2 because the previous jump consumes 2 bytes.
 };
+/* clang-format on */
 
 unsigned int __ulp_root_index_counter = 0;
 unsigned long __ulp_global_universe = 0;
@@ -695,7 +699,7 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
       return 0;
     }
 
-    if (!(ulp_patch_addr(old_fun, new_fun, root->index, true))) {
+    if (!(ulp_patch_addr(old_fun, new_fun, true))) {
       MSGQ_WARN("error patching address %p", old_fun);
       return 0;
     }
@@ -1009,10 +1013,9 @@ check_build_id(struct ulp_metadata *ulp)
 }
 
 void
-ulp_patch_prologue_layout(void *old_fentry, unsigned int function_index)
+ulp_patch_prologue_layout(void *old_fentry)
 {
   memcpy(old_fentry, ulp_prologue, sizeof(ulp_prologue));
-  memcpy(old_fentry + 4, &function_index, 4);
 }
 
 /*
@@ -1098,15 +1101,23 @@ push_new_detour(unsigned long universe, unsigned char *patch_id,
   return 1;
 }
 
+/** @brief Write new function address into data prologue of  `old_fentry`.
+ *
+ *  This function replaces the `<data>` section in prologue `old_fentry`
+ *  with a pointer to the new function given by `manager`, which will
+ *  replace the to be patched function.
+ *
+ *  @param old_fentry Pointer to prologue of to be replaced function
+ *  @param manager Address of new function.
+ */
 void
 ulp_patch_addr_absolute(void *old_fentry, void *manager)
 {
-  memcpy(old_fentry + 14, &manager, sizeof(void *));
+  memcpy(old_fentry + ULP_DATA_OFFSET, &manager, sizeof(void *));
 }
 
 int
-ulp_patch_addr(void *old_faddr, void *new_faddr, unsigned int index,
-               int enable)
+ulp_patch_addr(void *old_faddr, void *new_faddr, int enable)
 {
   void *addr;
   unsigned long page_size;
@@ -1157,7 +1168,7 @@ ulp_patch_addr(void *old_faddr, void *new_faddr, unsigned int index,
 
   /* Actually patch the prologue. */
   if (enable) {
-    ulp_patch_prologue_layout(addr, index);
+    ulp_patch_prologue_layout(addr);
     ulp_patch_addr_absolute(addr, new_faddr);
   }
   else {
@@ -1278,10 +1289,9 @@ ulp_revert_all_units(unsigned char *patch_id)
 
         /* Update the function prologue. */
         if (dactive == NULL)
-          ulp_patch_addr(r->patched_addr, NULL, 0, false);
+          ulp_patch_addr(r->patched_addr, NULL, false);
         else
-          ulp_patch_addr(r->patched_addr, dactive->target_addr, r->index,
-                         true);
+          ulp_patch_addr(r->patched_addr, dactive->target_addr, true);
       }
 
   return 1;
