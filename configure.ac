@@ -153,8 +153,8 @@ AC_SUBST([PAGE_SIZE], [$($GETCONF PAGE_SIZE)]))
 # before the entry point, and the remaining nops after it. At running time,
 # whenever a live patch is applied, libpulp replaces the remaining nops with
 # instructions that redirect execution to the universe handling routines.
-AC_SUBST([ULP_NOPS_LEN], [24])
-AC_SUBST([PRE_NOPS_LEN], [22])
+AC_SUBST([ULP_NOPS_LEN], [16])
+AC_SUBST([PRE_NOPS_LEN], [14])
 AC_DEFINE_UNQUOTED([ULP_NOPS_LEN], [$ULP_NOPS_LEN],
 [Total number of padding nops])
 AC_DEFINE_UNQUOTED([PRE_NOPS_LEN], [$PRE_NOPS_LEN],
