@@ -88,6 +88,6 @@ run_dump(struct arguments *arguments)
     WARN("error parsing the metadata file (%s).", arguments->args[0]);
     return 1;
   }
-  dump_metadata(&ulp, arguments->buildid_only);
+  dump_metadata(&ulp, arguments->buildid);
   return 0;
 }

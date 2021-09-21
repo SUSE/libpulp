@@ -152,9 +152,43 @@ build_process_list(void)
   return list;
 }
 
-/* Prints all the info collected about the processes in PROCESS_LIST. */
+/** @brief Convert build id provided in `build_id` into string.
+ *
+ * Example:
+ *
+ * with buildid: 338aa4d16c98dda7af170cc8e2b59d259bd5d4f4
+ *
+ * it will return the string:
+ * "338aa4d16c98dda7af170cc8e2b59d259bd5d4f4"
+ *
+ * The string returned by this function is statically allocated and don't
+ * require `free`.
+ *
+ * @param build_id The build id
+ *
+ * @return String representing buildid in hexadecimal format.
+ */
+const char *
+buildid_to_string(const unsigned char build_id[BUILDID_LEN])
+{
+  static char build_id_str[2 * BUILDID_LEN + 1];
+  int i;
+
+  memset(build_id_str, '\0', sizeof(build_id_str));
+
+  for (i = 0; i < BUILDID_LEN; i++)
+    snprintf(&build_id_str[2 * i], 3, "%02x", (unsigned)build_id[i]);
+
+  return build_id_str;
+}
+
+/** @brief Prints all the info collected about the processes in `process_list`.
+ *
+ * @param process_list List of processes.
+ * @param print_buildid Print build id identifier of library.
+ */
 void
-print_process_list(struct ulp_process *process_list)
+print_process_list(struct ulp_process *process_list, int print_buildid)
 {
   struct ulp_process *process_item;
   struct ulp_dynobj *object_item;
@@ -180,7 +214,12 @@ print_process_list(struct ulp_process *process_list)
     if (!object_item)
       printf("    (none)\n");
     while (object_item) {
-      printf("    in %s:\n", object_item->filename);
+      if (print_buildid)
+        printf("    in %s (%s):\n", object_item->filename,
+               buildid_to_string(object_item->build_id));
+      else
+        printf("    in %s:\n", object_item->filename);
+
       object_item = object_item->next;
     }
     process_item = process_item->next;
@@ -192,6 +231,7 @@ int
 run_patches(struct arguments *arguments)
 {
   struct ulp_process *process_list;
+  int print_buildid = arguments->buildid;
 
   /*
    * If the PID argument has not been provided, check all live patchable
@@ -204,7 +244,7 @@ run_patches(struct arguments *arguments)
     insert_target_process(arguments->pid, &process_list);
   }
 
-  print_process_list(process_list);
+  print_process_list(process_list, print_buildid);
 
   return 0;
 }

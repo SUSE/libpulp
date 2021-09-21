@@ -158,15 +158,23 @@ static ElfW(Addr)
   return 0;
 }
 
-/* Looks for a symbol named SYM in OBJ on the process with pid. If the symbols
- * gets found, returns its address. Otherwise, returns 0.
+/** @brief Parses ELF headers of dynobj `obj` from process with pid `pid`.
  *
- * The algorithm here is the same implemented in interpose.c, but with extra
- * complexity of reading memory in a remote process. For better understanding
- * of the algorithm, please check interpose.c comments.
+ * This function read the remote process memory to locate the following
+ * information in the process, contained in the ELF header:
+ *
+ * - The `dynsym` section, where externally visible symbols are located.
+ * - The `dynstr` section, where externally visible symbols name are located.
+ * - The `hash` section, which holds the number of externally symbols.
+ * - The `note` section, which holds the build-id of the library/program.
+ *
+ * @param pid Program ID of the process.
+ * @param obj Object representing a library, or the main program itself.
+ *
+ * @return 0 on success, anything else on failure.
  */
-Elf64_Addr
-get_loaded_symbol_addr(struct ulp_dynobj *obj, int pid, const char *sym_name)
+int
+parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
 {
   ElfW(Addr) ehdr_addr = 0;
   ElfW(Ehdr) ehdr;
@@ -176,17 +184,17 @@ get_loaded_symbol_addr(struct ulp_dynobj *obj, int pid, const char *sym_name)
   ElfW(Addr) dynstr_addr = 0;
   ElfW(Addr) hash_addr = 0;
 
-  int i, num_symbols = 0, ret;
+  ElfW(Addr) buildid_addr = 0;
 
-  /* Pointers to linux-vdso.so are invalid, so skip this library.  */
-  if (!strcmp(obj->filename, "linux-vdso.so.1")) {
-    return 0;
-  }
+  ElfW(Word) name_len = 0;
+  ElfW(Word) buildid_len = 0;
+
+  int i, num_symbols = 0, ret;
 
   /* If object has no link map attached to it, there is nothing we can do.  */
   if (!obj->link_map.l_addr) {
     DEBUG("no link map object found");
-    return 0;
+    return 1;
   }
 
   /* l_addr holds the pointer to the ELF header.  */
@@ -196,13 +204,13 @@ get_loaded_symbol_addr(struct ulp_dynobj *obj, int pid, const char *sym_name)
   ret = read_memory((char *)&ehdr, sizeof(ehdr), pid, ehdr_addr);
   if (ret != 0) {
     WARN("Unable to read ELF header from process %d\n", pid);
-    return 0;
+    return 1;
   }
 
   /* Sanity check if process header size is valid.  */
   if (ehdr.e_phentsize != sizeof(ElfW(Phdr))) {
     WARN("Invalid phdr readed");
-    return 0;
+    return 1;
   }
 
   /* Get first process header address.  */
@@ -230,7 +238,7 @@ get_loaded_symbol_addr(struct ulp_dynobj *obj, int pid, const char *sym_name)
         /* Get the dynamic symbol in remote process.  */
         ret = read_memory((char *)&dyn, sizeof(dyn), pid, dyn_addr);
         if (ret != 0) {
-          WARN("Unable to read process header from process %d\n", pid);
+          WARN("Unable to read dynamic symbol from process %d\n", pid);
           return 0;
         }
 
@@ -260,45 +268,126 @@ get_loaded_symbol_addr(struct ulp_dynobj *obj, int pid, const char *sym_name)
       }
       while (dyn.d_tag != DT_NULL);
     }
+    else if (phdr.p_type == PT_NOTE) {
+      /* We are after the build id.  */
+
+      ElfW(Addr) note_addr = ehdr_addr + phdr.p_paddr;
+      unsigned sec_size = phdr.p_memsz;
+      ElfW(Addr) note_addr_end = note_addr + sec_size;
+
+      do {
+        ElfW(Nhdr) note;
+
+        /* Get the note section in remote process.  */
+        ret = read_memory((char *)&note, sizeof(note), pid, note_addr);
+        if (ret != 0) {
+          WARN("Unable to read note header from process %d\n", pid);
+          return 0;
+        }
+
+        name_len = note.n_namesz;
+        buildid_len = note.n_descsz;
+
+        /* Align with the 4 bytes boundary.  */
+        buildid_len += buildid_len % 4;
+        name_len += name_len % 4;
+
+        if (note.n_type == NT_GNU_BUILD_ID) {
+          /* Build id note section found.  */
+          buildid_addr = note_addr + sizeof(note) + name_len;
+          break;
+        }
+
+        note_addr += buildid_len + name_len + 12;
+      }
+      while (note_addr < note_addr_end);
+    }
   }
 
-  if (!hash_addr) {
+  if (buildid_addr) {
+    if (buildid_len == sizeof(obj->build_id)) {
+      ret = read_memory((char *)obj->build_id, buildid_len, pid, buildid_addr);
+      if (ret != 0) {
+        WARN("Unable to read build id from target process %d", pid);
+      }
+    }
+    else {
+      WARN("build id length mismatch: expected %lu, got %d",
+           sizeof(obj->build_id), buildid_len);
+    }
+  }
+  else {
+    WARN("build id length mismatch: expected %lu, got %d",
+         sizeof(obj->build_id), buildid_len);
+  }
+
+  if (hash_addr) {
+    /* Look at the hash section for the number of the symbols in the
+     * symbol table.  This section structure in memory is:
+     *
+     * hash_t nbuckets;
+     * hash_t nchains;
+     * hash_t buckets[nbuckets];
+     * hash_t chain[nchains];
+     *
+     * hash_t is either int32_t or int64_t according to the arch.
+     * On x86_64 it is 32-bits.
+     */
+
+    /* Get nchains.  */
+    ret = read_memory((char *)&num_symbols, sizeof(int), pid,
+                      hash_addr + sizeof(int));
+    if (ret != 0) {
+      WARN("Unable to read hash table");
+      return 0;
+    }
+  }
+  else {
     WARN("hash table not found in %s", obj->filename);
-    return 0;
   }
 
-  /* Look at the hash section for the number of the symbols in the
-   * symbol table.  This section structure in memory is:
-   *
-   * hash_t nbuckets;
-   * hash_t nchains;
-   * hash_t buckets[nbuckets];
-   * hash_t chain[nchains];
-   *
-   * hash_t is either int32_t or int64_t according to the arch.
-   * On x86_64 it is 32-bits.
-   */
-
-  /* Get nchains.  */
-  ret = read_memory((char *)&num_symbols, sizeof(int), pid,
-                    hash_addr + sizeof(int));
-  if (ret != 0) {
-    WARN("Unable to read hash table");
-    return 0;
-  }
-
-  /* With the symbol table identified, find the wanted symbol.  */
-  if (dynsym_addr && dynstr_addr) {
-    ElfW(Addr) sym_addr;
-
-    sym_addr = get_symbol_by_name(pid, dynsym_addr, dynstr_addr, num_symbols,
-                                  sym_name);
-
-    if (sym_addr)
-      return ehdr_addr + sym_addr;
-  }
+  /* Finally store found address to the dynobj object.  */
+  obj->dynstr_addr = dynstr_addr;
+  obj->dynsym_addr = dynsym_addr;
+  obj->num_symbols = num_symbols;
 
   return 0;
+}
+
+/** @brief Looks for a symbol named `sym_name` in loaded object `obj`.
+ *
+ * This function searches for a loaded symbol in `obj` on the process with
+ * `pid` with a sumbol name `sym_name`. For example, calling this function
+ * with `sym_name = "printf"` on `obj` representing the libc will return the
+ * address of printf that was loaded in memory.
+ *
+ * @param obj The dynamic object representing a library or the process' binary.
+ * @param pid The pid of the process.
+ * @param sym_name The name of the symbol to look for
+ *
+ * @return The address of the symbol on success. Otherwise, returns 0.
+ */
+Elf64_Addr
+get_loaded_symbol_addr(struct ulp_dynobj *obj, int pid, const char *sym_name)
+{
+  /* l_addr holds the pointer to the ELF header.  */
+  ElfW(Addr) ehdr_addr = obj->link_map.l_addr;
+
+  ElfW(Addr) dynsym_addr = obj->dynsym_addr;
+  ElfW(Addr) dynstr_addr = obj->dynstr_addr;
+  int num_symbols = obj->num_symbols;
+
+  ElfW(Addr) sym_addr;
+
+  /* If, for some reason, parse_dynobj_elf_headers failed to locate
+    `num_symbols`, `dynsym`, or `dynstr`, we can't continue.  */
+  if (!dynsym_addr || !dynstr_addr || num_symbols <= 0)
+    return 0;
+
+  sym_addr =
+      get_symbol_by_name(pid, dynsym_addr, dynstr_addr, num_symbols, sym_name);
+
+  return sym_addr ? (ehdr_addr + sym_addr) : 0;
 }
 
 /* Same as get_loaded_symbol_addr, but use the file in disk instead of parsing
@@ -595,6 +684,10 @@ parse_lib_dynobj(struct ulp_process *process, struct link_map *link_map_addr)
    * some by the target library.
    */
   obj->link_map = *link_map;
+
+  /* Pointers to linux-vdso.so are invalid, so skip this library.  */
+  if (strcmp(obj->filename, "linux-vdso.so.1"))
+    parse_dynobj_elf_headers(pid, obj);
 
   /* Only libpulp.so should have those symbols exported.  */
   if (strstr(libname, "libpulp.so")) {
