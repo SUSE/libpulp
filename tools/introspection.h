@@ -91,10 +91,32 @@ struct thread_state
   struct thread_state *next;
 };
 
+/** Length of build id, in bytes.  */
+#define BUILDID_LEN 20
+
+/** Represents a dynamic object, such as dynamic libraries (.so) or the
+ *  executable itself.
+ */
 struct ulp_dynobj
 {
+  /** Name of the library. Empty string in case of the executable itself.  */
   char *filename;
+
+  /* Link map, as in _r_debug symbol loaded by the linker.  */
   struct link_map link_map;
+
+  /** Address of dynstr section of current library in the target process.  */
+  Elf64_Addr dynstr_addr;
+
+  /** Address of dynsym section of current library in the target process.  */
+  Elf64_Addr dynsym_addr;
+
+  /** Number of symbols in the dynsym section of current library in the target
+   * process.  */
+  int num_symbols;
+
+  /** Build id of current library loaded in the target process.  */
+  unsigned char build_id[BUILDID_LEN];
 
   /* FIXME: only libpulp objects should have those symbols.  */
   Elf64_Addr trigger;
@@ -107,6 +129,7 @@ struct ulp_dynobj
 
   struct thread_state *thread_states;
 
+  /** Next dynobj in the dynobj chain (linked list).  */
   struct ulp_dynobj *next;
 };
 

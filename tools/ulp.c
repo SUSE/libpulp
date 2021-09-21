@@ -75,8 +75,8 @@ static struct argp_option options[] = {
   { "quiet", 'q', 0, 0, "Don't produce any output", 0 },
   { 0, 0, 0, 0, "patches & check commands only:", 0 },
   { "pid", 'p', "PID", 0, "Target process with PID", 0 },
-  { 0, 0, 0, 0, "dump command only:", 0 },
-  { "buildid", 'b', 0, 0, "Only print the build id (dump only.)", 0 },
+  { 0, 0, 0, 0, "dump & patches command only:", 0 },
+  { "buildid", 'b', 0, 0, "Print the build id", 0 },
   { 0, 0, 0, 0, "trigger command only:", 0 },
   { "retries", 'r', "N", 0, "Retry N times if process busy", 0 },
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
@@ -198,7 +198,7 @@ parser(int key, char *arg, struct argp_state *state)
       arguments->pid = atoi(arg);
       break;
     case 'b':
-      arguments->buildid_only = 1;
+      arguments->buildid = 1;
       break;
     case 'o':
       arguments->metadata = arg;

@@ -50,7 +50,7 @@ struct arguments
   int retries;
   int quiet;
   int verbose;
-  int buildid_only;
+  int buildid;
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
   int check_stack;
 #endif
