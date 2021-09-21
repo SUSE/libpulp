@@ -227,6 +227,8 @@ unload_metadata(struct ulp_metadata *ulp)
 struct ulp_metadata *
 load_metadata()
 {
+WARN("SL: Loading Metadata.\n");
+
   struct ulp_metadata *ulp;
   if (__ulp_metadata_ref) {
     return __ulp_metadata_ref;
@@ -333,6 +335,9 @@ parse_metadata(struct ulp_metadata *ulp)
   struct ulp_unit *unit, *prev_unit = NULL;
   struct ulp_dependency *dep, *prev_dep = NULL;
   struct ulp_reference *ref, *prev_ref = NULL;
+
+WARN("SL: Parse Metadata.\n");
+
 
   fd = open(__ulp_path_buffer, O_RDONLY);
   if (fd == -1) {
@@ -513,6 +518,33 @@ parse_metadata(struct ulp_metadata *ulp)
   return 1;
 }
 
+int
+ulp_revert_patch_by_lib_name(char *lib_name)
+{
+  struct ulp_applied_patch *remove_patch;
+  struct ulp_applied_patch *patch = __ulp_state.patches;
+
+  int ret = 1;
+  WARN("SL: revert patch by lib name.\n");
+
+  while (patch) {
+    if (!strcmp(lib_name, patch->lib_name)) {
+      remove_patch = patch;
+      patch = patch->next;
+  WARN("SL: Calling revert patch.\n");
+
+       ret = ulp_revert_patch(remove_patch->patch_id);
+       WARN("Reverting previous patch: %s", remove_patch->patch_id);
+    }
+    else {
+      patch = patch->next;
+    }
+  }
+WARN("SL: Revert patch Done.\n");
+
+  return ret;
+}
+
 void *
 load_so(char *obj)
 {
@@ -534,6 +566,9 @@ load_patch()
   struct ulp_applied_patch *patch_entry;
   int patch;
 
+WARN("SL: Load patch.\n");
+
+
   ulp = load_metadata();
   if (ulp == NULL)
     return 0;
@@ -542,10 +577,16 @@ load_patch()
 
   switch (patch) {
     case 1: /* apply patch */
+      /* Revert previous patch if present */
+      /* Todo: this should be optional */
+      ulp_revert_patch_by_lib_name(ulp->objs->name);
+WARN("SL: Revert Done.\n");
+
       patch_entry = ulp_state_update(ulp);
       if (!patch_entry)
         break;
 
+WARN("SL: Apply units.\n");
       if (!ulp_apply_all_units(ulp)) {
         MSGQ_WARN("FATAL ERROR while applying patch units\n");
         exit(-1);
@@ -771,6 +812,9 @@ ulp_state_update(struct ulp_metadata *ulp)
   struct ulp_object *obj;
   struct ulp_unit *unit;
   struct ulp_dependency *dep, *a_dep;
+
+  WARN("SL: State Update.\n");
+
 
   a_patch = calloc(1, sizeof(struct ulp_applied_patch));
   if (!a_patch) {
