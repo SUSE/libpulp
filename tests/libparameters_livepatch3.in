@@ -1,0 +1,4 @@
+__ABS_BUILDDIR__/.libs/libparameters_livepatch1.so
+@.libs/libparameters.so.0
+int_params:new_int_params
+float_params:new_float_params

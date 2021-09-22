@@ -165,6 +165,7 @@ check_LTLIBRARIES += libdozens_livepatch1.la \
                      libhundreds_bsymbolic_livepatch1.la \
                      libparameters_livepatch1.la \
                      libparameters_livepatch2.la \
+                     libparameters_livepatch3.la \
                      librecursion_livepatch1.la \
                      libblocked_livepatch1.la \
                      libpagecross_livepatch1.la \
@@ -199,6 +200,9 @@ libparameters_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
 libparameters_livepatch2_la_SOURCES = libparameters_livepatch2.c
 libparameters_livepatch2_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
+
+libparameters_livepatch3_la_SOURCES = libparameters_livepatch3.c
+libparameters_livepatch3_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
 librecursion_livepatch1_la_SOURCES = librecursion_livepatch1.c
 librecursion_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
@@ -249,6 +253,9 @@ METADATA = \
   libparameters_livepatch2.dsc \
   libparameters_livepatch2.ulp \
   libparameters_livepatch2.rev \
+  libparameters_livepatch3.dsc \
+  libparameters_livepatch3.ulp \
+  libparameters_livepatch3.rev \
   librecursion_livepatch1.dsc \
   librecursion_livepatch1.ulp \
   librecursion_livepatch1.rev \
@@ -281,6 +288,7 @@ EXTRA_DIST = \
   libhundreds_bsymbolic_livepatch1.in \
   libparameters_livepatch1.in \
   libparameters_livepatch2.in \
+  libparameters_livepatch3.in \
   librecursion_livepatch1.in \
   libblocked_livepatch1.in \
   libpagecross_livepatch1.in \
@@ -421,7 +429,8 @@ TESTS = \
   missing_function.py \
   access.py \
   buildid.py \
-  libpulp_messages.py
+  libpulp_messages.py \
+  relative_path.py
 
 XFAIL_TESTS = \
   blocked.py \

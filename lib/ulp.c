@@ -340,6 +340,8 @@ parse_metadata(struct ulp_metadata *ulp)
     return 0;
   }
 
+  MSGQ_DEBUG("Opened metadata file: %s", __ulp_path_buffer);
+
   ulp->objs = NULL;
 
 #define READ(from, to, count) \

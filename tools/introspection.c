@@ -71,6 +71,40 @@ struct ulp_metadata ulp;
 int ulp_verbose;
 int ulp_quiet;
 
+static void
+debug_ulp_unit(struct ulp_unit *unit)
+{
+  if (!unit)
+    return;
+
+  DEBUG("");
+  DEBUG("  unit->old_fname: %s", unit->old_fname);
+  DEBUG("  unit->new_fname: %s", unit->new_fname);
+  DEBUG("  unit->old_faddr: %lx", (unsigned long)unit->old_faddr);
+  DEBUG("  unit->next: %lx", (unsigned long)unit->next);
+  DEBUG("");
+
+  debug_ulp_unit(unit->next);
+}
+
+static void
+debug_ulp_object(struct ulp_object *obj)
+{
+  DEBUG("");
+  DEBUG("obj: %lx", (unsigned long)obj);
+  DEBUG("obj->build_id_len: %u", obj->build_id_len);
+  DEBUG("obj->build_id_check: %u", obj->build_id_check);
+  DEBUG("obj->build id: %lx", (unsigned long)obj->build_id);
+  DEBUG("obj->name: %s", obj->name);
+  DEBUG("obj->dl_handler: %lx", (unsigned long)obj->dl_handler);
+  DEBUG("obj->flags: %lx", (unsigned long)obj->flag);
+  DEBUG("obj->nunits: %u", obj->nunits);
+  DEBUG("obj->units: %lx", (unsigned long)obj->units);
+  DEBUG("");
+
+  debug_ulp_unit(obj->units);
+}
+
 /* Parses the _DYNAMIC section of PROCESS, finds the DT_DEBUG entry,
  * from which the address of the chain of dynamically loaded objects
  * (link map) can be found, then reads it and stores it in PROCESS.
@@ -828,6 +862,8 @@ set_path_buffer(struct ulp_process *process, const char *path)
 {
   struct ulp_thread *thread;
   Elf64_Addr path_addr;
+  char full_path[PATH_MAX];
+  unsigned full_path_size;
 
   DEBUG("advertising live patch location to libpulp.");
 
@@ -839,7 +875,21 @@ set_path_buffer(struct ulp_process *process, const char *path)
   thread = process->main_thread;
   path_addr = process->dynobj_libpulp->path_buffer;
 
-  if (write_string(path, thread->tid, path_addr, ULP_PATH_LEN))
+  /* The target program can be running in other directory where CWD is,
+     therefore it is a good idea to pass the full path to the metadata
+     info to avoid potential problems.  */
+  if (!realpath(path, full_path)) {
+    WARN("unable to retrieve full path to %s", path);
+    return 1;
+  }
+
+  full_path_size = strlen(full_path) + 1; /* Include '\0'.  */
+  if (full_path_size >= ULP_PATH_LEN) {
+    WARN("full path to metadata file is too large");
+    return 1;
+  }
+
+  if (write_string(full_path, thread->tid, path_addr, full_path_size))
     return 1;
 
   return 0;
@@ -1376,6 +1426,8 @@ check_livepatch_functions_matches_metadata(void)
     return 1;
   }
 
+  debug_ulp_object(ulp.objs);
+
   /* Iterate over all unit objects in the metadata file.  */
   for (curr_unit = ulp.objs->units; curr_unit != NULL;
        curr_unit = curr_unit->next) {
@@ -1422,11 +1474,35 @@ check_patch_sanity(struct ulp_process *process)
     return 1;
   }
 
-  target = ulp.objs->name;
+  target = strrchr(ulp.objs->name, '/');
+  if (target) {
+    /* strrchr returns pointer to the last occurence of '/'.  Therefore, the
+       library base name should be one character ahead.  */
+    target++;
+  }
+  else {
+    /* name is already the library's basename.  */
+    target = ulp.objs->name;
+  }
 
   /* check if the affected library is present in the process. */
   for (d = process->dynobj_targets; d != NULL; d = d->next) {
-    if (strcmp(d->filename, target) == 0)
+    bool buildid_match = false;
+    bool name_match = false;
+    const char *basename = strrchr(d->filename, '/');
+
+    if (basename)
+      basename++;
+    else
+      basename = d->filename;
+
+    if (strcmp(basename, target) == 0)
+      name_match = true;
+
+    if (memcmp(ulp.objs->build_id, d->build_id, BUILDID_LEN) == 0)
+      buildid_match = true;
+
+    if (name_match && buildid_match)
       break;
   }
   if (!d) {
