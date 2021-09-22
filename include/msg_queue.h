@@ -22,10 +22,10 @@
 #ifndef MSGQ_H
 #define MSGQ_H
 
-/* Define a 2Mb buffer for holding the messages.  */
+/** Define a 2Mb buffer for holding the messages.  */
 #define MSGQ_BUFFER_MAX (2 * 1024 * 1024)
 
-/* This is the circular message queue datastructure.
+/** This is the circular message queue datastructure.
  *
  * It works on a fixed-size buffer and operates maintaining three variables:
  *
@@ -60,19 +60,28 @@
  */
 struct msg_queue
 {
-  char buffer[MSGQ_BUFFER_MAX]; /* Buffer holding the messages.  */
-  int top;      /* Position pointing to free memory that can be written to.  */
-  int bottom;   /* Position pointing to the oldest message still in buffer.  */
-  int distance; /* Distance betweem top and bottom.  Should not be greater than
-                   MSGQ_BUFFER_MAX.  */
+  /** Buffer holding the messages.  */
+  char buffer[MSGQ_BUFFER_MAX];
+
+  /** Position pointing to free memory that can be written to.  */
+  int top;
+
+  /** Position pointing to the oldest message still in buffer.  */
+  int bottom;
+
+  /** Distance betweem top and bottom. Should not be greater than
+   * MSGQ_BUFFER_MAX.  */
+  int distance;
 };
 
 extern struct msg_queue __ulp_msg_queue;
 
 void msgq_push(const char *format, ...);
 
-/* Warn message using the message queue.  */
-
+/** Send a warning message to the message queue.  */
 #define MSGQ_WARN(fmt, ...) msgq_push("ulp: " fmt "\n", ##__VA_ARGS__)
+
+/** Send a debug message to the message queue, if debugging is enabled.  */
+#define MSGQ_DEBUG(fmt, ...) msgq_push("ulp: " fmt "\n", ##__VA_ARGS__)
 
 #endif /* MSGQ_H */
