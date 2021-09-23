@@ -142,6 +142,8 @@ struct ulp_addresses
   Elf64_Addr global;
 };
 
+void release_ulp_process(struct ulp_process *);
+
 int dig_main_link_map(struct ulp_process *process);
 
 Elf64_Addr get_loaded_symbol_addr_on_disk(struct ulp_dynobj *obj,

@@ -170,7 +170,7 @@ parse_metadata(const char *filename, struct ulp_metadata *ulp)
 int
 run_reverse(struct arguments *arguments)
 {
-  struct ulp_metadata ulp;
+  struct ulp_metadata ulp = { 0 };
   /* .metadata is passed in .o from packer.  */
   const char *filename = arguments->metadata;
   const char *metadata = arguments->args[0];
@@ -184,5 +184,6 @@ run_reverse(struct arguments *arguments)
     WARN("Error gerenating reverse live patch.\n");
     return 2;
   }
+  free_metadata(&ulp);
   return 0;
 }

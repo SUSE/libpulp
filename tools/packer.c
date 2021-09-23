@@ -40,8 +40,20 @@ free_metadata(struct ulp_metadata *ulp)
 {
   struct ulp_object *obj;
   struct ulp_unit *unit, *next_unit;
+  struct ulp_reference *ref, *next_ref;
   if (!ulp)
     return;
+
+  free(ulp->so_filename);
+
+  for (ref = ulp->refs; ref != NULL; ref = next_ref) {
+    free(ref->target_name);
+    free(ref->reference_name);
+    next_ref = ref->next;
+    free(ref);
+  }
+  ulp->refs = NULL;
+
   obj = ulp->objs;
   if (obj) {
     unit = obj->units;
@@ -148,7 +160,7 @@ get_build_id_note(Elf *elf)
 int
 get_ulp_elf_metadata(const char *filename, struct ulp_object *obj)
 {
-  int fd;
+  int fd, ret;
   Elf *elf;
   Elf_Scn *dynsym;
 
@@ -162,24 +174,27 @@ get_ulp_elf_metadata(const char *filename, struct ulp_object *obj)
   dynsym = get_dynsym(elf);
   if (!dynsym) {
     WARN("Unable to get .dynsym section.");
-    goto error_elf_loaded;
+    ret = 0;
+    goto clean_elf;
   }
 
   if (!get_object_metadata(elf, obj)) {
     WARN("Unable to get object metadata.");
-    goto error_elf_loaded;
+    ret = 0;
+    goto clean_elf;
   }
 
   if (!get_elf_tgt_addrs(elf, obj, dynsym)) {
     WARN("Unable to get target addresses.");
-    goto error_elf_loaded;
+    ret = 0;
+    goto clean_elf;
   }
 
-  return 1;
+  ret = 1;
 
-error_elf_loaded:
+clean_elf:
   unload_elf(&elf, &fd);
-  return 0;
+  return ret;
 }
 
 int
@@ -523,6 +538,7 @@ parse_description(const char *filename, struct ulp_metadata *ulp)
     len = 0;
     n = getline(&first, &len, file);
   }
+  free(first);
   return 1;
 }
 
@@ -716,6 +732,8 @@ write_patch_id(struct ulp_metadata *ulp, const char *description,
   else
     length = MD4_LENGTH;
   memcpy(ulp->patch_id + half, digest, length);
+  free(input);
+  free(digest);
 
   return 0;
 }

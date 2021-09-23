@@ -45,7 +45,7 @@ run_trigger(struct arguments *arguments)
   int ret;
   int retry;
 
-  struct ulp_process target;
+  struct ulp_process *target = calloc(1, sizeof(struct ulp_process));
 
   /* Set the verbosity level in the common introspection infrastructure. */
   ulp_verbose = arguments->verbose;
@@ -58,17 +58,18 @@ run_trigger(struct arguments *arguments)
     return 1;
   }
 
-  memset(&target, 0, sizeof(target));
-  target.pid = arguments->pid;
-  ret = initialize_data_structures(&target);
+  target->pid = arguments->pid;
+  ret = initialize_data_structures(target);
   if (ret) {
     WARN("error gathering target process information.");
-    return 1;
+    ret = 1;
+    goto target_clean;
   }
 
-  if (check_patch_sanity(&target)) {
+  if (check_patch_sanity(target)) {
     WARN("error checking live patch sanity.");
-    return 1;
+    ret = 1;
+    goto target_clean;
   }
 
   /*
@@ -83,32 +84,34 @@ run_trigger(struct arguments *arguments)
   while (retry) {
     retry--;
 
-    ret = hijack_threads(&target);
+    ret = hijack_threads(target);
     if (ret == -1) {
       FATAL("fatal error during live patch application (hijacking).");
-      return 1;
+      ret = 1;
+      goto target_clean;
     }
     if (ret > 0) {
       WARN("unable to hijack process.");
-      return 1;
+      ret = 1;
+      goto target_clean;
     }
 
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
     if (arguments->check_stack) {
-      ret = coarse_library_range_check(&target, NULL);
+      ret = coarse_library_range_check(target, NULL);
       if (ret) {
         DEBUG("range check failed");
         goto range_check_failed;
       }
     }
 #endif
-    result = apply_patch(&target, livepatch);
+    result = apply_patch(target, livepatch);
     if (result == -1) {
       FATAL("fatal error during live patch application (hijacked execution).");
       retry = 0;
     }
     if (result)
-      DEBUG("live patching %d failed (attempt #%d).", target.pid,
+      DEBUG("live patching %d failed (attempt #%d).", target->pid,
             (arguments->retries - retry));
     else
       retry = 0;
@@ -116,7 +119,7 @@ run_trigger(struct arguments *arguments)
   range_check_failed:
 #endif
 
-    ret = restore_threads(&target);
+    ret = restore_threads(target);
     if (ret) {
       FATAL("fatal error during live patch application (restoring).");
       retry = 0;
@@ -126,9 +129,14 @@ run_trigger(struct arguments *arguments)
 
   if (result) {
     WARN("live patching failed.");
-    return 1;
+    ret = 1;
+    goto target_clean;
   }
 
   WARN("live patching succeeded.");
-  return 0;
+  ret = 0;
+
+target_clean:
+  release_ulp_process(target);
+  return ret;
 }
