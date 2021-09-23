@@ -124,26 +124,29 @@ print_message_buffer(const struct ulp_process *p, bool debug)
 int
 run_messages(struct arguments *arguments)
 {
-  int ret;
-  struct ulp_process target;
+  int ret = 0;
+  struct ulp_process *target = calloc(1, sizeof(struct ulp_process));
 
   /* Set the verbosity level in the common introspection infrastructure. */
   ulp_verbose = arguments->verbose;
   ulp_quiet = arguments->quiet;
 
-  memset(&target, 0, sizeof(target));
-  target.pid = arguments->pid;
-  ret = initialize_data_structures(&target);
+  target->pid = arguments->pid;
+  ret = initialize_data_structures(target);
   if (ret) {
     WARN("error gathering target process information.");
-    return 1;
+    ret = 1;
+    goto ulp_process_clean;
   }
 
-  ret = print_message_buffer(&target, false);
+  ret = print_message_buffer(target, false);
   if (ret > 0) {
     WARN("message queue reading failed.");
-    return 1;
+    ret = 1;
+    goto ulp_process_clean;
   }
 
-  return 0;
+ulp_process_clean:
+  release_ulp_process(target);
+  return ret;
 }

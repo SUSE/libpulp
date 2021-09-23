@@ -55,3 +55,9 @@ ulp_LDADD = libcommon.la
 
 # Ensure access to the include directory
 AM_CFLAGS += -I$(abs_top_srcdir)/include
+
+if ENABLE_ADDRSAN
+# Add address sanitizer
+AM_CFLAGS += -fsanitize=address,undefined
+AM_LDFLAGS += -fsanitize=address,undefined
+endif

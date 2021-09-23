@@ -49,6 +49,21 @@ AM_INIT_AUTOMAKE([-Wall -Wno-portability foreign subdir-objects])
 # supposed to be dynamically linked into applications.
 LT_INIT([shared disable-static])
 
+# Enable sanitizers on ulp tools
+AC_ARG_ENABLE(sanitizers,
+AS_HELP_STRING([--enable-sanitizers],
+[compile ulp tools with address and undefined-behaviour sanitizer [default=no]]),
+[enable_sanitizers=yes]
+[AC_SUBST([UBSAN_OPTIONS], ["print_stack_trace=1 detect_stack_use_after_return=1"])],
+[enable_sanitizesr=no; break])
+
+AM_CONDITIONAL([ENABLE_ADDRSAN], [test "x$enable_sanitizers" == "xyes"])
+
+# We need to disable optimizations if libsanitizer is enabled, else we
+# lose interesting informations about the leaks/errors.
+AS_IF([test "x$enable_sanitizers" == "xyes"],
+      [CFLAGS="-O0 -g"], [])
+
 AC_PROG_CC
 AC_PROG_CXX
 AM_PROG_AS
@@ -89,7 +104,6 @@ AC_SUBST([AM_CFLAGS], ["-Wall -Wextra -Werror"])
 AC_SUBST([AM_CCASFLAGS], ["-Wa,--fatal-warnings"])
 
 # Use the glibc versions installed on path
-# "-Wl,--dynamic-linker=$enableval/lib64/ld-linux-x86-64.so.2 -Wl,--rpath=$enableval/lib64/"
 AC_ARG_WITH([glibc],
 AC_HELP_STRING([--with-glibc=GLIBC_PATH],
 [Use the glibc installed on GLIBC_PATH, where the .so file is present]),

@@ -45,7 +45,7 @@ run_check(struct arguments *arguments)
   int check;
   int result;
 
-  struct ulp_process target;
+  struct ulp_process *target = calloc(1, sizeof(struct ulp_process));
 
   /* Set the verbosity level in the common introspection infrastructure. */
   ulp_verbose = arguments->verbose;
@@ -55,33 +55,37 @@ run_check(struct arguments *arguments)
 
   if (load_patch_info(livepatch)) {
     WARN("error parsing the metadata file (%s).", livepatch);
-    return 1;
+    ret = 1;
+    goto ulp_process_clean;
   }
 
-  memset(&target, 0, sizeof(target));
-  target.pid = arguments->pid;
-  ret = initialize_data_structures(&target);
+  target->pid = arguments->pid;
+  ret = initialize_data_structures(target);
   if (ret) {
     WARN("error gathering target process information.");
-    return -1;
+    ret = -1;
+    goto ulp_process_clean;
   }
 
-  if (check_patch_sanity(&target)) {
+  if (check_patch_sanity(target)) {
     WARN("error checking live patch sanity.");
-    return -1;
+    ret = -1;
+    goto ulp_process_clean;
   }
 
-  ret = hijack_threads(&target);
+  ret = hijack_threads(target);
   if (ret == -1) {
     FATAL("fatal error during live patch application (hijacking).");
-    return -1;
+    ret = -1;
+    goto ulp_process_clean;
   }
   if (ret > 0) {
     WARN("unable to hijack process.");
-    return -1;
+    ret = -1;
+    goto ulp_process_clean;
   }
 
-  check = patch_applied(&target, ulp.patch_id, &result);
+  check = patch_applied(target, ulp.patch_id, &result);
   if (check == -1) {
     FATAL("fatal error during live patch status check (hijacked execution).");
   }
@@ -89,10 +93,11 @@ run_check(struct arguments *arguments)
     WARN("error during live patch status check (hijacked execution).");
   }
 
-  ret = restore_threads(&target);
+  ret = restore_threads(target);
   if (ret) {
     FATAL("fatal error during live patch application (restoring).");
-    return -1;
+    ret = -1;
+    goto ulp_process_clean;
   }
 
   /*
@@ -100,11 +105,17 @@ run_check(struct arguments *arguments)
    * Otherwise, forward the result of the check routine, i.e. 0 if the
    * patch has been previously applied, or 1 if it hasn't.
    */
-  if (check)
-    return -1;
+  if (check) {
+    ret = -1;
+    goto ulp_process_clean;
+  }
   if (result == 0)
     WARN("patch not yet applied");
   else
     WARN("patch already applied");
-  return result;
+  ret = result;
+
+ulp_process_clean:
+  release_ulp_process(target);
+  return ret;
 }

@@ -105,6 +105,71 @@ debug_ulp_object(struct ulp_object *obj)
   debug_ulp_unit(obj->units);
 }
 
+/** @brief Release memory of an ulp_thread `t`
+ *
+ *  Release memory of an ulp_thread allocated with malloc as well as
+ *  every field associated with it.
+ *
+ * @param p An ulp_thread structure.
+ */
+static void
+release_ulp_thread(struct ulp_thread *t)
+{
+  struct ulp_thread *nextt;
+
+  for (; t != NULL; t = nextt) {
+    nextt = t->next;
+    free(t);
+  }
+}
+
+/** @brief Release memory of an ulp_dynobj `obj`
+ *
+ *  Release memory of an ulp_dynobj allocated with malloc as well as
+ *  every field associated with it.
+ *
+ * @param p An ulp_dynobj structure.
+ */
+static void
+release_ulp_dynobj(struct ulp_dynobj *obj)
+{
+  struct ulp_dynobj *nexto;
+
+  for (; obj != NULL; obj = nexto) {
+    nexto = obj->next;
+
+    if (obj->filename)
+      free(obj->filename);
+    if (obj->thread_states)
+      free(obj->thread_states);
+    free(obj);
+  }
+}
+
+/** @brief Release memory of an ulp_process `p`
+ *
+ *  Release memory of an ulp_process allocated with malloc as well as
+ *  every field associated with it.
+ *
+ * @param p An ulp_process structure
+ */
+void
+release_ulp_process(struct ulp_process *p)
+{
+  struct ulp_process *nextp;
+
+  for (; p != NULL; p = nextp) {
+    nextp = p->next;
+
+    release_ulp_thread(p->threads);
+    release_ulp_dynobj(p->dynobj_main);
+    release_ulp_dynobj(p->dynobj_targets);
+    /* p->dynobj_libpulp don't require free as it is in targets chain.  */
+    release_ulp_dynobj(p->dynobj_patches);
+    free(p);
+  }
+}
+
 /* Parses the _DYNAMIC section of PROCESS, finds the DT_DEBUG entry,
  * from which the address of the chain of dynamically loaded objects
  * (link map) can be found, then reads it and stores it in PROCESS.
@@ -684,22 +749,19 @@ struct link_map *
 parse_lib_dynobj(struct ulp_process *process, struct link_map *link_map_addr)
 {
   struct ulp_dynobj *obj;
-  struct link_map *link_map;
   char *libname;
   int pid = process->pid;
 
   /* calloc initializes all to zero */
   obj = calloc(sizeof(struct ulp_dynobj), 1);
-  link_map = calloc(sizeof(struct link_map), 1);
 
-  if (read_memory((char *)link_map, sizeof(struct link_map), pid,
+  if (read_memory((char *)&obj->link_map, sizeof(struct link_map), pid,
                   (Elf64_Addr)link_map_addr)) {
     WARN("error reading link_map address.");
     return NULL;
   }
 
-  libname = calloc(PATH_MAX, 1);
-  if (read_string(&libname, pid, (Elf64_Addr)link_map->l_name)) {
+  if (read_string(&libname, pid, (Elf64_Addr)obj->link_map.l_name)) {
     WARN("error reading link_map string.");
     return NULL;
   }
@@ -717,7 +779,6 @@ parse_lib_dynobj(struct ulp_process *process, struct link_map *link_map_addr)
    * live-patching. Most symbols will be provided by libpulp.so, and
    * some by the target library.
    */
-  obj->link_map = *link_map;
 
   /* Pointers to linux-vdso.so are invalid, so skip this library.  */
   if (strcmp(obj->filename, "linux-vdso.so.1"))
@@ -764,7 +825,7 @@ parse_lib_dynobj(struct ulp_process *process, struct link_map *link_map_addr)
     process->dynobj_targets = obj;
   }
 
-  return link_map;
+  return &obj->link_map;
 }
 
 /* Collects multiple pieces of information about PROCESS, so that it can
