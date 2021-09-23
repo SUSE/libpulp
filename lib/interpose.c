@@ -57,7 +57,7 @@ static int (*real_dladdr)(const void *, Dl_info *) = NULL;
 static int (*real_dladdr1)(const void *, Dl_info *, void **, int) = NULL;
 static int (*real_dlinfo)(void *, int, void *) = NULL;
 
-/* Get symbol by its name
+/** @brief Get symbol by its name
  *
  * Example: calling this function with name = 'printf' will return
  * the ELF symbol referring to the printf function.
@@ -84,7 +84,7 @@ get_symbol_by_name(Elf64_Sym dynsym[], const char *dynstr, int len,
   return NULL;
 }
 
-/* struct containing the parameters that will be passed to dl_find_symbol.  */
+/** struct containing the parameters that will be passed to dl_find_symbol.  */
 struct dl_iterate_arg
 {
   const char *library; /* Name of the .so file to find the symbol. */
@@ -93,7 +93,7 @@ struct dl_iterate_arg
   void *symbol_addr; /* The address of the symbol in the program. */
 };
 
-/* dl_iterate_phdr callback.
+/** @brief dl_iterate_phdr callback.
  *
  * This function do the hard work into gathering the necessary informations
  * about the symbols in the process. It works by being a callback to
@@ -214,7 +214,8 @@ dl_find_symbol(struct dl_phdr_info *info, size_t size, void *data)
     Elf64_Sym *sym;
 
     sym = get_symbol_by_name(dynsym, dynstr, num_symbols, args->symbol);
-    args->symbol_addr = (void *)(info->dlpi_addr + sym->st_value);
+    if (sym)
+      args->symbol_addr = (void *)(info->dlpi_addr + sym->st_value);
 
     /* Alert dl_iterate_phdr that we are finished.  */
     return 1;
@@ -222,7 +223,7 @@ dl_find_symbol(struct dl_phdr_info *info, size_t size, void *data)
   return 0;
 }
 
-/* Get the address of a loaded symbol from library.
+/** @brief Get the address of a loaded symbol from library.
  *
  * This function will return the address where the symbol with the name
  * "symbol" from the library "library" was allocated in memory.
@@ -260,8 +261,13 @@ __ulp_asunsafe_begin(void)
    * at the loaded dynamic symbols from "libdl.so" for the "dlsym" function.
    */
   real_dlsym = (typeof(real_dlsym))get_loaded_symbol_addr("libdl.so", "dlsym");
-  if (!real_dlsym)
-    errx(EXIT_FAILURE, "Unable to find dlsym in libdl.so");
+  if (!real_dlsym) {
+    /* Check if that is present in libc.  */
+    real_dlsym =
+        (typeof(real_dlsym))get_loaded_symbol_addr("libc.so", "dlsym");
+    if (!real_dlsym)
+      errx(EXIT_FAILURE, "Unable to find dlsym in libdl.so");
+  }
 
   real_dlopen = dlsym(RTLD_NEXT, "dlopen");
   real_dlmopen = dlsym(RTLD_NEXT, "dlmopen");
