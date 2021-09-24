@@ -73,7 +73,7 @@ static struct argp_option options[] = {
   { 0, 0, 0, 0, "Options:", 0 },
   { "verbose", 'v', 0, 0, "Produce verbose output", 0 },
   { "quiet", 'q', 0, 0, "Don't produce any output", 0 },
-  { 0, 0, 0, 0, "patches & check commands only:", 0 },
+  { 0, 0, 0, 0, "patches, check & trigger commands only:", 0 },
   { "pid", 'p', "PID", 0, "Target process with PID", 0 },
   { 0, 0, 0, 0, "dump & patches command only:", 0 },
   { "buildid", 'b', 0, 0, "Print the build id", 0 },
