@@ -25,41 +25,30 @@
 #include "arguments.h"
 #include "dump.h"
 #include "introspection.h"
+#include "patches.h"
 
 extern struct ulp_metadata ulp;
 
 static void
-id2str(char *str, char *id, int idlen)
-{
-  int i;
-  char item[4];
-
-  for (i = 0; i < idlen; i++) {
-    snprintf(item, 4, "%02x ", (unsigned int)(*(id + i) & 0x0FF));
-    str = stpcpy(str, item);
-  }
-}
-
-static void
 dump_metadata(struct ulp_metadata *ulp, int buildid_only)
 {
-  char buffer[128];
   struct ulp_object *obj;
   struct ulp_unit *unit;
+  const char *buildid_string = buildid_to_string(ulp->patch_id);
+
   if (ulp) {
     if (!buildid_only) {
-      id2str(buffer, (char *)ulp->patch_id, 32);
-      fprintf(stdout, "patch id: %s\n", buffer);
+      fprintf(stdout, "patch id: %s\n", buildid_string);
       fprintf(stdout, "so filename: %s\n", ulp->so_filename);
     }
     obj = ulp->objs;
     if (obj) {
-      id2str(buffer, obj->build_id, obj->build_id_len);
+      buildid_string = buildid_to_string((unsigned char *)obj->build_id);
       if (!buildid_only) {
-        fprintf(stdout, "\n* build id: %s\n", buffer);
+        fprintf(stdout, "\n* build id: %s\n", buildid_string);
       }
       else {
-        fprintf(stdout, "%s\n", buffer);
+        fprintf(stdout, "%s\n", buildid_string);
       }
       if (obj->name && !buildid_only) {
         fprintf(stdout, "* name: %s\n", obj->name);
