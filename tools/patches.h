@@ -24,6 +24,8 @@
 
 struct arguments;
 
+const char *buildid_to_string(const unsigned char[BUILDID_LEN]);
+
 int run_patches(struct arguments *);
 
 #endif
