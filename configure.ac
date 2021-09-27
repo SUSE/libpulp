@@ -180,6 +180,7 @@ AC_CONFIG_FILES([Makefile
 		 man/Makefile
 		 tests/Makefile
 		 tools/Makefile
+		 common/Makefile
 		 docs/Makefile])
 
 AC_OUTPUT

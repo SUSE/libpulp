@@ -27,6 +27,8 @@ libpulp_la_LDFLAGS = \
   -Wl,--hash-style=sysv \ # Ubuntu seems to default to gnu, so be clear we ...
   $(AM_LDFLAGS) # ... want old style hash sections, else DT_HASH is empty.
 
+libpulp_la_LIBADD = $(top_builddir)/common/libcommon.la
+
 AM_CFLAGS += -I$(top_srcdir)/include
 
 EXTRA_DIST = libpulp.versions

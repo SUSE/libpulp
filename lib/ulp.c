@@ -71,21 +71,6 @@ begin(void)
   msgq_push("libpulp loaded...\n");
 }
 
-/*FIXME: Move this function to a common library. Tools also have a copy of
- * this.  */
-static const char *
-get_basename(const char *name)
-{
-  const char *base = strrchr(name, '/');
-
-  /* If strrchr returned non-null, it means that it found the last '/' in the
-   * path, so add one to get the base name.  */
-  if (base)
-    return base + 1;
-
-  return name;
-}
-
 /** @brief Revert all live patches associated with library `lib_name`
  *
  * The user may have applied a series of live patches on a library named

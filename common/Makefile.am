@@ -17,42 +17,12 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-bin_PROGRAMS = ulp
-
-noinst_HEADERS = \
-  trigger.h \
-  arguments.h \
-  introspection.h \
-  ptrace.h \
-  packer.h \
-  md4.h \
-  check.h \
-  patches.h \
-  dump.h \
-  post.h \
-  revert.h \
-  messages.h
-
-ulp_SOURCES = \
-  ulp.c \
-  check.c \
-  patches.c \
-  dump.c \
-  packer.c \
-  md4.c \
-  trigger.c \
-  post.c \
-  revert.c \
-  messages.c \
-  introspection.c \
-  ptrace.c
-ulp_LDADD = $(top_builddir)/common/libcommon.la -lelf -ldl $(LIBUNWIND_LIBS)
+# Static library shared among the tools.
+noinst_LTLIBRARIES = libcommon.la
 
 # Ensure access to the include directory
 AM_CFLAGS += -I$(abs_top_srcdir)/include
 
-if ENABLE_ADDRSAN
-# Add address sanitizer
-AM_CFLAGS += -fsanitize=address,undefined
-AM_LDFLAGS += -fsanitize=address,undefined
-endif
+libcommon_la_SOURCES = common.c
+libcommon_la_LIBADD = $(LIBUNWIND_LIBS)
+
