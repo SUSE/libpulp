@@ -1463,6 +1463,7 @@ load_patch_info(const char *livepatch)
       WARN("Unable to read unit new function name.");
       return 1;
     }
+    DEBUG(">> Just read new_fname: %s", unit->new_fname);
 
     if (fread(&unit->old_faddr, sizeof(void *), 1, file) < 1) {
       WARN("Unable to read old function address.");
