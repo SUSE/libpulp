@@ -33,13 +33,6 @@ noinst_HEADERS = \
   revert.h \
   messages.h
 
-# Static library shared among the tools.
-
-noinst_LTLIBRARIES = libcommon.la
-
-libcommon_la_SOURCES = introspection.c ptrace.c
-libcommon_la_LIBADD = -lelf -ldl $(LIBUNWIND_LIBS)
-
 ulp_SOURCES = \
   ulp.c \
   check.c \
@@ -50,8 +43,10 @@ ulp_SOURCES = \
   trigger.c \
   post.c \
   revert.c \
-  messages.c
-ulp_LDADD = libcommon.la
+  messages.c \
+  introspection.c \
+  ptrace.c
+ulp_LDADD = -lelf -ldl $(LIBUNWIND_LIBS)
 
 # Ensure access to the include directory
 AM_CFLAGS += -I$(abs_top_srcdir)/include
