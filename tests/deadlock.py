@@ -42,7 +42,7 @@ for attempt in range(32):
   # such, should not make calls to Asynchronous Signal Unsafe functions.
   # However, libpulp calls dlopen, which is AS-Unsafe.
   try:
-    child.livepatch('libblocked_livepatch1.ulp', retries=100, timeout=20)
+    child.livepatch('libblocked_livepatch1.ulp', retries=10000, timeout=20)
   except subprocess.TimeoutExpired:
     print('Deadlock detected.')
     errors = 1
