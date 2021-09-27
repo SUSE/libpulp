@@ -59,11 +59,6 @@ AS_HELP_STRING([--enable-sanitizers],
 
 AM_CONDITIONAL([ENABLE_ADDRSAN], [test "x$enable_sanitizers" == "xyes"])
 
-# We need to disable optimizations if libsanitizer is enabled, else we
-# lose interesting informations about the leaks/errors.
-AS_IF([test "x$enable_sanitizers" == "xyes"],
-      [CFLAGS="-O0 -g"], [])
-
 AC_PROG_CC
 AC_PROG_CXX
 AM_PROG_AS
