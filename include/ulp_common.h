@@ -91,4 +91,7 @@ struct ulp_reference
   struct ulp_reference *next;
 };
 
+/* Functions present in libcommon, linked agaist both libpulp.so and tools.  */
+const char *get_basename(const char *);
+
 #endif

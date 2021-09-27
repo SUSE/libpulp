@@ -133,19 +133,6 @@ command_from_string(const char *str)
   return ULP_NONE;
 }
 
-static const char *
-get_basename(const char *name)
-{
-  const char *base = strrchr(name, '/');
-
-  /* If strrchr returned non-null, it means that it found the last '/' in the
-   * path, so add one to get the base name.  */
-  if (base)
-    return base + 1;
-
-  return name;
-}
-
 /* This function is called when all arguments have been parsed.  */
 static void
 handle_end_of_arguments(const struct argp_state *state)
