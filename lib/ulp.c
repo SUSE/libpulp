@@ -226,9 +226,6 @@ free_metadata(struct ulp_metadata *ulp)
         unit = next_unit;
       }
       free(obj->build_id);
-      if (obj->dl_handler && dlclose(obj->dl_handler)) {
-        MSGQ_WARN("Error closing handler for %s.", obj->name);
-      }
       free(obj->name);
       free(obj);
     }
@@ -240,15 +237,9 @@ free_metadata(struct ulp_metadata *ulp)
 int
 unload_handlers(struct ulp_metadata *ulp)
 {
-  struct ulp_object *obj;
   int status = 1;
   if (ulp->so_handler && dlclose(ulp->so_handler)) {
     MSGQ_WARN("Error unloading patch so handler: %s", ulp->so_filename);
-    status = 0;
-  }
-  obj = ulp->objs;
-  if (obj->dl_handler && dlclose(obj->dl_handler)) {
-    MSGQ_WARN("Error unloading patch target so handler: %s", obj->name);
     status = 0;
   }
   return status;
@@ -273,7 +264,6 @@ load_so_symbol(char *fname, void *handle)
 int
 load_so_handlers(struct ulp_metadata *ulp)
 {
-  struct ulp_object *obj;
   ulp->so_handler = load_so(ulp->so_filename);
 
   if (!ulp->so_handler) {
@@ -282,13 +272,6 @@ load_so_handlers(struct ulp_metadata *ulp)
     return 0;
   }
 
-  obj = ulp->objs;
-  obj->dl_handler = load_so(obj->name);
-  if (!obj->dl_handler) {
-    MSGQ_WARN("Unable to load dl handler.");
-    unload_handlers(ulp);
-    return 0;
-  }
   return 1;
 }
 
@@ -751,7 +734,7 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
   /* only shared objs have units, this loop never runs for main obj */
   unit = obj->units;
   while (unit) {
-    old_fun = load_so_symbol(unit->old_fname, obj->dl_handler);
+    old_fun = get_loaded_symbol_addr(get_basename(obj->name), unit->old_fname);
     if (!old_fun)
       return 0;
 
@@ -767,7 +750,6 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
 
       root->index = get_next_function_index();
       root->patched_addr = old_fun;
-      root->handler = obj->dl_handler;
     }
 
     if (!(push_new_detour(__ulp_global_universe, ulp->patch_id, root,
@@ -799,19 +781,14 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
   struct link_map *map_ptr;
   uintptr_t target_base;
   uintptr_t patch_base;
+  const char *target_basename = get_basename(ulp->objs->name);
 
-  map_ptr = &map_data;
-  memset(map_ptr, 0, sizeof(struct link_map));
-  retcode = dlinfo(ulp->objs->dl_handler, RTLD_DI_LINKMAP, &map_ptr);
-  if (retcode == -1) {
-    MSGQ_WARN("Error in call to dlinfo: %s", dlerror());
+  target_base = (uintptr_t)get_loaded_library_base_addr(target_basename);
+  if (target_base == 0xFF) {
+    MSGQ_WARN("Unable to find target library load address of %s",
+              target_basename);
     return 0;
   }
-  if (map_ptr->l_addr == 0) {
-    MSGQ_WARN("Unable to find target library load address: %s", dlerror());
-    return 0;
-  }
-  target_base = map_ptr->l_addr;
 
   map_ptr = &map_data;
   memset(map_ptr, 0, sizeof(struct link_map));
@@ -848,6 +825,7 @@ ulp_state_update(struct ulp_metadata *ulp)
   struct ulp_object *obj;
   struct ulp_unit *unit;
   struct ulp_dependency *dep, *a_dep;
+  const char *basename_target;
 
   a_patch = calloc(1, sizeof(struct ulp_applied_patch));
   if (!a_patch) {
@@ -878,6 +856,8 @@ ulp_state_update(struct ulp_metadata *ulp)
   obj = ulp->objs;
   unit = obj->units;
 
+  basename_target = get_basename(obj->name);
+
   /* only shared objs have units, this loop never runs for main obj */
   while (unit != NULL) {
     a_unit = calloc(1, sizeof(struct ulp_applied_unit));
@@ -886,7 +866,8 @@ ulp_state_update(struct ulp_metadata *ulp)
       return 0;
     }
 
-    a_unit->patched_addr = load_so_symbol(unit->old_fname, obj->dl_handler);
+    a_unit->patched_addr =
+        get_loaded_symbol_addr(basename_target, unit->old_fname);
     if (!a_unit->patched_addr)
       return 0;
 

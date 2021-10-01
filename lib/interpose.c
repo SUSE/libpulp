@@ -245,6 +245,43 @@ get_loaded_symbol_addr(const char *library, const char *symbol)
   return arg.symbol_addr;
 }
 
+static int
+dl_find_base_addr(struct dl_phdr_info *info, size_t size, void *data)
+{
+  struct dl_iterate_arg *args = (struct dl_iterate_arg *)data;
+
+  /* Highly improvable that any library will have this base address.  */
+  args->symbol_addr = (void *)0xFF;
+
+  /* Sanity check if size matches the size of the struct.  */
+  if (size != sizeof(*info))
+    errx(EXIT_FAILURE, "dl_phdr_info size is unexpected");
+
+  /* Pointers to linux-vdso.so are invalid, so skip this library.  */
+  if (!strcmp(info->dlpi_name, "linux-vdso.so.1"))
+    return 0;
+
+  /* Check if the current info is the library we want to find the symbols.  */
+  if (*info->dlpi_name != '\0' && strstr(info->dlpi_name, args->library)) {
+    /* Found.  Set symbol_addr as the base address of library.  */
+    args->symbol_addr = (void *)info->dlpi_addr;
+
+    /* Alert dl_iterate that we are finished.  */
+    return 1;
+  }
+
+  return 0;
+}
+
+void *
+get_loaded_library_base_addr(const char *library)
+{
+  struct dl_iterate_arg arg = { .library = library };
+  dl_iterate_phdr(dl_find_base_addr, &arg);
+
+  return arg.symbol_addr;
+}
+
 __attribute__((constructor)) void
 __ulp_asunsafe_begin(void)
 {

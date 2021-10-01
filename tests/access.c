@@ -31,6 +31,7 @@ main(void)
   char buffer[128];
 
   /* Original banner. */
+  printf("Banner addr: 0x%lX\n", (unsigned long)banner_get());
   printf("%s\n", banner_get());
 
   /* Use original banner setting function. */
