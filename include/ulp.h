@@ -52,7 +52,6 @@ struct ulp_detour_root
 {
   unsigned int index;
   void *patched_addr;
-  void *handler;
   struct ulp_detour_root *next;
   struct ulp_detour *detours;
 };

@@ -21,3 +21,7 @@
 
 int __ulp_asunsafe_trylock(void);
 int __ulp_asunsafe_unlock(void);
+
+void *get_loaded_symbol_addr(const char *, const char *);
+
+void *get_loaded_library_base_addr(const char *);

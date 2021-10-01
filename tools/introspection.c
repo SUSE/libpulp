@@ -96,7 +96,6 @@ debug_ulp_object(struct ulp_object *obj)
   DEBUG("obj->build_id_check: %u", obj->build_id_check);
   DEBUG("obj->build id: %lx", (unsigned long)obj->build_id);
   DEBUG("obj->name: %s", obj->name);
-  DEBUG("obj->dl_handler: %lx", (unsigned long)obj->dl_handler);
   DEBUG("obj->flags: %lx", (unsigned long)obj->flag);
   DEBUG("obj->nunits: %u", obj->nunits);
   DEBUG("obj->units: %lx", (unsigned long)obj->units);

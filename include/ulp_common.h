@@ -61,7 +61,6 @@ struct ulp_object
   uint32_t build_id_check;
   char *build_id;
   char *name;
-  void *dl_handler;
   void *flag;
   uint32_t nunits;
   struct ulp_unit *units;
