@@ -168,6 +168,17 @@ class spawn(pexpect.spawn):
       if not file.is_file():
         raise FileNotFoundError('File ' + filename + ' not found')
 
+  # Dump a compiled metadata file (.ulp) provided in metadata
+  def show_metadata(self, metadata):
+    command = [ulptool, "dump", metadata]
+    try:
+      self.print(metadata + ' content:')
+      tool = subprocess.run(command, timeout=10)
+    except subprocess.TimeoutExpired:
+      self.print('ulp dump timed out.')
+      raise
+
+
   # Apply a live patch to the spawned process. The path to the live patch
   # metadata must be passed through 'filename'. The remaining parameters, which
   # are optional, are the same that the Trigger tool provides (see its --help
@@ -186,6 +197,8 @@ class spawn(pexpect.spawn):
       command.append(revert_lib)
     if filename is not None:
       command.append(filename)
+      self.print('')
+      self.show_metadata(filename)
     if verbose:
       command.append('-v')
     if quiet:
