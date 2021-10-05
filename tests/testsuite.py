@@ -170,6 +170,17 @@ class spawn(pexpect.spawn):
 
   # Dump a compiled metadata file (.ulp) provided in metadata
   def show_metadata(self, metadata):
+    # See if there is a .dsc file. On true, print it as well.
+    suffix = metadata.rfind(".ulp")
+    dsc = metadata[:suffix] + ".dsc"
+    if os.path.isfile(dsc):
+      self.print(dsc + " content:")
+      dscf = open(dsc, 'r')
+      content = dscf.read()
+      dscf.close()
+      self.print(content)
+
+    # Now print the .ulp file
     command = [ulptool, "dump", metadata]
     try:
       self.print(metadata + ' content:')
