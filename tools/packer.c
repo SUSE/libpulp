@@ -247,7 +247,7 @@ create_patch_metadata_file(struct ulp_metadata *ulp, const char *filename)
 
   /* Patch id (first 32b) */
   fwrite(ulp->patch_id, sizeof(char), 32, file);
-  c = strlen(ulp->so_filename);
+  c = strlen(ulp->so_filename) + 1;
   /* patch .so filename length */
   fwrite(&c, sizeof(uint32_t), 1, file);
   /* patch .so filename */
@@ -261,9 +261,10 @@ create_patch_metadata_file(struct ulp_metadata *ulp, const char *filename)
 
   if (!obj->name) {
     WARN("to be patched object has no name\n");
+    fclose(file);
     return 0;
   }
-  c = strlen(obj->name);
+  c = strlen(obj->name) + 1;
   /* object name length */
   fwrite(&c, sizeof(uint32_t), 1, file);
   /* object name */
@@ -273,13 +274,13 @@ create_patch_metadata_file(struct ulp_metadata *ulp, const char *filename)
   fwrite(&obj->nunits, sizeof(uint32_t), 1, file);
 
   for (unit = obj->units; unit != NULL; unit = unit->next) {
-    c = strlen(unit->old_fname);
+    c = strlen(unit->old_fname) + 1;
     /* to-be-patched function name length */
     fwrite(&c, sizeof(uint32_t), 1, file);
     /* to-be-patched function name */
     fwrite(unit->old_fname, sizeof(char), c, file);
 
-    c = strlen(unit->new_fname);
+    c = strlen(unit->new_fname) + 1;
     /* patch function name length */
     fwrite(&c, sizeof(uint32_t), 1, file);
     /* patch function name */
@@ -299,10 +300,10 @@ create_patch_metadata_file(struct ulp_metadata *ulp, const char *filename)
 
   for (ref = ulp->refs; ref != NULL; ref = ref->next) {
     uint32_t len;
-    len = strlen(ref->target_name);
+    len = strlen(ref->target_name) + 1;
     fwrite(&len, sizeof(len), 1, file);
     fwrite(ref->target_name, sizeof(char), len, file);
-    len = strlen(ref->reference_name);
+    len = strlen(ref->reference_name) + 1;
     fwrite(&len, sizeof(len), 1, file);
     fwrite(ref->reference_name, sizeof(char), len, file);
     fwrite(&ref->target_offset, sizeof(ref->target_offset), 1, file);
@@ -310,6 +311,7 @@ create_patch_metadata_file(struct ulp_metadata *ulp, const char *filename)
     fflush(file);
   }
 
+  fclose(file);
   return 1;
 }
 
@@ -361,7 +363,7 @@ parse_description(const char *filename, struct ulp_metadata *ulp)
   char *first;
   char *second;
   char *third;
-  size_t i, len = 0;
+  size_t len = 0;
   int n;
 
   /* zero the entire structure before filling */
@@ -489,12 +491,8 @@ parse_description(const char *filename, struct ulp_metadata *ulp)
       else {
 
         /* find old/new function name separator */
-        for (i = 0; i < len; i++) {
-          if (first[i] == ':') {
-            first[i] = '\0';
-            second = &first[i + 1];
-          }
-        }
+        first = strtok(first, ":");
+        second = strtok(NULL, ":");
 
         if (!second) {
           WARN("Invalid input description.");
