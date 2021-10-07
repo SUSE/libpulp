@@ -75,13 +75,23 @@ __LIB_FILENAME="libcrypto.so.1.1"
 
 __MULTIBUILD_FILE="_multibuild.template"
 
-__DIST_NAME="openSUSE:Leap:15.2:Update"
+#__DIST_NAME="openSUSE:Leap:15.2:Update"
+__DIST_NAME="SUSE:SLE-15-SP2:Update"
 # Build Target is Dist Name but with _ instead of :
 __BUILD_TARGET=${__DIST_NAME//:/_}
 # Valid choices openSUSE / SUSE - Used for SUSE:Maintenance:XXXXX etc
-__PRODUCT="openSUSE"
-# lp152 for Leap 15.2 for example
-__PKG_SUFFIX="lp152"
+__PRODUCT="SUSE"
+
+if [[ $__PRODUCT == "openSUSE" ]]; then
+__API="https://api.opensuse.org"
+elif [[ $__PRODUCT == "SUSE" ]]; then
+__API="https://api.suse.de"
+else
+fail "__PRODUCT is not correctly defined must be SUSE or openSUSE"
+fi
+
+# lp152 for Leap 15.2 for example - Not needed for SLE
+#__PKG_SUFFIX="lp152"
 
 if [[ -f "$_TARGET_REPO" ]]; then
   echo "$__MULTIBUILD_FILE exists and therefore won't be recreated"
@@ -95,29 +105,44 @@ fi
 __tmp_dir=$(mktemp -d -t ulp-XXXXXXXXXX)
 mkdir -p "$__tmp_dir/$__PACKAGE_NAME-libs"
 
-for __PKG in $(osc -A https://api.opensuse.org ls $__DIST_NAME | grep "$__PACKAGE_NAME."); do
+for __PKG in $(osc -A $__API ls $__DIST_NAME | grep "$__PACKAGE_NAME."); do
 
   echo "### $__PKG ###"
   __INCIDENT=${__PKG#*.}
   # Get history from osc api
   # Parse XML for versrel
+  # Only keep the last entry - sometimes stuff is broken and built multiple times
   # Strip versrel=
   # Strip Quotes
   # Example api Call osc api "https://api.opensuse.org/build/openSUSE:Maintenance:16863/openSUSE_Leap_15.2_Update/x86_64/openssl-1_1.openSUSE_Leap_15.2_Update/_history"
-  __FULL_VERSION=$(osc api "https://api.opensuse.org/build/$__PRODUCT:Maintenance:$__INCIDENT/$__BUILD_TARGET/x86_64/$__PACKAGE_NAME.$__BUILD_TARGET/_history" |
-                   xpath -q  -e "//entry/@versrel" | grep -o '".*"' | sed 's/"//g')
-  __BUILD_COUNT=$(osc api "https://api.opensuse.org/build/$__PRODUCT:Maintenance:$__INCIDENT/$__BUILD_TARGET/x86_64/$__PACKAGE_NAME.$__BUILD_TARGET/_history" |
-                  xpath -q  -e "//entry/@bcnt" | grep -o '".*"' | sed 's/"//g')
+  echo "osc api $__API/build/$__PRODUCT:Maintenance:$__INCIDENT/$__BUILD_TARGET/x86_64/$__PACKAGE_NAME.$__BUILD_TARGET/_history"
+  __FULL_VERSION=$(osc api "$__API/build/$__PRODUCT:Maintenance:$__INCIDENT/$__BUILD_TARGET/x86_64/$__PACKAGE_NAME.$__BUILD_TARGET/_history" |
+                   xpath -q  -e "//entry/@versrel" | tail -1 | grep -o '".*"' | sed 's/"//g')
+  __BUILD_COUNT=$(osc api "$__API/build/$__PRODUCT:Maintenance:$__INCIDENT/$__BUILD_TARGET/x86_64/$__PACKAGE_NAME.$__BUILD_TARGET/_history" |
+                  xpath -q  -e "//entry/@bcnt" | tail -1 | grep -o '".*"' | sed 's/"//g')
   __FULL_VERSION="$__FULL_VERSION.$__BUILD_COUNT"
   __BUILD_VERSION=${__FULL_VERSION#*-}
 
-  __PKG_VERSION=${__FULL_VERSION/"-"/"-$__PKG_SUFFIX."}
-
-  echo "Version: $__FULL_VERSION"
+  if [[ -z $__PKG_SUFFIX ]]; then
+    __PKG_VERSION=${__FULL_VERSION}
+  else
+    __PKG_VERSION=${__FULL_VERSION/"-"/"-$__PKG_SUFFIX."}
+  fi
+  echo "Version: \"$__FULL_VERSION\""
 
   __RPM_FILENAME="$__LIB_NAME-$__PKG_VERSION.x86_64.rpm"
-  echo "wget -q -P \"$__tmp_dir/rpms\" \"https://download.opensuse.org/update/leap/15.2/oss/x86_64/$__RPM_FILENAME\""
-  wget -q --show-progress -P "$__tmp_dir/rpms" "https://download.opensuse.org/update/leap/15.2/oss/x86_64/$__RPM_FILENAME"
+  if [[ $__PRODUCT == "openSUSE" ]]; then
+    echo "wget -q -P \"$__tmp_dir/rpms\" \"https://download.opensuse.org/update/leap/15.2/oss/x86_64/$__RPM_FILENAME\""
+    wget -q --show-progress -P "$__tmp_dir/rpms" "https://download.opensuse.org/update/leap/15.2/oss/x86_64/$__RPM_FILENAME"
+
+  elif [[ $__PRODUCT == "SUSE" ]]; then
+    echo "wget -q -P \"$__tmp_dir/rpms\" \"http://download.suse.de/updates/SUSE/Updates/SLE-Module-Basesystem/15-SP2/x86_64/update/x86_64/$__RPM_FILENAME\""
+    wget -q --show-progress -P "$__tmp_dir/rpms" "http://download.suse.de/updates/SUSE/Updates/SLE-Module-Basesystem/15-SP2/x86_64/update/x86_64/$__RPM_FILENAME"
+  fi
+
+  if [[ ! -f "$__tmp_dir/rpms/$__RPM_FILENAME" ]]; then
+    fail "$__tmp_dir/rpms/$__RPM_FILENAME was not downloaded correctly"
+  fi
 
   # Extract filename
   mkdir -p "$__tmp_dir/$__PACKAGE_NAME-libs/extract"
