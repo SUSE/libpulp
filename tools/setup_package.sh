@@ -157,11 +157,9 @@ is_lib_livepatcheable() {
   return 0
 }
 
-_TARGET_REPO="home:simotek:ulp"
 __PACKAGE_NAME="openssl-1_1"
 __LIB_NAME="libopenssl1_1"
 __LIB_FILENAME="libcrypto.so.1.1"
-
 
 __MULTIBUILD_FILE="_multibuild.template"
 
@@ -183,7 +181,7 @@ fi
 # lp152 for Leap 15.2 for example - Not needed for SLE
 #__PKG_SUFFIX="lp152"
 
-if [[ -f "$_TARGET_REPO" ]]; then
+if [[ -f "$__MULTIBUILD_FILE" ]]; then
   echo "$__MULTIBUILD_FILE exists and therefore won't be recreated"
   __SKIP_MULTIBUILD="1"
 fi
