@@ -100,7 +100,7 @@ fetch_rpm() {
     wget -q --show-progress -P "$tmp_dir/rpms" "https://download.opensuse.org/update/leap/15.2/oss/x86_64/$rpm_filename"
     local ret=$?
     if [[ $ret != 0 ]]; then
-      error "wget returned $ret downloading $rpm_filename failed"
+      fail "wget returned $ret downloading $rpm_filename failed"
     fi
 
   elif [[ $product == "SUSE" ]]; then
@@ -108,7 +108,7 @@ fetch_rpm() {
     wget -q --show-progress -P "$tmp_dir/rpms" "http://download.suse.de/updates/SUSE/Updates/SLE-Module-Basesystem/15-SP2/x86_64/update/x86_64/$rpm_filename"
     local ret=$?
     if [[ $ret != 0 ]]; then
-      error "wget returned $ret downloading $rpm_filename failed"
+      fail "wget returned $ret downloading $rpm_filename failed"
     fi
   fi
 }
