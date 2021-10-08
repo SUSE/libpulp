@@ -1,14 +1,26 @@
 #!/bin/bash
 
+ULP_PACKAGE_NAME="openssl-1_1"
+ULP_LIB_NAME="libopenssl1_1"
+ULP_LIB_FILENAME="libcrypto.so.1.1"
+
+ULP_MULTIBUILD_FILE="_multibuild.template"
+
+# Valid choices openSUSE / SUSE - Used for SUSE:Maintenance:XXXXX etc
+ULP_PRODUCT="SUSE"
+
+#ULP_DIST_NAME="openSUSE:Leap:15.2:Update"
+ULP_DIST_NAME="SUSE:SLE-15-SP2:Update"
+
+# Comment out to disable debug prints
+ULP_DEBUG="On"
+
 # Color special caracters.
 GREEN='\033[1;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
 BLUE='\033[1;34m'
 NC='\033[0m' # No Color
-
-# Comment out to disable debug prints
-DEBUG="On"
 
 # Check if running bash
 if [ -z "$BASH" ]; then
@@ -157,62 +169,52 @@ is_lib_livepatcheable() {
   return 0
 }
 
-__PACKAGE_NAME="openssl-1_1"
-__LIB_NAME="libopenssl1_1"
-__LIB_FILENAME="libcrypto.so.1.1"
-
-__MULTIBUILD_FILE="_multibuild.template"
-
-#__DIST_NAME="openSUSE:Leap:15.2:Update"
-__DIST_NAME="SUSE:SLE-15-SP2:Update"
 # Build Target is Dist Name but with _ instead of :
-__BUILD_TARGET=${__DIST_NAME//:/_}
-# Valid choices openSUSE / SUSE - Used for SUSE:Maintenance:XXXXX etc
-__PRODUCT="SUSE"
+__BUILD_TARGET=${ULP_DIST_NAME//:/_}
 
-if [[ $__PRODUCT == "openSUSE" ]]; then
+if [[ $ULP_PRODUCT == "openSUSE" ]]; then
 __API="https://api.opensuse.org"
-elif [[ $__PRODUCT == "SUSE" ]]; then
+elif [[ $ULP_PRODUCT == "SUSE" ]]; then
 __API="https://api.suse.de"
 else
-fail "__PRODUCT is not correctly defined must be SUSE or openSUSE"
+fail "ULP_PRODUCT is not correctly defined must be SUSE or openSUSE"
 fi
 
 # lp152 for Leap 15.2 for example - Not needed for SLE
 #__PKG_SUFFIX="lp152"
 
-if [[ -f "$__MULTIBUILD_FILE" ]]; then
-  echo "$__MULTIBUILD_FILE exists and therefore won't be recreated"
+if [[ -f "$ULP_MULTIBUILD_FILE" ]]; then
+  echo "$ULP_MULTIBUILD_FILE exists and therefore won't be recreated"
   __SKIP_MULTIBUILD="1"
 fi
 
 if [[ -z $__SKIP_MULTIBUILD ]]; then
-  echo "<multibuild>" >> $__MULTIBUILD_FILE
+  echo "<multibuild>" >> $ULP_MULTIBUILD_FILE
 fi
 
 __TMP_DIR=$(mktemp -d -t ulp-XXXXXXXXXX)
-mkdir -p "$__TMP_DIR/$__PACKAGE_NAME-libs"
+mkdir -p "$__TMP_DIR/$ULP_PACKAGE_NAME-libs"
 
-for __PKG in $(osc -A $__API ls $__DIST_NAME | grep "$__PACKAGE_NAME."); do
+for __PKG in $(osc -A $__API ls $ULP_DIST_NAME | grep "$ULP_PACKAGE_NAME."); do
 
   echo "### $__PKG ###"
   __INCIDENT=${__PKG#*.}
 
-  __FULL_VERSION=$(get_update_version "$__INCIDENT" "$__PACKAGE_NAME" "$__PRODUCT" "$__API" "$__BUILD_TARGET")
+  __FULL_VERSION=$(get_update_version "$__INCIDENT" "$ULP_PACKAGE_NAME" "$ULP_PRODUCT" "$__API" "$__BUILD_TARGET")
 
   echo "Version: \"$__FULL_VERSION\""
 
-  __RPM_FILENAME=$(get_rpm_filename "$__LIB_NAME" "$__PKG_SUFFIX" "$__FULL_VERSION")
+  __RPM_FILENAME=$(get_rpm_filename "$ULP_LIB_NAME" "$__PKG_SUFFIX" "$__FULL_VERSION")
 
-  fetch_rpm $__TMP_DIR $__PRODUCT $__RPM_FILENAME
+  fetch_rpm $__TMP_DIR $ULP_PRODUCT $__RPM_FILENAME
 
   if [[ ! -f "$__TMP_DIR/rpms/$__RPM_FILENAME" ]]; then
     fail "$__TMP_DIR/rpms/$__RPM_FILENAME was not downloaded correctly"
   fi
 
-  extract_so "$__TMP_DIR" "$__PACKAGE_NAME" "$__FULL_VERSION" "$__LIB_FILENAME" "$__RPM_FILENAME"
+  extract_so "$__TMP_DIR" "$ULP_PACKAGE_NAME" "$__FULL_VERSION" "$ULP_LIB_FILENAME" "$__RPM_FILENAME"
 done
 
-tar -caf "$__PACKAGE_NAME-libs.tar.xz" -C "$__TMP_DIR/" "$__PACKAGE_NAME-libs"
+tar -caf "$ULP_PACKAGE_NAME-libs.tar.xz" -C "$__TMP_DIR/" "$ULP_PACKAGE_NAME-libs"
 
 rm -r "$__TMP_DIR"
