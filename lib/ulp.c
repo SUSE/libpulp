@@ -35,6 +35,7 @@
 #include <unistd.h>
 
 #include "config.h"
+#include "error.h"
 #include "interpose.h"
 #include "msg_queue.h"
 #include "ulp.h"
@@ -153,6 +154,10 @@ __ulp_apply_patch()
 {
   int result;
 
+  /* If libpulp is in an error state, we cannot continue.  */
+  if (libpulp_is_in_error_state())
+    return get_libpulp_error_state();
+
   /*
    * If the target process is busy within functions from the malloc or
    * dlopen implementations, applying a live patch could lead to a
@@ -193,6 +198,10 @@ int
 __ulp_check_applied_patch()
 {
   struct ulp_applied_patch *patch;
+
+  /* If libpulp is in an error state, we cannot continue.  */
+  if (libpulp_is_in_error_state())
+    return 0;
 
   patch = ulp_get_applied_patch((unsigned char *)__ulp_path_buffer);
   if (patch)
@@ -609,7 +618,7 @@ load_patch()
 
       if (!ulp_apply_all_units(ulp)) {
         MSGQ_WARN("FATAL ERROR while applying patch units\n");
-        exit(-1);
+        libpulp_exit(-1);
       }
 
       goto load_patch_success;
@@ -1112,7 +1121,7 @@ __ulp_manage_universes(unsigned long idx)
   root = get_detour_root_by_index((unsigned int)idx);
   if (!root) {
     MSGQ_WARN("FATAL ERROR While Live Patching.");
-    exit(-1);
+    libpulp_exit(-1);
   }
 
   target = NULL;

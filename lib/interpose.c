@@ -20,7 +20,6 @@
  */
 
 #define _GNU_SOURCE
-#include <assert.h>
 #include <dlfcn.h>
 #include <elf.h>
 #include <err.h>
@@ -32,6 +31,9 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
+
+/* This header should be included last, as it poisons some symbols.  */
+#include "error.h"
 
 static int flag = 0;
 
@@ -143,8 +145,10 @@ dl_find_symbol(struct dl_phdr_info *info, size_t size, void *data)
   struct dl_iterate_arg *args = (struct dl_iterate_arg *)data;
 
   /* Sanity check if size matches the size of the struct.  */
-  if (size != sizeof(*info))
-    errx(EXIT_FAILURE, "dl_phdr_info size is unexpected");
+  if (size != sizeof(*info)) {
+    libpulp_errx(EXIT_FAILURE, "dl_phdr_info size is unexpected");
+    return 0;
+  }
 
   /* Initialize output value as being NULL (symbol not found).  */
   args->symbol_addr = NULL;
@@ -184,9 +188,11 @@ dl_find_symbol(struct dl_phdr_info *info, size_t size, void *data)
           case DT_SYMENT:
             /* This section stores the size of a symbol entry. So compare it
              * with the size of Elf64_Sym as a sanity check.  */
-            if (dyn->d_un.d_val != sizeof(Elf64_Sym))
-              errx(EXIT_FAILURE, "DT_SYMENT value of %s is unexpected",
-                   info->dlpi_name);
+            if (dyn->d_un.d_val != sizeof(Elf64_Sym)) {
+              libpulp_errx(EXIT_FAILURE, "DT_SYMENT value of %s is unexpected",
+                           info->dlpi_name);
+              return 0;
+            }
             break;
 
           case DT_HASH:
@@ -254,8 +260,10 @@ dl_find_base_addr(struct dl_phdr_info *info, size_t size, void *data)
   args->symbol_addr = (void *)0xFF;
 
   /* Sanity check if size matches the size of the struct.  */
-  if (size != sizeof(*info))
-    errx(EXIT_FAILURE, "dl_phdr_info size is unexpected");
+  if (size != sizeof(*info)) {
+    libpulp_errx(EXIT_FAILURE, "dl_phdr_info size is unexpected");
+    return 0;
+  }
 
   /* Pointers to linux-vdso.so are invalid, so skip this library.  */
   if (!strcmp(info->dlpi_name, "linux-vdso.so.1"))
@@ -302,9 +310,9 @@ __ulp_asunsafe_begin(void)
     /* Check if that is present in libc.  */
     real_dlsym =
         (typeof(real_dlsym))get_loaded_symbol_addr("libc.so", "dlsym");
-    if (!real_dlsym)
-      errx(EXIT_FAILURE, "Unable to find dlsym in libdl.so");
   }
+
+  libpulp_crash_assert(real_dlsym);
 
   real_dlopen = dlsym(RTLD_NEXT, "dlopen");
   real_dlmopen = dlsym(RTLD_NEXT, "dlmopen");
@@ -314,13 +322,13 @@ __ulp_asunsafe_begin(void)
   real_dladdr1 = dlsym(RTLD_NEXT, "dladdr1");
   real_dlinfo = dlsym(RTLD_NEXT, "dlinfo");
 
-  assert(real_dlopen);
-  assert(real_dlmopen);
-  assert(real_dlvsym);
-  assert(real_dlclose);
-  assert(real_dladdr);
-  assert(real_dladdr1);
-  assert(real_dlinfo);
+  libpulp_crash_assert(real_dlopen);
+  libpulp_crash_assert(real_dlmopen);
+  libpulp_crash_assert(real_dlvsym);
+  libpulp_crash_assert(real_dlclose);
+  libpulp_crash_assert(real_dladdr);
+  libpulp_crash_assert(real_dladdr1);
+  libpulp_crash_assert(real_dlinfo);
 
   real_free = dlsym(RTLD_NEXT, "free");
   real_malloc = dlsym(RTLD_NEXT, "malloc");
@@ -333,16 +341,17 @@ __ulp_asunsafe_begin(void)
   real_aligned_alloc = dlsym(RTLD_NEXT, "aligned_alloc");
   real_posix_memalign = dlsym(RTLD_NEXT, "posix_memalign");
 
-  assert(real_free);
-  assert(real_malloc);
-  assert(real_calloc);
-  assert(real_realloc);
-  assert(real_reallocarray);
-  assert(real_valloc);
-  assert(real_pvalloc);
-  assert(real_memalign);
-  assert(real_aligned_alloc);
-  assert(real_posix_memalign);
+  libpulp_crash_assert(real_free);
+  libpulp_crash_assert(real_malloc);
+  libpulp_crash_assert(real_calloc);
+  libpulp_crash_assert(real_realloc);
+  libpulp_crash_assert(real_reallocarray);
+  libpulp_crash_assert(real_valloc);
+  libpulp_crash_assert(real_pvalloc);
+  libpulp_crash_assert(real_memalign);
+  libpulp_crash_assert(real_aligned_alloc);
+  libpulp_crash_assert(real_posix_memalign);
+  libpulp_crash_assert(real_posix_memalign);
 }
 
 int
