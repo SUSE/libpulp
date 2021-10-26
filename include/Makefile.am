@@ -17,4 +17,4 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-noinst_HEADERS = ulp.h ulp_common.h interpose.h msg_queue.h
+noinst_HEADERS = ulp.h ulp_common.h interpose.h msg_queue.h error.h
