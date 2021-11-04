@@ -34,6 +34,9 @@
 
 #define ARRAY_LENGTH(v) (sizeof(v) / sizeof(*(v)))
 
+/** Length of build id, in bytes.  */
+#define BUILDID_LEN 20
+
 extern __thread int __ulp_pending;
 
 struct ulp_patching_state
@@ -92,5 +95,7 @@ struct ulp_reference
 
 /* Functions present in libcommon, linked agaist both libpulp.so and tools.  */
 const char *get_basename(const char *);
+
+const char *buildid_to_string(const unsigned char[BUILDID_LEN]);
 
 #endif

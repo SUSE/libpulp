@@ -432,7 +432,8 @@ TESTS = \
   libpulp_messages.py \
   relative_path.py \
   revert_all.py \
-  revert_and_patch.py
+  revert_and_patch.py \
+  manyprocesses.py
 
 XFAIL_TESTS = \
   blocked.py \

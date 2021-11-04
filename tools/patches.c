@@ -152,36 +152,6 @@ build_process_list(void)
   return list;
 }
 
-/** @brief Convert build id provided in `build_id` into string.
- *
- * Example:
- *
- * with buildid: 338aa4d16c98dda7af170cc8e2b59d259bd5d4f4
- *
- * it will return the string:
- * "338aa4d16c98dda7af170cc8e2b59d259bd5d4f4"
- *
- * The string returned by this function is statically allocated and don't
- * require `free`.
- *
- * @param build_id The build id
- *
- * @return String representing buildid in hexadecimal format.
- */
-const char *
-buildid_to_string(const unsigned char build_id[BUILDID_LEN])
-{
-  static char build_id_str[2 * BUILDID_LEN + 1];
-  int i;
-
-  memset(build_id_str, '\0', sizeof(build_id_str));
-
-  for (i = 0; i < BUILDID_LEN; i++)
-    snprintf(&build_id_str[2 * i], 3, "%02x", (unsigned)build_id[i]);
-
-  return build_id_str;
-}
-
 /** @brief Prints all the info collected about the processes in `process_list`.
  *
  * @param process_list List of processes.
@@ -245,6 +215,7 @@ run_patches(struct arguments *arguments)
   }
 
   print_process_list(process_list, print_buildid);
+  release_ulp_process(process_list);
 
   return 0;
 }

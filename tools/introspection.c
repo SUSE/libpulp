@@ -104,6 +104,16 @@ debug_ulp_object(struct ulp_object *obj)
   debug_ulp_unit(obj->units);
 }
 
+/** Release `x` if non null, and also set it to `NULL`.  */
+#define FREE_NON_NULL(x) \
+  do { \
+    if (x) { \
+      free(x); \
+      x = NULL; \
+    } \
+  } \
+  while (0)
+
 /** @brief Release memory of an ulp_thread `t`
  *
  *  Release memory of an ulp_thread allocated with malloc as well as
@@ -167,6 +177,100 @@ release_ulp_process(struct ulp_process *p)
     release_ulp_dynobj(p->dynobj_patches);
     free(p);
   }
+}
+
+/** @brief Release memory of an ulp_unit `unit`
+ *
+ *  Release memory of an ulp_unit allocated with malloc as well as
+ *  every field associated with it.
+ *
+ * @param unit An ulp_unit structure.
+ */
+void
+release_ulp_unit(struct ulp_unit *unit)
+{
+  if (!unit)
+    return;
+
+  FREE_NON_NULL(unit->old_fname);
+  FREE_NON_NULL(unit->new_fname);
+  release_ulp_unit(unit->next);
+  free(unit);
+}
+
+/** @brief Release memory of an ulp_object `obj`
+ *
+ *  Release memory of an ulp_object allocated with malloc as well as
+ *  every field associated with it.
+ *
+ * @param obj An ulp_object structure.
+ */
+void
+release_ulp_object(struct ulp_object *obj)
+{
+  if (!obj)
+    return;
+
+  FREE_NON_NULL(obj->build_id);
+  FREE_NON_NULL(obj->name);
+
+  release_ulp_unit(obj->units);
+  free(obj);
+}
+
+/** @brief Release memory of an ulp_dependency `dep`.
+ *
+ *  Release memory of an ulp_dependency allocated with malloc as well as
+ *  every field associated with it.
+ *
+ * @param dep An ulp_dependency structure.
+ */
+void
+release_ulp_dependency(struct ulp_dependency *dep)
+{
+  if (!dep)
+    return;
+
+  release_ulp_dependency(dep->next);
+  FREE_NON_NULL(dep);
+}
+
+/** @brief Release memory of an ulp_reference `ref`.
+ *
+ *  Release memory of an ulp_reference allocated with malloc as well as
+ *  every field associated with it.
+ *
+ * @param ref An ulp_reference structure.
+ */
+void
+release_ulp_reference(struct ulp_reference *ref)
+{
+  if (!ref)
+    return;
+
+  release_ulp_reference(ref->next);
+
+  FREE_NON_NULL(ref->target_name);
+  FREE_NON_NULL(ref->reference_name);
+  FREE_NON_NULL(ref);
+}
+
+/** @brief Release memory of the global structure `ulp`.
+ *
+ *  Release memory of the global `ulp_metadata` object allocated with
+ *  malloc as well as every field associated with it.
+ */
+void
+release_ulp_global_metadata(void)
+{
+  struct ulp_metadata *meta = &ulp;
+
+  FREE_NON_NULL(meta->so_filename);
+  release_ulp_object(meta->objs);
+  release_ulp_dependency(meta->deps);
+  release_ulp_reference(meta->refs);
+
+  memset(meta, 0, sizeof(struct ulp_metadata));
 }
 
 /* Parses the _DYNAMIC section of PROCESS, finds the DT_DEBUG entry,
@@ -1589,6 +1693,8 @@ check_patch_sanity(struct ulp_process *process)
     target = ulp.objs->name;
   }
 
+  const unsigned char *buildid = NULL;
+
   /* check if the affected library is present in the process. */
   for (d = process->dynobj_targets; d != NULL; d = d->next) {
     bool buildid_match = false;
@@ -1600,8 +1706,10 @@ check_patch_sanity(struct ulp_process *process)
     else
       basename = d->filename;
 
-    if (strcmp(basename, target) == 0)
+    if (strcmp(basename, target) == 0) {
+      buildid = d->build_id;
       name_match = true;
+    }
 
     if (memcmp(ulp.objs->build_id, d->build_id, BUILDID_LEN) == 0)
       buildid_match = true;
@@ -1610,10 +1718,25 @@ check_patch_sanity(struct ulp_process *process)
       break;
   }
   if (!d) {
-    WARN("target library (%s) not loaded.", target);
+    if (buildid) {
+      /* strdup because buildid_to_string returns a pointer to a static
+         variable.  */
+      char *buildid_str = strdup(buildid_to_string(buildid));
+      char *lp_buildid = strdup(buildid_to_string((void *)ulp.objs->build_id));
+
+      WARN("livepatch buildid mismatch for %s (%s)\n"
+           "    expected buildid: %s\n",
+           target, buildid_str, lp_buildid);
+
+      free(buildid_str);
+      free(lp_buildid);
+    }
+    else {
+      WARN("target library (%s) not loaded.", target);
+    }
     DEBUG("available target libraries:");
     for (d = process->dynobj_targets; d != NULL; d = d->next)
-      DEBUG("  %s", d->filename);
+      DEBUG("  %s (%s)", d->filename, buildid_to_string(d->build_id));
     return 1;
   }
 
