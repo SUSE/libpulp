@@ -23,8 +23,11 @@
 #define PATCHES_H
 
 struct arguments;
+struct ulp_process;
 
 const char *buildid_to_string(const unsigned char[BUILDID_LEN]);
+
+struct ulp_process *build_process_list(void);
 
 int run_patches(struct arguments *);
 

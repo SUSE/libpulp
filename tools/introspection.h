@@ -91,9 +91,6 @@ struct thread_state
   struct thread_state *next;
 };
 
-/** Length of build id, in bytes.  */
-#define BUILDID_LEN 20
-
 /** Represents a dynamic object, such as dynamic libraries (.so) or the
  *  executable itself.
  */
@@ -144,6 +141,10 @@ struct ulp_addresses
 };
 
 void release_ulp_process(struct ulp_process *);
+void release_ulp_global_metadata(void);
+void release_ulp_reference(struct ulp_reference *);
+void release_ulp_dependency(struct ulp_dependency *);
+void release_ulp_object(struct ulp_object *unit);
 
 int dig_main_link_map(struct ulp_process *process);
 

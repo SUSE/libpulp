@@ -115,8 +115,9 @@ read_long(long *word, int pid, Elf64_Addr addr)
 {
   long value;
   int ret = ptrace_peekdata(&value, pid, addr);
-  if (!ret)
-    *word = value;
+  if (!ret) {
+    memcpy(word, &value, sizeof(long));
+  }
 
   return ret;
 }
