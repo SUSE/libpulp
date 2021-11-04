@@ -37,30 +37,21 @@
 #include "trigger.h"
 #include "ulp_common.h"
 
-int
-run_trigger(struct arguments *arguments)
+static int
+trigger_one_process(int pid, int retries, const char *livepatch,
+                    const char *revert_library)
 {
-  const char *livepatch;
-  const char *revert_library;
+  struct ulp_process *target = calloc(1, sizeof(struct ulp_process));
   int result;
   int ret;
-  int retry;
 
-  struct ulp_process *target = calloc(1, sizeof(struct ulp_process));
-
-  /* Set the verbosity level in the common introspection infrastructure. */
-  ulp_verbose = arguments->verbose;
-  ulp_quiet = arguments->quiet;
-
-  livepatch = arguments->args[0];
-  revert_library = arguments->library;
+  target->pid = pid;
 
   if (livepatch && load_patch_info(livepatch)) {
     WARN("error parsing the metadata file (%s).", livepatch);
     return 1;
   }
 
-  target->pid = arguments->pid;
   ret = initialize_data_structures(target);
   if (ret) {
     WARN("error gathering target process information.");
@@ -82,7 +73,7 @@ run_trigger(struct arguments *arguments)
    * so retry in a finite loop.
    */
   result = -1;
-  retry = arguments->retries;
+  int retry = retries;
   while (retry) {
     retry--;
 
@@ -115,7 +106,7 @@ run_trigger(struct arguments *arguments)
       }
       if (result)
         DEBUG("live patching revert %d failed (attempt #%d).", target->pid,
-              (arguments->retries - retry));
+              (retries - retry));
       else
         retry = 0;
     }
@@ -129,7 +120,7 @@ run_trigger(struct arguments *arguments)
       }
       if (result)
         DEBUG("live patching %d failed (attempt #%d).", target->pid,
-              (arguments->retries - retry));
+              (retries - retry));
       else
         retry = 0;
     }
@@ -157,4 +148,19 @@ run_trigger(struct arguments *arguments)
 target_clean:
   release_ulp_process(target);
   return ret;
+}
+
+int
+run_trigger(struct arguments *arguments)
+{
+  /* Set the verbosity level in the common introspection infrastructure. */
+  ulp_verbose = arguments->verbose;
+  ulp_quiet = arguments->quiet;
+
+  const char *livepatch = arguments->args[0];
+  const char *revert_library = arguments->library;
+  int retry = arguments->retries;
+  pid_t pid = arguments->pid;
+
+  return trigger_one_process(pid, retry, livepatch, revert_library);
 }
