@@ -300,6 +300,12 @@ EXTRA_DIST = \
 clean-local:
 	rm -f $(METADATA)
 
+# There is a race condition within tests.  Some of them delete files used by
+# other tests, other try to patch a process which is yet to be patched by a
+# test. Enforcing that tests runs serially avoid such issues, so here we do
+# so it. We may have to fix it in the future if this project grows (issue #82).
+.NOTPARALLEL: check check-am dist-check
+
 # Test programs
 check_PROGRAMS = \
   numserv \
