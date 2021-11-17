@@ -155,6 +155,15 @@ libbuildid_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
 POST_PROCESS += .libs/libbuildid.post
 
+# Target libraries to test static data access
+check_LTLIBRARIES += libmanyprocesses.la
+
+libmanyprocesses_la_SOURCES = libmanyprocesses.c
+libmanyprocesses_la_CFLAGS = $(TARGET_CFLAGS)
+libmanyprocesses_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
+
+POST_PROCESS += .libs/libmanyprocesses.post
+
 # Live patches
 check_LTLIBRARIES += libdozens_livepatch1.la \
                      libdozens_livepatch99.la \
@@ -172,7 +181,8 @@ check_LTLIBRARIES += libdozens_livepatch1.la \
                      libaddress_livepatch1.la \
                      libcontract_livepatch1.la \
                      libaccess_livepatch1.la \
-                     libbuildid_livepatch1.la
+                     libbuildid_livepatch1.la \
+                     libmanyprocesses_livepatch1.la
 
 libdozens_livepatch1_la_SOURCES = libdozens_livepatch1.c
 libdozens_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
@@ -225,6 +235,9 @@ libaccess_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 libbuildid_livepatch1_la_SOURCES = libbuildid_livepatch1.c
 libbuildid_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
+libmanyprocesses_livepatch1_la_SOURCES = libmanyprocesses_livepatch1.c
+libmanyprocesses_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
+
 METADATA = \
   libdozens_livepatch1.dsc \
   libdozens_livepatch1.ulp \
@@ -276,7 +289,10 @@ METADATA = \
   libaccess_livepatch1.rev \
   libbuildid_livepatch1.dsc \
   libbuildid_livepatch1.ulp \
-  libbuildid_livepatch1.rev
+  libbuildid_livepatch1.rev \
+  libmanyprocesses_livepatch1.dsc \
+  libmanyprocesses_livepatch1.ulp \
+  libmanyprocesses_livepatch1.rev
 
 EXTRA_DIST = \
   libdozens_livepatch1.in \
@@ -295,7 +311,8 @@ EXTRA_DIST = \
   libaddress_livepatch1.in \
   libcontract_livepatch1.in \
   libaccess_livepatch1.in \
-  libbuildid_livepatch1.in
+  libbuildid_livepatch1.in \
+  libmanyprocesses_livepatch1.in
 
 clean-local:
 	rm -f $(METADATA)
@@ -326,7 +343,8 @@ check_PROGRAMS = \
   contract \
   exception_handling \
   access \
-  buildid
+  buildid \
+  manyprocesses
 
 numserv_SOURCES = numserv.c
 numserv_LDADD = libdozens.la libhundreds.la
@@ -412,6 +430,10 @@ access_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 buildid_SOURCES = buildid.c
 buildid_LDADD = libbuildid.la
 buildid_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
+
+manyprocesses_SOURCES = manyprocesses.c
+manyprocesses_LDADD = libmanyprocesses.la
+manyprocesses_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
 TESTS = \
   numserv.py \
