@@ -23,6 +23,8 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <fnmatch.h>
+#include <libgen.h>
 #include <link.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -198,15 +200,18 @@ metadata_clean:
  *  @return 0 on success, anything else on error.
  */
 static int
-trigger_many_ulps(int pid, int retries, const char *ulp_folder_path,
+trigger_many_ulps(int pid, int retries, const char *wildcard_path,
                   const char *library, bool check_stack)
 {
+  const char *wildcard = get_basename(wildcard_path);
+  char *ulp_folder_path = dirname(strdup(wildcard_path));
   DIR *directory = opendir(ulp_folder_path);
   struct dirent *entry;
   char buffer[ULP_PATH_LEN];
 
   if (!directory) {
     FATAL("Unable to open directory: %s", ulp_folder_path);
+    free(ulp_folder_path);
     return 1;
   }
 
@@ -244,6 +249,11 @@ trigger_many_ulps(int pid, int retries, const char *ulp_folder_path,
       continue;
     }
 
+    if (fnmatch(wildcard, entry->d_name, FNM_NOESCAPE) != 0) {
+      /* Skip if file does not match wildcard.  */
+      continue;
+    }
+
     if (trigger_one_process(pid, retries, buffer, library, check_stack) == 0)
       globals.trigger_successes++;
     globals.trigger_processes++;
@@ -251,6 +261,7 @@ trigger_many_ulps(int pid, int retries, const char *ulp_folder_path,
 
   closedir(directory);
 
+  free(ulp_folder_path);
   return 0;
 }
 

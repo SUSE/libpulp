@@ -18,7 +18,7 @@
 import testsuite
 import subprocess
 
-def childless_livepatch(directory, timeout=10, retries=1,
+def childless_livepatch(wildcard, timeout=10, retries=1,
             verbose=False, quiet=False, revert_lib=None):
 
     # Build command-line from arguments
@@ -26,8 +26,8 @@ def childless_livepatch(directory, timeout=10, retries=1,
     if revert_lib is not None:
       command.append("--revert-all")
       command.append(revert_lib)
-    if directory is not None:
-      command.append(directory)
+    if wildcard is not None:
+      command.append(wildcard)
       print('')
     if verbose:
       command.append('-v')
@@ -52,9 +52,9 @@ def childless_livepatch(directory, timeout=10, retries=1,
     print('Live patch applied/reverted successfully.')
 
 
-childs = [testsuite.spawn('parameters'),
-          testsuite.spawn('parameters'),
-          testsuite.spawn('parameters')]
+childs = [testsuite.spawn('manyprocesses'),
+          testsuite.spawn('manyprocesses'),
+          testsuite.spawn('manyprocesses')]
 
 
 
@@ -65,7 +65,7 @@ for child in childs:
     child.expect('1-2-3-4-5-6-7-8');
     child.expect('1.0-2.0-3.0-4.0-5.0-6.0-7.0-8.0-9.0-10.0');
 
-childless_livepatch(directory='./', revert_lib='libparameters.so')
+childless_livepatch(wildcard='./libmanyprocesses*', revert_lib='libmanyprocesses.so.0')
 
 for child in childs:
     child.sendline('')

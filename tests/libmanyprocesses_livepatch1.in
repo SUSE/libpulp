@@ -1,0 +1,4 @@
+__ABS_BUILDDIR__/.libs/libmanyprocesses_livepatch1.so
+@__ABS_BUILDDIR__/.libs/libmanyprocesses.so.0
+int_params:new_int_params
+float_params:new_float_params
