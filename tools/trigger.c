@@ -166,7 +166,8 @@ trigger_one_process(int pid, int retries, const char *livepatch,
       FATAL("fatal error during live patch application (restoring).");
       retry = 0;
     }
-    usleep(1000);
+    if (result)
+      usleep(1000);
   }
 
   if (result) {
