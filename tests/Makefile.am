@@ -317,12 +317,6 @@ EXTRA_DIST = \
 clean-local:
 	rm -f $(METADATA)
 
-# There is a race condition within tests.  Some of them delete files used by
-# other tests, other try to patch a process which is yet to be patched by a
-# test. Enforcing that tests runs serially avoid such issues, so here we do
-# so it. We may have to fix it in the future if this project grows (issue #82).
-.NOTPARALLEL: check check-am dist-check
-
 # Test programs
 check_PROGRAMS = \
   numserv \
@@ -467,6 +461,22 @@ XFAIL_TESTS = \
   blocked.py \
   contract.py \
   hidden.py
+
+# Some tests must run serially because they may interfere with other
+# tests. We use *.log because automake rule that runs the tests are
+# the rule that generates the *.log.
+#
+# manyprocesses must run serially because it touches all processes
+# looking for libraries to patch, and for that it locks the ptrace
+# lock.
+
+SERIAL_TESTS = \
+  manyprocesses.log
+
+# Remove the test itself from the dependency list.
+MANYPROCESSES_DEPS = $(filter-out $(SERIAL_TESTS),$(TEST_LOGS))
+
+manyprocesses.log: $(MANYPROCESSES_DEPS)
 
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON) -B

@@ -21,7 +21,7 @@
 
 import testsuite
 
-child = testsuite.spawn('redzone', timeout=10)
+child = testsuite.spawn('redzone', timeout=50)
 
 child.expect('Waiting for input.')
 
