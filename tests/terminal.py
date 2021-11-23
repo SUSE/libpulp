@@ -26,7 +26,7 @@ import time
 import testsuite
 from testsuite import ulptool
 
-parent = testsuite.spawn('./terminal ./loop')
+parent = testsuite.spawn('./terminal ./loop', script=False)
 
 # Parent signal readiness first
 parent.expect('Parent ready')

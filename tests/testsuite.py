@@ -81,12 +81,24 @@ class spawn(pexpect.spawn):
   # print messages to stdout. By default, all messages are printed, so that the
   # test suite logs contain more information for debugging.
   def __init__(self, testname, timeout=10, env=Ellipsis, log=sys.stdout,
-               encoding='utf-8', verbose=True):
+               encoding='utf-8', verbose=True, script=True):
 
     # If testname is a relative path, i.e. not starting with slash, prepend
     # dot-slash to enable command-line execution.
     if testname[0] != '/':
       testname = './' + testname
+
+    if script == True:
+        # Run the wrapper script with dash.
+        testname = '/usr/bin/dash ' + testname
+
+    # if TEST_THROUGH_VALGRIND environment variable is defined, append valgrind
+    # call on every command.
+    try:
+        if os.environ['TESTS_THROUGH_VALGRIND'] == '1':
+            testname = 'valgrind --leak-check=full ' + testname
+    except KeyError:
+        pass
 
     # If env has not been provided, default to LD_PRELOAD'ing libpulp.so.
     if env == Ellipsis:
@@ -125,6 +137,14 @@ class spawn(pexpect.spawn):
     if reject == None:
       reject = []
 
+    # Valgrind always print the error summary message. Match if the errors are
+    # a positive value.
+    valgrind_errors = ['ERROR SUMMARY: [1-9]+ errors from',
+                       'definitely lost: [1-9]+']
+
+    reject += valgrind_errors
+    valgrind_reject_index = len(reject) - len(valgrind_errors)
+
     # Also add EOF and TIMEOUT to the expected patterns to avoid the verbose
     # output of pexpect.expect when the expected patterns are not found
     patterns = [pexpect.EOF, pexpect.TIMEOUT] + accept + reject
@@ -151,8 +171,12 @@ class spawn(pexpect.spawn):
 
     # Otherwise, the matching pattern belongs to the rejected list
     index = index - len(accept)
-    self.print('Reject pattern found:', reject[index])
-    raise ValueError
+    if index >= valgrind_reject_index:
+        self.print('Valgrind error detected.')
+        raise MemoryError
+    else:
+        self.print('Reject pattern found:', reject[index])
+        raise ValueError
 
   # Verify sanity of arguments to ulp tools
   def sanity(self, filename=Ellipsis, pid=Ellipsis):
