@@ -478,6 +478,10 @@ EXTRA_DIST += \
   testsuite.py \
   offsets.py
 
+if ENABLE_VALGRIND
+check: export TESTS_THROUGH_VALGRIND=1
+endif
+
 # Custom rule for libbuild_livepatch1.ulp. This tests if the build id
 # is correct before applying the patch. A trivial way of testing it
 # would be editing the build id from the metadata file, however, that

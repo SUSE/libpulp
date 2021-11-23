@@ -55,7 +55,7 @@ AS_HELP_STRING([--enable-sanitizers],
 [compile ulp tools with address and undefined-behaviour sanitizer [default=no]]),
 [enable_sanitizers=yes]
 [AC_SUBST([UBSAN_OPTIONS], ["print_stack_trace=1 detect_stack_use_after_return=1"])],
-[enable_sanitizesr=no; break])
+[enable_sanitizers=no; break])
 
 AM_CONDITIONAL([ENABLE_ADDRSAN], [test "x$enable_sanitizers" == "xyes"])
 
@@ -63,6 +63,15 @@ AM_CONDITIONAL([ENABLE_ADDRSAN], [test "x$enable_sanitizers" == "xyes"])
 # lose interesting informations about the leaks/errors.
 AS_IF([test "x$enable_sanitizers" == "xyes"],
       [CFLAGS="-O0 -g"], [])
+
+# Enable valgrind on testing. Catches memory errors in libpulp.so.
+AC_ARG_ENABLE(valgrind,
+AS_HELP_STRING([--enable-valgrind],
+[run tests through valgrind to catch memory errors in libpulp.so [default=no]]),
+[enable_valgrind=yes],
+[enable_valgrind=no; break])
+
+AM_CONDITIONAL([ENABLE_VALGRIND], [test "x$enable_valgrind" == "xyes"])
 
 AC_PROG_CC
 AC_PROG_CXX
