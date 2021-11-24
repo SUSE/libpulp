@@ -23,16 +23,9 @@
 #define ERROR_H
 
 #include <stdbool.h>
+#include "error_common.h"
 
 /* Error checking routines.  */
-
-/** @brief The error which made libpulp want to quit.  */
-
-typedef enum
-{
-  ULP_ERROR_NONE,    /** No error occurred (success).  */
-  ULP_ERROR_UNKNOWN, /** Unknown error occured.  */
-} ulp_error_t;
 
 void exit(int);
 
