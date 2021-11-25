@@ -22,8 +22,8 @@
 #ifndef ERROR_H
 #define ERROR_H
 
-#include <stdbool.h>
 #include "error_common.h"
+#include <stdbool.h>
 
 /* Error checking routines.  */
 

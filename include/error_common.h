@@ -22,8 +22,8 @@
 #ifndef ERROR_COMMON_H
 #define ERROR_COMMON_H
 
-#include <stdbool.h>
 #include <errno.h>
+#include <stdbool.h>
 
 typedef int ulp_error_t;
 
@@ -34,9 +34,38 @@ typedef int ulp_error_t;
  *  libpulp.
  **/
 
-#define ENONE         0     /** No error (success). */
-#define EUNKNOWN      257   /** Unknown error. */
-#define EBUILDID      258   /** Build Id Mismatch.  */
+/* clang-format off */
+#define ENONE           0 /** No error (success).  */
+#define EUNKNOWN      256 /** Unknown error.  */
+#define EBUILDID      257 /** Build Id Mismatch.  */
+#define ETARGETHOOK   258 /** Error attaching to process.  */
+#define ENODEBUGTAG   259 /** Process without DT_DEBUG tag.  */
+#define ENOLINKMAP    260 /** No link map in object.  */
+#define ENOPHDR       261 /** Invalid program header.  */
+#define ENOPENTRY     262 /** Unable to find process entry address.  */
+#define ENOLIBPULP    263 /** Libpulp not found.  */
+#define ETHRDATTACH   264 /** Thread attach failure.  */
+#define ETHRDDETTACH  265 /** Thread dettach failure.  */
+#define EINVALIDULP   266 /** Invalid ULP file.  */
+
+/** Table used to map error code to message.  Define it here so that it is
+ *  easier for it being maintained.
+ */
+#define __ULP_ERRLIST \
+  { \
+    "Unknown error", \
+    "Build ID mismatch", \
+    "Error attaching to process", \
+    "Process without debug tag", \
+    "No link map in object", \
+    "Invalid program header", \
+    "Unable to find process entry address", \
+    "Libpulp not found", \
+    "Thread attach failure", \
+    "Thread dettach failure", \
+    "Invalid .ulp file", \
+  }
+/* clang-format on */
 
 const char *libpulp_strerror(ulp_error_t);
 

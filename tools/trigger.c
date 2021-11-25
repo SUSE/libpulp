@@ -40,6 +40,7 @@
 #include "patches.h"
 #include "trigger.h"
 #include "ulp_common.h"
+#include "error_common.h"
 
 /** Holds global variables used in this file. */
 static struct
@@ -111,7 +112,7 @@ trigger_one_process(int pid, int retries, const char *livepatch,
     retry--;
 
     ret = hijack_threads(target);
-    if (ret == -1) {
+    if (ret == ETHRDDETTACH) {
       FATAL("fatal error during live patch application (hijacking).");
       ret = TRIGGER_ERR_UNKNOWN;
       goto target_clean;

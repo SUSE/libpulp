@@ -34,6 +34,7 @@
 #include "config.h"
 #include "introspection.h"
 #include "ulp_common.h"
+#include "error_common.h"
 
 extern struct ulp_metadata ulp;
 
@@ -74,7 +75,7 @@ run_check(struct arguments *arguments)
   }
 
   ret = hijack_threads(target);
-  if (ret == -1) {
+  if (ret == ETHRDDETTACH) {
     FATAL("fatal error during live patch application (hijacking).");
     ret = -1;
     goto ulp_process_clean;

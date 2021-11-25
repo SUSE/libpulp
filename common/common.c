@@ -22,8 +22,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "ulp_common.h"
 #include "error_common.h"
+#include "ulp_common.h"
 
 /** @brief Get basename of a library in the path `name`
  *
@@ -87,14 +87,12 @@ buildid_to_string(const unsigned char build_id[BUILDID_LEN])
 const char *
 libpulp_strerror(ulp_error_t errnum)
 {
-  static const char *const libpulp_errlist[] = {
-    "Unknown error",
-    "Build ID mismatch",
-  };
+  static const char *const libpulp_errlist[] = __ULP_ERRLIST;
 
-  if (errnum > 0xFF) {
+  if (0xFF < errnum) {
     return libpulp_errlist[errnum & 0xFF];
-  } else {
+  }
+  else {
     return strerror(errnum);
   }
 }
