@@ -47,6 +47,14 @@ typedef int ulp_error_t;
 #define ETHRDATTACH   264 /** Thread attach failure.  */
 #define ETHRDDETTACH  265 /** Thread dettach failure.  */
 #define EINVALIDULP   266 /** Invalid ULP file.  */
+#define ENOOLDFUNC    267 /** To be patched function not found.  */
+#define ENONEWFUNC    268 /** New function not found.  */
+#define ENOMETA       269 /** Metadata load failure.  */
+#define ESTATE        270 /** State update failure.  */
+#define ENOSTATE      271 /** Unable to retrieve ulp state.  */
+#define ENOTAPPLIED   272 /** Patch not applied. */
+#define EDEPEND       273 /** Dependency failure.  */
+#define ENOADDRESS    274 /** Address*/
 
 /** Table used to map error code to message.  Define it here so that it is
  *  easier for it being maintained.
@@ -64,6 +72,14 @@ typedef int ulp_error_t;
     "Thread attach failure", \
     "Thread dettach failure", \
     "Invalid .ulp file", \
+    "To be patched function not found", \
+    "New function not found", \
+    "Metadata load failure", \
+    "State update failure", \
+    "Unable to retrieve ulp state", \
+    "Patch not applied", \
+    "Dependency failure", \
+    "Address read error", \
   }
 /* clang-format on */
 

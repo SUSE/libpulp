@@ -100,13 +100,12 @@ revert_all_patches_from_lib(const char *lib_name)
   while (patch) {
     next = patch->next;
     if (!strncmp(lib_basename, patch->lib_name, ULP_PATH_LEN)) {
-      if (!ulp_can_revert_patch(patch->patch_id)) {
-        ret = 1;
+      ret = ulp_can_revert_patch(patch->patch_id);
+      if (ret) {
         break;
       }
 
-      if (!ulp_revert_patch(patch->patch_id))
-        ret = 1;
+      ret = ulp_revert_patch(patch->patch_id);
     }
 
     patch = next;
@@ -172,14 +171,10 @@ __ulp_apply_patch()
 
   /*
    * Live patching could fail for a couple of different reasons, thus
-   * check the result and return either zero for success or one for
-   * failures (except for EAGAIN above).
+   * check the result and return either zero for success or whatever
+   * error happened internally.
    */
-  if (result) {
-    return 0;
-  }
-
-  return 1;
+  return result;
 }
 
 void
@@ -603,30 +598,38 @@ load_patch()
   struct ulp_metadata *ulp = NULL;
   struct ulp_applied_patch *patch_entry;
   int patch;
+  int ret = 0;
 
   ulp = load_metadata();
   if (ulp == NULL)
-    return 0;
+    return ENOMETA;
 
   patch = ulp->type;
 
   switch (patch) {
     case 1: /* apply patch */
       patch_entry = ulp_state_update(ulp);
-      if (!patch_entry)
+      if (!patch_entry) {
+        ret = ESTATE;
         break;
+      }
 
-      if (!ulp_apply_all_units(ulp)) {
+      ret = ulp_apply_all_units(ulp);
+      if (ret) {
         MSGQ_WARN("FATAL ERROR while applying patch units\n");
-        libpulp_exit(-1);
+        libpulp_exit(ret);
       }
 
       goto load_patch_success;
 
     case 2: /* revert patch */
-      if (!ulp_can_revert_patch(ulp->patch_id))
+      ret = ulp_can_revert_patch(ulp->patch_id);
+      if (ret) {
         break;
-      if (!ulp_revert_patch(ulp->patch_id)) {
+      }
+
+      ret = ulp_revert_patch(ulp->patch_id);
+      if (ret) {
         MSGQ_WARN("Unable to revert patch.");
         break;
       }
@@ -634,16 +637,19 @@ load_patch()
       goto load_patch_success;
 
     default: /* load patch metadata error */
-      if (!patch)
+      if (!patch) {
         MSGQ_WARN("load patch metadata error");
-      else
+        ret = ENOMETA;
+      }
+      else {
         MSGQ_WARN("Unknown load metadata status");
+        ret = EUNKNOWN;
+      }
   }
-  patch = 0;
 
 load_patch_success:
   unload_metadata(ulp);
-  return patch;
+  return ret;
 }
 
 int
@@ -657,7 +663,7 @@ ulp_can_revert_patch(const unsigned char *id)
   applied_patch = ulp_get_applied_patch(id);
   if (!applied_patch) {
     MSGQ_WARN("Can't revert because patch was not applied");
-    return 0;
+    return ENOTAPPLIED;
   }
 
   /* check if someone depends on the patch */
@@ -669,12 +675,12 @@ ulp_can_revert_patch(const unsigned char *id)
           msgq_push("%x ", id[i]);
         }
         msgq_push("\n");
-        return 0;
+        return EDEPEND;
       }
     }
   }
 
-  return 1;
+  return 0;
 }
 
 struct ulp_detour_root *
@@ -745,17 +751,17 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
   while (unit) {
     old_fun = get_loaded_symbol_addr(get_basename(obj->name), unit->old_fname);
     if (!old_fun)
-      return 0;
+      return ENOOLDFUNC;
 
     new_fun = load_so_symbol(unit->new_fname, patch_so);
     if (!new_fun)
-      return 0;
+      return ENONEWFUNC;
 
     root = get_detour_root_by_address(old_fun);
     if (!root) {
       root = push_new_root();
       if (!root)
-        return 0;
+        return EUNKNOWN;
 
       root->index = get_next_function_index();
       root->patched_addr = old_fun;
@@ -764,12 +770,12 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
     if (!(push_new_detour(__ulp_global_universe, ulp->patch_id, root,
                           new_fun))) {
       MSGQ_WARN("error setting ulp data structure\n");
-      return 0;
+      return EUNKNOWN;
     }
 
     if (!(ulp_patch_addr(old_fun, new_fun, true))) {
       MSGQ_WARN("error patching address %p", old_fun);
-      return 0;
+      return EUNKNOWN;
     }
 
     unit = unit->next;
@@ -796,7 +802,7 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
   if (target_base == 0xFF) {
     MSGQ_WARN("Unable to find target library load address of %s",
               target_basename);
-    return 0;
+    return ENOADDRESS;
   }
 
   map_ptr = &map_data;
@@ -804,11 +810,11 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
   retcode = dlinfo(ulp->so_handler, RTLD_DI_LINKMAP, &map_ptr);
   if (retcode == -1) {
     MSGQ_WARN("Error in call to dlinfo: %s", dlerror());
-    return 0;
+    return EUNKNOWN;
   }
   if (map_ptr->l_addr == 0) {
     MSGQ_WARN("Unable to find target library load address: %s", dlerror());
-    return 0;
+    return ENOADDRESS;
   }
   patch_base = map_ptr->l_addr;
 
@@ -823,7 +829,7 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
     ref = ref->next;
   }
 
-  return 1;
+  return 0;
 }
 
 struct ulp_applied_patch *
@@ -1285,11 +1291,11 @@ ulp_revert_patch(unsigned char *id)
   if (ulp_revert_all_units(id)) {
     if (!ulp_state_remove(patch)) {
       MSGQ_WARN("Problem updating state. Program may be inconsistent.");
-      return 0;
+      return ESTATE;
     }
   }
 
-  return 1;
+  return 0;
 }
 
 int
