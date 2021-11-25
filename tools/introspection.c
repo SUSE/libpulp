@@ -62,6 +62,7 @@
 #include "config.h"
 #include "introspection.h"
 #include "ulp_common.h"
+#include "error_common.h"
 
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
 #include <libunwind-ptrace.h>
@@ -288,12 +289,12 @@ dig_main_link_map(struct ulp_process *process)
 
   while (1) {
     if (read_memory((char *)&dyn, sizeof(ElfW(Dyn)), process->pid, dyn_addr)) {
-      WARN("error reading _DYNAMIC array.");
-      return 1;
+      DEBUG("error reading _DYNAMIC array.");
+      return ETARGETHOOK;
     }
     if (dyn.d_tag == DT_NULL) {
-      WARN("error searching for r_debug.");
-      return 1;
+      DEBUG("error searching for r_debug.");
+      return ENODEBUGTAG;
     }
     if (dyn.d_tag == DT_DEBUG) {
       r_debug = dyn.d_un.d_ptr;
@@ -306,14 +307,14 @@ dig_main_link_map(struct ulp_process *process)
 
   if (read_memory((char *)&link_map, sizeof(void *), process->pid,
                   link_map_addr)) {
-    WARN("error reading link_map address.");
-    return 1;
+    DEBUG("error reading link_map address.");
+    return ETARGETHOOK;
   }
 
   if (read_memory((char *)&process->dynobj_main->link_map,
                   sizeof(struct link_map), process->pid, link_map)) {
-    WARN("error reading link_map data.");
-    return 1;
+    DEBUG("error reading link_map data.");
+    return ETARGETHOOK;
   }
 
   return 0;
@@ -396,7 +397,7 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
   /* If object has no link map attached to it, there is nothing we can do.  */
   if (!obj->link_map.l_addr) {
     DEBUG("no link map object found");
-    return 1;
+    return ENOLINKMAP;
   }
 
   /* l_addr holds the pointer to the ELF header.  */
@@ -405,14 +406,14 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
   /* Read ELF header from remote process.  */
   ret = read_memory((char *)&ehdr, sizeof(ehdr), pid, ehdr_addr);
   if (ret != 0) {
-    WARN("Unable to read ELF header from process %d\n", pid);
-    return 1;
+    DEBUG("Unable to read ELF header from process %d\n", pid);
+    return ETARGETHOOK;
   }
 
   /* Sanity check if process header size is valid.  */
   if (ehdr.e_phentsize != sizeof(ElfW(Phdr))) {
-    WARN("Invalid phdr readed");
-    return 1;
+    DEBUG("Invalid phdr readed");
+    return ENOPHDR;
   }
 
   /* Get first process header address.  */
@@ -426,8 +427,8 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
     /* Get first process header from remote process.  */
     ret = read_memory((char *)&phdr, sizeof(phdr), pid, curr_phdr_addr);
     if (ret != 0) {
-      WARN("Unable to read process header from process %d\n", pid);
-      return 0;
+      DEBUG("Unable to read process header from process %d\n", pid);
+      return ETARGETHOOK;
     }
 
     /* Look for the dynamic section.  */
@@ -440,8 +441,8 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
         /* Get the dynamic symbol in remote process.  */
         ret = read_memory((char *)&dyn, sizeof(dyn), pid, dyn_addr);
         if (ret != 0) {
-          WARN("Unable to read dynamic symbol from process %d\n", pid);
-          return 0;
+          DEBUG("Unable to read dynamic symbol from process %d\n", pid);
+          return ETARGETHOOK;
         }
 
         switch (dyn.d_tag) {
@@ -457,7 +458,7 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
             /* This section stores the size of a symbol entry. So compare it
              * with the size of Elf64_Sym as a sanity check.  */
             if (dyn.d_un.d_val != sizeof(ElfW(Sym)))
-              WARN("DT_SYMENT value of %s is unexpected", obj->filename);
+              DEBUG("DT_SYMENT value of %s is unexpected", obj->filename);
             break;
 
           case DT_HASH:
@@ -483,8 +484,8 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
         /* Get the note section in remote process.  */
         ret = read_memory((char *)&note, sizeof(note), pid, note_addr);
         if (ret != 0) {
-          WARN("Unable to read note header from process %d\n", pid);
-          return 0;
+          DEBUG("Unable to read note header from process %d\n", pid);
+          return ETARGETHOOK;
         }
 
         name_len = note.n_namesz;
@@ -510,16 +511,16 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
     if (buildid_len == sizeof(obj->build_id)) {
       ret = read_memory((char *)obj->build_id, buildid_len, pid, buildid_addr);
       if (ret != 0) {
-        WARN("Unable to read build id from target process %d", pid);
+        DEBUG("Unable to read build id from target process %d", pid);
       }
     }
     else {
-      WARN("build id length mismatch: expected %lu, got %d",
+      DEBUG("build id length mismatch: expected %lu, got %d",
            sizeof(obj->build_id), buildid_len);
     }
   }
   else {
-    WARN("build id length mismatch: expected %lu, got %d",
+    DEBUG("build id length mismatch: expected %lu, got %d",
          sizeof(obj->build_id), buildid_len);
   }
 
@@ -540,12 +541,12 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
     ret = read_memory((char *)&num_symbols, sizeof(int), pid,
                       hash_addr + sizeof(int));
     if (ret != 0) {
-      WARN("Unable to read hash table");
-      return 0;
+      DEBUG("Unable to read hash table");
+      return ETARGETHOOK;
     }
   }
   else {
-    WARN("hash table not found in %s", obj->filename);
+    DEBUG("hash table not found in %s", obj->filename);
   }
 
   /* Finally store found address to the dynobj object.  */
@@ -700,14 +701,14 @@ dig_load_bias(struct ulp_process *process)
 
   auxv = open(filename, O_RDONLY);
   if (!auxv) {
-    WARN("error: unable to open auxv.");
-    return 1;
+    DEBUG("error: unable to open auxv.");
+    return ENOENT;
   }
 
   do {
     if (read(auxv, &at, sizeof(Elf64_auxv_t)) != sizeof(Elf64_auxv_t)) {
-      WARN("error: unable to read auxv.");
-      return 1;
+      DEBUG("error: unable to read auxv.");
+      return errno;
     }
     if (at.a_type == AT_ENTRY) {
       addrof_entry = at.a_un.a_val;
@@ -724,21 +725,21 @@ dig_load_bias(struct ulp_process *process)
   }
   while (at.a_type != AT_NULL);
   if (addrof_entry == 0) {
-    WARN("error: unable to find entry address for the executable");
-    return 1;
+    DEBUG("error: unable to find entry address for the executable");
+    return ENOPENTRY;
   }
   if (at_phdr == 0) {
-    WARN("error: unable to find program header of target process");
-    return 1;
+    DEBUG("error: unable to find program header of target process");
+    return ENOPHDR;
   }
   if (phent != sizeof(phdr)) {
-    WARN("error: invalid PHDR size for target process (32 bit process?)");
-    return 1;
+    DEBUG("error: invalid PHDR size for target process (32 bit process?)");
+    return ENOPHDR;
   }
   for (i = 0; i < phnum; i++) {
     if (read_memory((char *)&phdr, phent, process->pid, at_phdr + i * phent)) {
-      WARN("error: unable to read PHDR entry");
-      return 1;
+      DEBUG("error: unable to read PHDR entry");
+      return ETARGETHOOK;
     }
     switch (phdr.p_type) {
       case PT_PHDR:
@@ -769,14 +770,15 @@ int
 parse_main_dynobj(struct ulp_process *process)
 {
   struct ulp_dynobj *obj;
+  ulp_error_t ret = 0;
 
   DEBUG("getting in-memory information about the main executable.");
 
   /* calloc initializes all to zero */
   obj = calloc(sizeof(struct ulp_dynobj), 1);
   if (!obj) {
-    WARN("unable to allocate memory.");
-    return 1;
+    DEBUG("unable to allocate memory.");
+    return ENOMEM;
   }
 
   obj->filename = malloc(PATH_MAX);
@@ -786,13 +788,18 @@ parse_main_dynobj(struct ulp_process *process)
 
   process->dynobj_main = obj;
 
-  if (dig_load_bias(process)) {
-    WARN("unable to calculate the load bias for the executable.");
-    return 1;
+  ret = dig_load_bias(process);
+  if (ret) {
+    WARN("unable to calculate the load bias for the executable: %s\n",
+        libpulp_strerror(ret));
+    return ret;
   }
-  if (dig_main_link_map(process)) {
-    WARN("unable to parse the mappings of objects in memory.");
-    return 1;
+
+  ret = dig_main_link_map(process);
+  if (ret) {
+    WARN("unable to parse the mappings of objects in memory: %s\n",
+        libpulp_strerror(ret));
+    return ret;
   }
 
   return 0;
@@ -827,8 +834,8 @@ parse_libs_dynobj(struct ulp_process *process)
    * and this function returns an error.
    */
   if (process->dynobj_libpulp == NULL) {
-    WARN("libpulp not loaded, thus live patching not possible.");
-    return 1;
+    DEBUG("libpulp not loaded, thus live patching not possible.");
+    return ENOLIBPULP;
   }
 
   return 0;
@@ -889,8 +896,6 @@ parse_lib_dynobj(struct ulp_process *process, struct link_map *link_map_addr)
 
   /* Only libpulp.so should have those symbols exported.  */
   if (strstr(libname, "libpulp.so")) {
-    DEBUG("Potential libpulp found");
-
     obj->trigger = get_loaded_symbol_addr(obj, pid, "__ulp_trigger");
     obj->path_buffer = get_loaded_symbol_addr(obj, pid, "__ulp_path_buffer");
     obj->check = get_loaded_symbol_addr(obj, pid, "__ulp_check_patched");
@@ -945,17 +950,24 @@ parse_lib_dynobj(struct ulp_process *process, struct link_map *link_map_addr)
 int
 initialize_data_structures(struct ulp_process *process)
 {
+  ulp_error_t ret = 0;
+
   if (!process)
     return 1;
 
   DEBUG("getting in-memory information about process %d.", process->pid);
 
-  if (parse_main_dynobj(process)) {
-    WARN("unable to get in-memory information about the main executable.");
+  ret = parse_main_dynobj(process);
+  if (ret) {
+    WARN("unable to get in-memory information about the main executable: %s\n",
+        libpulp_strerror(ret));
     return 1;
   }
-  if (parse_libs_dynobj(process)) {
-    WARN("unable to get in-memory information about shared libraries.");
+
+  ret = parse_libs_dynobj(process);
+  if (ret) {
+    WARN("unable to get in-memory information about shared libraries: %s\n",
+        libpulp_strerror(ret));
     return 1;
   }
 
@@ -1002,7 +1014,7 @@ set_id_buffer(struct ulp_process *process, unsigned char *patch_id)
 
   if (!process->all_threads_hijacked) {
     WARN("not all threads hijacked.");
-    return 1;
+    return EUNKNOWN;
   }
 
   thread = process->main_thread;
@@ -1011,7 +1023,7 @@ set_id_buffer(struct ulp_process *process, unsigned char *patch_id)
   for (i = 0; i < 32; i++) {
     if (write_byte(patch_id[i], thread->tid, path_addr + i)) {
       WARN("Unable to write id byte %d.", i);
-      return 1;
+      return ETARGETHOOK;
     }
   }
 
@@ -1032,7 +1044,7 @@ set_path_buffer(struct ulp_process *process, const char *path)
 
   if (!process->all_threads_hijacked) {
     WARN("not all threads hijacked.");
-    return 1;
+    return EUNKNOWN;
   }
 
   thread = process->main_thread;
@@ -1068,7 +1080,7 @@ hijack_threads(struct ulp_process *process)
   if (process->all_threads_hijacked) {
     WARN("trying to reenter critical section with all threads hijacked is "
          "unsupported.");
-    return 1;
+    return EUNKNOWN;
   }
 
   DEBUG("entering the critical section (process hijacking).");
@@ -1079,7 +1091,7 @@ hijack_threads(struct ulp_process *process)
   taskdir = opendir(taskname);
   if (taskdir == NULL) {
     WARN("error opening %s: %s.", taskname, strerror(errno));
-    return 1;
+    return errno;
   }
 
   fatal = 0;
@@ -1189,8 +1201,8 @@ children_restore:
     WARN("Closing %s failed: %s", taskname, strerror(errno));
 
   if (fatal)
-    return -1;
-  return 1;
+    return ETHRDDETTACH;
+  return ETHRDATTACH;
 }
 
 /*
@@ -1213,12 +1225,12 @@ patch_applied(struct ulp_process *process, unsigned char *id, int *result)
 
   if (!process->all_threads_hijacked) {
     WARN("not all threads hijacked.");
-    return 1;
+    return EUNKNOWN;
   }
 
   if (set_id_buffer(process, id)) {
     WARN("unable to write live patch ID into target process memory.");
-    return 1;
+    return ETARGETHOOK;
   }
 
   thread = process->main_thread;
@@ -1267,7 +1279,7 @@ apply_patch(struct ulp_process *process, const char *metadata)
 
   if (!process->all_threads_hijacked) {
     WARN("not all threads hijacked.");
-    return 1;
+    return EUNKNOWN;
   }
 
   /* The target program can be running in other directory where CWD is,
@@ -1275,18 +1287,18 @@ apply_patch(struct ulp_process *process, const char *metadata)
      info to avoid potential problems.  */
   if (!realpath(metadata, full_path)) {
     WARN("unable to retrieve full path to %s", metadata);
-    return 1;
+    return errno;
   }
 
   full_path_size = strlen(full_path) + 1; /* Include '\0'.  */
   if (full_path_size >= ULP_PATH_LEN) {
     WARN("full path to metadata file is too large");
-    return 1;
+    return EINVAL;
   }
 
   if (set_path_buffer(process, full_path)) {
     WARN("unable to write live patch path into target process memory.");
-    return 1;
+    return ETARGETHOOK;
   }
 
   thread = process->main_thread;
@@ -1323,12 +1335,12 @@ revert_patches_from_lib(struct ulp_process *process, const char *lib_name)
 
   if (!process->all_threads_hijacked) {
     WARN("not all threads hijacked.");
-    return 1;
+    return EUNKNOWN;
   }
 
   if (set_path_buffer(process, lib_name)) {
     WARN("unable to write library name into target process memory.");
-    return 1;
+    return ETARGETHOOK;
   }
 
   thread = process->main_thread;
@@ -1365,7 +1377,7 @@ read_global_universe(struct ulp_process *process)
 
   if (!process->all_threads_hijacked) {
     WARN("not all threads hijacked.");
-    return 1;
+    return EUNKNOWN;
   }
 
   thread = process->main_thread;
@@ -1438,7 +1450,7 @@ load_patch_info(const char *livepatch)
   file = fopen(livepatch, "rb");
   if (!file) {
     WARN("Unable to open metadata file: %s.", livepatch);
-    return 1;
+    return ENOENT;
   }
 
   /* read metadata header information */
@@ -1446,34 +1458,34 @@ load_patch_info(const char *livepatch)
 
   if (fread(&ulp.type, sizeof(uint8_t), 1, file) < 1) {
     WARN("Unable to read patch type.");
-    return 1;
+    return EINVALIDULP;
   }
 
   if (fread(&ulp.patch_id, sizeof(char), 32, file) < 32) {
     WARN("Unable to read patch id.");
-    return 2;
+    return EINVALIDULP;
   }
 
   if (fread(&c, sizeof(uint32_t), 1, file) < 1) {
     WARN("Unable to read so filename length.");
-    return 1;
+    return EINVALIDULP;
   }
 
   ulp.so_filename = calloc(c + 1, sizeof(char));
   if (!ulp.so_filename) {
     WARN("Unable to allocate so filename buffer.");
-    return 1;
+    return EINVALIDULP;
   }
 
   if (fread(ulp.so_filename, sizeof(char), c, file) < c) {
     WARN("Unable to read so filename.");
-    return 1;
+    return EINVALIDULP;
   }
 
   obj = calloc(1, sizeof(struct ulp_object));
   if (!obj) {
     WARN("Unable to allocate memory for the patch objects.");
-    return 1;
+    return ENOMEM;
   }
 
   ulp.objs = obj;
@@ -1481,37 +1493,37 @@ load_patch_info(const char *livepatch)
 
   if (fread(&c, sizeof(uint32_t), 1, file) < 1) {
     WARN("Unable to read build id length (trigger).");
-    return 1;
+    return EINVALIDULP;
   }
   obj->build_id_len = c;
   obj->build_id = calloc(c, sizeof(char));
   if (!obj->build_id) {
     WARN("Unable to allocate build id buffer.");
-    return 1;
+    return EINVALIDULP;
   }
 
   if (fread(obj->build_id, sizeof(char), c, file) < c) {
     WARN("Unable to read build id.");
-    return 1;
+    return EINVALIDULP;
   }
 
   obj->build_id_check = 0;
 
   if (fread(&c, sizeof(uint32_t), 1, file) < 1) {
     WARN("Unable to read object name length.");
-    return 1;
+    return EINVALIDULP;
   }
 
   /* shared object: fill data + read patching units */
   obj->name = calloc(c + 1, sizeof(char));
   if (!obj->name) {
     WARN("Unable to allocate object name buffer.");
-    return 1;
+    return EINVALIDULP;
   }
 
   if (fread(obj->name, sizeof(char), c, file) < c) {
     WARN("Unable to read object name.");
-    return 1;
+    return EINVALIDULP;
   }
 
   if (ulp.type == 2) {
@@ -1532,44 +1544,44 @@ load_patch_info(const char *livepatch)
     unit = calloc(1, sizeof(struct ulp_unit));
     if (!unit) {
       WARN("Unable to allocate memory for the patch units.");
-      return 1;
+      return ENOMEM;
     }
 
     if (fread(&c, sizeof(uint32_t), 1, file) < 1) {
       WARN("Unable to read unit old function name length.");
-      return 1;
+      return EINVALIDULP;
     }
 
     unit->old_fname = calloc(c + 1, sizeof(char));
     if (!unit->old_fname) {
       WARN("Unable to allocate unit old function name buffer.");
-      return 1;
+      return EINVALIDULP;
     }
 
     if (fread(unit->old_fname, sizeof(char), c, file) < c) {
       WARN("Unable to read unit old function name.");
-      return 1;
+      return EINVALIDULP;
     }
 
     if (fread(&c, sizeof(uint32_t), 1, file) < 1) {
       WARN("Unable to read unit new function name length.");
-      return 1;
+      return EINVALIDULP;
     }
 
     unit->new_fname = calloc(c + 1, sizeof(char));
     if (!unit->new_fname) {
       WARN("Unable to allocate unit new function name buffer.");
-      return 1;
+      return EINVALIDULP;
     }
 
     if (fread(unit->new_fname, sizeof(char), c, file) < c) {
       WARN("Unable to read unit new function name.");
-      return 1;
+      return EINVALIDULP;
     }
 
     if (fread(&unit->old_faddr, sizeof(void *), 1, file) < 1) {
       WARN("Unable to read old function address.");
-      return 1;
+      return EINVALIDULP;
     }
 
     if (obj->units) {
@@ -1584,18 +1596,18 @@ load_patch_info(const char *livepatch)
   /* read dependencies */
   if (fread(&c, sizeof(uint32_t), 1, file) < 1) {
     WARN("Unable to read number of dependencies.");
-    return 1;
+    return EINVALIDULP;
   }
 
   for (i = 0; i < c; i++) {
     dep = calloc(1, sizeof(struct ulp_dependency));
     if (!dep) {
       WARN("Unable to allocate memory for dependency state.");
-      return 1;
+      return ENOMEM;
     }
     if (fread(&dep->dep_id, sizeof(char), 32, file) < 32) {
       WARN("Unable to read dependency patch id.");
-      return 1;
+      return EINVALIDULP;
     }
     if (ulp.deps) {
       prev_dep->next = dep;
@@ -1631,7 +1643,7 @@ check_livepatch_functions_matches_metadata(void)
 
   if (!container_handle) {
     WARN("failed to load container livepatch file in %s.", so_filename);
-    return 1;
+    return EINVAL;
   }
 
   debug_ulp_object(ulp.objs);
@@ -1647,7 +1659,7 @@ check_livepatch_functions_matches_metadata(void)
 
     if (!symbol) {
       WARN("symbol %s is not present in the livepatch container.", new_fname);
-      ret = 1;
+      ret = EINVAL;
       break;
     }
   }
@@ -1674,12 +1686,12 @@ check_patch_sanity(struct ulp_process *process)
 
   if (ulp.objs == NULL || ulp.objs->name == NULL) {
     WARN("metadata has not been properly parsed.");
-    return 1;
+    return EUNKNOWN;
   }
 
   if (check_livepatch_functions_matches_metadata()) {
     WARN("metadata contain functions that are not present in the livepatch.");
-    return 1;
+    return EUNKNOWN;
   }
 
   target = strrchr(ulp.objs->name, '/');
@@ -1737,7 +1749,7 @@ check_patch_sanity(struct ulp_process *process)
     DEBUG("available target libraries:");
     for (d = process->dynobj_targets; d != NULL; d = d->next)
       DEBUG("  %s (%s)", d->filename, buildid_to_string(d->build_id));
-    return 1;
+    return EBUILDID;
   }
 
   return 0;
@@ -1769,11 +1781,11 @@ library_range_detect(pid_t pid, char *library, uintptr_t *range_start,
 
   retcode = snprintf(procmaps, sizeof(procmaps), "/proc/%d/maps", pid);
   if (retcode < 0)
-    return 1;
+    return EINVAL;
 
   fp = fopen(procmaps, "r");
   if (fp == NULL)
-    return 1;
+    return ENOENT;
 
   size = PATH_MAX;
   line = malloc(size);
@@ -1800,7 +1812,7 @@ library_range_detect(pid_t pid, char *library, uintptr_t *range_start,
   free(line);
 
   if (errno)
-    return 1;
+    return errno;
   return 0;
 }
 
