@@ -32,9 +32,9 @@
 #include "arguments.h"
 #include "check.h"
 #include "config.h"
+#include "error_common.h"
 #include "introspection.h"
 #include "ulp_common.h"
-#include "error_common.h"
 
 extern struct ulp_metadata ulp;
 

@@ -54,7 +54,8 @@ typedef int ulp_error_t;
 #define ENOSTATE      271 /** Unable to retrieve ulp state.  */
 #define ENOTAPPLIED   272 /** Patch not applied. */
 #define EDEPEND       273 /** Dependency failure.  */
-#define ENOADDRESS    274 /** Address*/
+#define ENOADDRESS    274 /** Address Error.  */
+#define EAPPLIED      275 /** Patch applied.  */
 
 /** Table used to map error code to message.  Define it here so that it is
  *  easier for it being maintained.
@@ -80,6 +81,7 @@ typedef int ulp_error_t;
     "Patch not applied", \
     "Dependency failure", \
     "Address read error", \
+    "Patch applied", \
   }
 /* clang-format on */
 

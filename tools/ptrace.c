@@ -28,6 +28,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "error_common.h"
 #include "introspection.h"
 #include "ptrace.h"
 #include "ulp_common.h"
@@ -354,12 +355,12 @@ run_and_redirect(int pid, struct user_regs_struct *regs, ElfW(Addr) routine)
 
   if (ptrace(PTRACE_SETREGS, pid, NULL, regs)) {
     WARN("PTRACE_SETREGS error (pid %d).\n", pid);
-    return 1;
+    return ETARGETHOOK;
   }
 
   if (ptrace(PTRACE_CONT, pid, NULL, NULL)) {
     WARN("PTRACE_CONT error (pid %d).\n", pid);
-    return 1;
+    return ETARGETHOOK;
   }
 
   usleep(1000);

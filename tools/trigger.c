@@ -36,11 +36,11 @@
 
 #include "arguments.h"
 #include "config.h"
+#include "error_common.h"
 #include "introspection.h"
 #include "patches.h"
 #include "trigger.h"
 #include "ulp_common.h"
-#include "error_common.h"
 
 /** Holds global variables used in this file. */
 static struct
