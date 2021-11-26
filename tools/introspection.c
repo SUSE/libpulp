@@ -60,9 +60,9 @@
 #include <unistd.h>
 
 #include "config.h"
+#include "error_common.h"
 #include "introspection.h"
 #include "ulp_common.h"
-#include "error_common.h"
 
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
 #include <libunwind-ptrace.h>
@@ -516,12 +516,12 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
     }
     else {
       DEBUG("build id length mismatch: expected %lu, got %d",
-           sizeof(obj->build_id), buildid_len);
+            sizeof(obj->build_id), buildid_len);
     }
   }
   else {
     DEBUG("build id length mismatch: expected %lu, got %d",
-         sizeof(obj->build_id), buildid_len);
+          sizeof(obj->build_id), buildid_len);
   }
 
   if (hash_addr) {
@@ -791,14 +791,14 @@ parse_main_dynobj(struct ulp_process *process)
   ret = dig_load_bias(process);
   if (ret) {
     WARN("unable to calculate the load bias for the executable: %s\n",
-        libpulp_strerror(ret));
+         libpulp_strerror(ret));
     return ret;
   }
 
   ret = dig_main_link_map(process);
   if (ret) {
     WARN("unable to parse the mappings of objects in memory: %s\n",
-        libpulp_strerror(ret));
+         libpulp_strerror(ret));
     return ret;
   }
 
@@ -960,14 +960,14 @@ initialize_data_structures(struct ulp_process *process)
   ret = parse_main_dynobj(process);
   if (ret) {
     WARN("unable to get in-memory information about the main executable: %s\n",
-        libpulp_strerror(ret));
+         libpulp_strerror(ret));
     return 1;
   }
 
   ret = parse_libs_dynobj(process);
   if (ret) {
     WARN("unable to get in-memory information about shared libraries: %s\n",
-        libpulp_strerror(ret));
+         libpulp_strerror(ret));
     return 1;
   }
 
@@ -1309,16 +1309,19 @@ apply_patch(struct ulp_process *process, const char *metadata)
   ret = run_and_redirect(thread->tid, &context, routine);
   if (ret == -1) {
     WARN("fatal error during live patch application.");
-  };
+  }
   if (ret) {
-    WARN("error during live patch application.");
+    WARN("error during live patch application: %s",
+         libpulp_strerror(context.rax));
   }
   DEBUG(">>> done.");
   if (ret)
     return ret;
 
   if (context.rax == EAGAIN)
-    DEBUG("libc/libdl locks were busy: patch not applied.");
+    WARN("patching failed in libpulp.so: libc/libdl locks were busy");
+  else
+    WARN("patching failed in libpulp.so: %s", libpulp_strerror(context.rax));
 
   return context.rax;
 }
