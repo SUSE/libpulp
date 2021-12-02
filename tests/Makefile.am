@@ -146,6 +146,15 @@ libaccess_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
 POST_PROCESS += .libs/libaccess.post
 
+# Target libraries to test TLS data access
+check_LTLIBRARIES += libtls.la
+
+libtls_la_SOURCES = libtls.c
+libtls_la_CFLAGS = $(TARGET_CFLAGS)
+libtls_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
+
+POST_PROCESS += .libs/libtls.post
+
 # Target libraries to test static data access
 check_LTLIBRARIES += libbuildid.la
 
@@ -181,6 +190,7 @@ check_LTLIBRARIES += libdozens_livepatch1.la \
                      libaddress_livepatch1.la \
                      libcontract_livepatch1.la \
                      libaccess_livepatch1.la \
+                     libtls_livepatch1.la \
                      libbuildid_livepatch1.la \
                      libmanyprocesses_livepatch1.la
 
@@ -231,6 +241,9 @@ libcontract_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
 libaccess_livepatch1_la_SOURCES = libaccess_livepatch1.c
 libaccess_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
+
+libtls_livepatch1_la_SOURCES = libtls_livepatch1.c
+libtls_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
 libbuildid_livepatch1_la_SOURCES = libbuildid_livepatch1.c
 libbuildid_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
@@ -287,6 +300,9 @@ METADATA = \
   libaccess_livepatch1.dsc \
   libaccess_livepatch1.ulp \
   libaccess_livepatch1.rev \
+  libtls_livepatch1.dsc \
+  libtls_livepatch1.ulp \
+  libtls_livepatch1.rev \
   libbuildid_livepatch1.dsc \
   libbuildid_livepatch1.ulp \
   libbuildid_livepatch1.rev \
@@ -311,6 +327,7 @@ EXTRA_DIST = \
   libaddress_livepatch1.in \
   libcontract_livepatch1.in \
   libaccess_livepatch1.in \
+  libtls_livepatch1.in \
   libbuildid_livepatch1.in \
   libmanyprocesses_livepatch1.in
 
@@ -337,6 +354,7 @@ check_PROGRAMS = \
   contract \
   exception_handling \
   access \
+  tls \
   buildid \
   manyprocesses
 
@@ -421,6 +439,11 @@ access_SOURCES = access.c
 access_LDADD = libaccess.la
 access_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
+tls_SOURCES = tls.c
+tls_CFLAGS = -pthread $(AM_CFLAGS)
+tls_LDADD = libtls.la
+tls_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
+
 buildid_SOURCES = buildid.c
 buildid_LDADD = libbuildid.la
 buildid_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
@@ -450,6 +473,7 @@ TESTS = \
   exception_handling.py \
   missing_function.py \
   access.py \
+  tls.py \
   buildid.py \
   libpulp_messages.py \
   relative_path.py \

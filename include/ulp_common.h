@@ -19,6 +19,7 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #ifndef _ULP_LIB_COMMON_
@@ -38,6 +39,16 @@
 #define BUILDID_LEN 20
 
 extern __thread int __ulp_pending;
+
+/** Used on __tls_get_addr(tls_index *).  */
+typedef struct
+{
+  /** Internal module index.  */
+  unsigned long ti_module;
+
+  /** Symbol index in tls section.  */
+  unsigned long ti_offset;
+} tls_index;
 
 struct ulp_patching_state
 {
@@ -90,6 +101,7 @@ struct ulp_reference
   char *reference_name;
   uintptr_t target_offset;
   uintptr_t patch_offset;
+  bool tls;
   struct ulp_reference *next;
 };
 

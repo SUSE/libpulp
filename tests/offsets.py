@@ -46,8 +46,13 @@ for line in ifile:
   # Lines starting with '#' contain local variables
   if line[0] == '#':
 
+    # If there is a % then it is a TLS variable.
+    if line[1] == '%':
+      split = line.lstrip('#%')
+    else:
+      split = line.lstrip('#')
+
     # Parse the line
-    split = line.lstrip('#')
     split = split.split(':')
 
     # Get the name of the local variable in the target library
