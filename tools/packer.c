@@ -308,6 +308,7 @@ create_patch_metadata_file(struct ulp_metadata *ulp, const char *filename)
     fwrite(ref->reference_name, sizeof(char), len, file);
     fwrite(&ref->target_offset, sizeof(ref->target_offset), 1, file);
     fwrite(&ref->patch_offset, sizeof(ref->patch_offset), 1, file);
+    fwrite(&ref->tls, sizeof(ref->tls), 1, file);
     fflush(file);
   }
 
@@ -459,6 +460,13 @@ parse_description(const char *filename, struct ulp_metadata *ulp)
         if (!ref) {
           WARN("Unable to allocate memory");
           return 0;
+        }
+
+        if (first[1] == '%') {
+          ref->tls = true;
+        }
+        else {
+          ref->tls = false;
         }
 
         third = first + 1;

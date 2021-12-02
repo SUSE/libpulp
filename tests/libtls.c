@@ -19,11 +19,18 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-int __ulp_asunsafe_trylock(void);
-int __ulp_asunsafe_unlock(void);
+#include <string.h>
 
-void *get_loaded_symbol_addr(const char *, const char *);
+static __thread char *banner = "Original TLS banner";
 
-void *get_loaded_library_base_addr(const char *);
+char *
+banner_get(void)
+{
+  return banner;
+}
 
-int get_loaded_library_tls_index(const char *);
+void
+banner_set(char *new)
+{
+  banner = new;
+}

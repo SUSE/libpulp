@@ -563,6 +563,9 @@ parse_metadata(struct ulp_metadata *ulp)
     /* read reference offset within the patch object */
     READ(fd, &ref->patch_offset, sizeof(uintptr_t));
 
+    /* read if variable is tls within the patch object */
+    READ(fd, &ref->tls, sizeof(bool));
+
     if (ulp->refs) {
       prev_ref->next = ref;
     }
@@ -789,10 +792,12 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
   struct link_map map_data;
   struct link_map *map_ptr;
   uintptr_t target_base;
+  int tls_idx;
   uintptr_t patch_base;
   const char *target_basename = get_basename(ulp->objs->name);
 
   target_base = (uintptr_t)get_loaded_library_base_addr(target_basename);
+  tls_idx = get_loaded_library_tls_index(target_basename);
   if (target_base == 0xFF) {
     MSGQ_WARN("Unable to find target library load address of %s",
               target_basename);
@@ -815,11 +820,15 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
   /* Now patch static data references in the live patch object */
   ref = ulp->refs;
   while (ref) {
-    uintptr_t target_address;
-    uintptr_t patch_address;
-    target_address = target_base + ref->target_offset;
-    patch_address = patch_base + ref->patch_offset;
-    memcpy((void *)patch_address, &target_address, sizeof(void *));
+    uintptr_t patch_address = patch_base + ref->patch_offset;
+    if (ref->tls) {
+      tls_index ti = { .ti_module = tls_idx, .ti_offset = ref->target_offset };
+      memcpy((void *)patch_address, &ti, sizeof(ti));
+    }
+    else {
+      uintptr_t target_address = target_base + ref->target_offset;
+      memcpy((void *)patch_address, &target_address, sizeof(void *));
+    }
     ref = ref->next;
   }
 

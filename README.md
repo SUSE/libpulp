@@ -174,6 +174,7 @@ written with the following syntax:
 4: <old_fname_2>:<new_fname_2>
 5: #<var1>:<var1ref>:<var1_offset>:<var1ref_offset>
 6: #<var2>:<var2ref>:<var2_offset>:<var2ref_offset>
+6: #%<tlsvar1>:<tlsvar1ref>:<tlsvar1_offset>:<tlsvar1ref_offset>
 ...
 ```
 
@@ -184,5 +185,7 @@ the absolute path for the library that will be patched; it must be preceded by
 could be more lines if more functions need replacing). Lines 5 and 6 specify
 the offsets that local (not-exported) variables in the target library have from
 the beginning of the library load location, as well as the offsets of
-references to those variables in the live patch object. These offsets are used
-by Libpulp to enable access to local variables from the live patch.
+references to those variables in the live patch object. If the local variable
+line contains a %, it indicates that it is a Thread Local Storage (TLS) variable.
+These offsets are used by Libpulp to enable access to local variables from the
+live patch.

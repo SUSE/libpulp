@@ -89,10 +89,21 @@ get_symbol_by_name(Elf64_Sym dynsym[], const char *dynstr, int len,
 /** struct containing the parameters that will be passed to dl_find_symbol.  */
 struct dl_iterate_arg
 {
-  const char *library; /* Name of the .so file to find the symbol. */
-  const char *symbol;  /* The name of the wanted symbol. */
+  /* Input.  */
 
-  void *symbol_addr; /* The address of the symbol in the program. */
+  /** Name of the .so file to find the symbol. */
+  const char *library;
+
+  /** The name of the wanted symbol. */
+  const char *symbol;
+
+  /* Output.  */
+
+  /** The address of the symbol in the program. */
+  void *symbol_addr;
+
+  /** The TLS module index of the library.  */
+  int tls_index;
 };
 
 /** @brief dl_iterate_phdr callback.
@@ -152,6 +163,9 @@ dl_find_symbol(struct dl_phdr_info *info, size_t size, void *data)
 
   /* Initialize output value as being NULL (symbol not found).  */
   args->symbol_addr = NULL;
+
+  /* Initialize TLS index with invalid value.  */
+  args->tls_index = -1;
 
   /* Check if the current info is the library we want to find the symbols.  */
   if (args->library && !strstr(info->dlpi_name, args->library))
@@ -218,6 +232,7 @@ dl_find_symbol(struct dl_phdr_info *info, size_t size, void *data)
   /* With the symbol table identified, find the wanted symbol.  */
   if (dynstr && dynsym) {
     Elf64_Sym *sym;
+    args->tls_index = info->dlpi_tls_modid;
 
     sym = get_symbol_by_name(dynsym, dynstr, num_symbols, args->symbol);
     if (sym)
@@ -259,6 +274,9 @@ dl_find_base_addr(struct dl_phdr_info *info, size_t size, void *data)
   /* Highly improvable that any library will have this base address.  */
   args->symbol_addr = (void *)0xFF;
 
+  /* Initialize TLS index with an incorrect value.  */
+  args->tls_index = -1;
+
   /* Sanity check if size matches the size of the struct.  */
   if (size != sizeof(*info)) {
     libpulp_errx(EXIT_FAILURE, "dl_phdr_info size is unexpected");
@@ -273,6 +291,7 @@ dl_find_base_addr(struct dl_phdr_info *info, size_t size, void *data)
   if (*info->dlpi_name != '\0' && strstr(info->dlpi_name, args->library)) {
     /* Found.  Set symbol_addr as the base address of library.  */
     args->symbol_addr = (void *)info->dlpi_addr;
+    args->tls_index = info->dlpi_tls_modid;
 
     /* Alert dl_iterate that we are finished.  */
     return 1;
@@ -288,6 +307,15 @@ get_loaded_library_base_addr(const char *library)
   dl_iterate_phdr(dl_find_base_addr, &arg);
 
   return arg.symbol_addr;
+}
+
+int
+get_loaded_library_tls_index(const char *library)
+{
+  struct dl_iterate_arg arg = { .library = library };
+  dl_iterate_phdr(dl_find_base_addr, &arg);
+
+  return arg.tls_index;
 }
 
 __attribute__((constructor)) void

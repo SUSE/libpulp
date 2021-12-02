@@ -19,11 +19,26 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-int __ulp_asunsafe_trylock(void);
-int __ulp_asunsafe_unlock(void);
+#include <err.h>
+#include <stdio.h>
+#include <stdlib.h>
 
-void *get_loaded_symbol_addr(const char *, const char *);
+#include "../include/ulp_common.h"
 
-void *get_loaded_library_base_addr(const char *);
+// ti is overriden in the livepatching process.  It must not be declared static
+// else the compiler may remove the variable because it is unreferenced.
+tls_index ti = { 0 };
+static char *ulpr_string = "String from live patch";
 
-int get_loaded_library_tls_index(const char *);
+void *__tls_get_addr(tls_index *);
+
+void
+new_banner_set(__attribute__((unused)) char *new)
+{
+  if (ti.ti_module == 0 && ti.ti_offset == 0)
+    errx(EXIT_FAILURE, "Live patch data references not initialized");
+
+  char **ulpr_banner = __tls_get_addr(&ti);
+  printf("addr: 0x%lx\n", (unsigned long)ulpr_banner);
+  *ulpr_banner = ulpr_string;
+}
