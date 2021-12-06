@@ -7,27 +7,51 @@ on:
     branches: [ master ]
 
 jobs:
-  build-and-test:
+  CI:
+    runs-on: ubuntu-latest
 
-    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        opensuse: [tumbleweed, leap]
+        compiler: [gcc, clang]
+        build-type: [NORMAL]
+        extra-configure: ['']
+        include:
+          - opensuse: tumbleweed
+            compiler: gcc
+            build-type: sanitizers
+            extra-configure: --enable-sanitizers
+          - opensuse: tumbleweed
+            compiler: gcc
+            build-type: valgrind
+            extra-configure: --enable-valgrind
+
+    container:
+      image: opensuse/${{ matrix.opensuse }}
+      options: --privileged
 
     steps:
-    - uses: actions/checkout@v2
     - name: dependencies
-      run: sudo apt install autoconf-archive libelf-dev python3-pexpect python3-psutil libunwind-dev
-    - name: permissions
-      run: echo 0 | sudo tee /proc/sys/kernel/yama/ptrace_scope
+      run: zypper -n install autoconf-archive libelf-devel
+        python3-pexpect python3-psutil libunwind-devel
+        git gcc gcc-c++ clang libtool make dash valgrind gzip
+        findutils
+    - uses: actions/checkout@v2
     - name: bootstrap
       run: ./bootstrap
     - name: configure
-      run: ./configure --enable-stack-check
+      run: ./configure --enable-stack-check ${{ matrix.extra-configure }}
+      if: ${{ matrix.compiler != 'clang' }}
+    - name: configure
+      run: CC=clang CXX=clang++ ./configure --enable-stack-check  ${{ matrix.extra-configure }}
+      if: ${{ matrix.compiler == 'clang' }}
     - name: make
-      run: make
+      run: make -j`nproc`
     - name: make check
-      run: make check
+      run: make check -j`nproc`
       id: check
     - name: diagnostics
       if: failure () && steps.check.outcome == 'failure'
       run: cat tests/test-suite.log
     - name: make distcheck
-      run: make distcheck
+      run: make distcheck -j`nproc`
