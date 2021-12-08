@@ -758,7 +758,8 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
   /* only shared objs have units, this loop never runs for main obj */
   unit = obj->units;
   while (unit) {
-    old_fun = get_loaded_symbol_addr(get_basename(obj->name), unit->old_fname);
+    old_fun = get_loaded_symbol_addr(get_basename(obj->name), unit->old_fname,
+                                     unit->old_faddr);
     if (!old_fun)
       return ENOOLDFUNC;
 
@@ -896,14 +897,18 @@ ulp_state_update(struct ulp_metadata *ulp)
       return 0;
     }
 
-    a_unit->patched_addr =
-        get_loaded_symbol_addr(basename_target, unit->old_fname);
-    if (!a_unit->patched_addr)
+    a_unit->patched_addr = get_loaded_symbol_addr(
+        basename_target, unit->old_fname, unit->old_faddr);
+    if (!a_unit->patched_addr) {
+      MSGQ_WARN("Symbol %s not found in %s.", unit->old_fname,
+                basename_target);
       return 0;
+    }
 
     a_unit->target_addr = load_so_symbol(unit->new_fname, ulp->so_handler);
-    if (!a_unit->target_addr)
+    if (!a_unit->target_addr) {
       return 0;
+    }
 
     memcpy(a_unit->overwritten_bytes, a_unit->patched_addr, 14);
 

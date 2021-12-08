@@ -101,8 +101,8 @@ load_elf(const char *obj, int *fd)
   return elf;
 }
 
-Elf_Scn *
-get_dynsym(Elf *elf)
+static Elf_Scn *
+get_elf_section(Elf *elf, ElfW(Word) sht_type)
 {
   size_t i, nsecs;
   Elf_Scn *s;
@@ -121,11 +121,23 @@ get_dynsym(Elf *elf)
     }
     gelf_getshdr(s, &sh);
 
-    if (sh.sh_type == SHT_DYNSYM) {
+    if (sh.sh_type == sht_type) {
       return s;
     }
   }
   return NULL;
+}
+
+Elf_Scn *
+get_dynsym(Elf *elf)
+{
+  return get_elf_section(elf, SHT_DYNSYM);
+}
+
+Elf_Scn *
+get_symtab(Elf *elf)
+{
+  return get_elf_section(elf, SHT_SYMTAB);
 }
 
 Elf_Scn *
@@ -163,6 +175,7 @@ get_ulp_elf_metadata(const char *filename, struct ulp_object *obj)
   int fd, ret;
   Elf *elf;
   Elf_Scn *dynsym;
+  Elf_Scn *symtab = NULL;
 
   fd = 0;
   elf = load_elf(filename, &fd);
@@ -178,13 +191,16 @@ get_ulp_elf_metadata(const char *filename, struct ulp_object *obj)
     goto clean_elf;
   }
 
+  /* Symtab support should be optional. A linux binary can have it stripped. */
+  symtab = get_symtab(elf);
+
   if (!get_object_metadata(elf, obj)) {
     WARN("Unable to get object metadata.");
     ret = 0;
     goto clean_elf;
   }
 
-  if (!get_elf_tgt_addrs(elf, obj, dynsym)) {
+  if (!get_elf_tgt_addrs(elf, obj, dynsym, symtab)) {
     WARN("Unable to get target addresses.");
     ret = 0;
     goto clean_elf;
@@ -210,14 +226,18 @@ get_object_metadata(Elf *elf, struct ulp_object *obj)
 }
 
 int
-get_elf_tgt_addrs(Elf *elf, struct ulp_object *obj, Elf_Scn *st)
+get_elf_tgt_addrs(Elf *elf, struct ulp_object *obj, Elf_Scn *st1, Elf_Scn *st2)
 {
   struct ulp_unit *unit;
-  unit = obj->units;
 
-  while (unit != NULL) {
-    unit->old_faddr = get_symbol_addr(elf, st, unit->old_fname);
-    unit = unit->next;
+  for (unit = obj->units; unit != NULL; unit = unit->next) {
+    /* First look at dynsym. This section is always present in binary.  */
+    unit->old_faddr = get_symbol_addr(elf, st1, unit->old_fname);
+    if (unit->old_faddr == NULL && st2 != NULL) {
+      /* In case we couldn't find the symbol there, look in the symtab, if
+       * available.  */
+      unit->old_faddr = get_symbol_addr(elf, st2, unit->old_fname);
+    }
   }
   return 1;
 }
