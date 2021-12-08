@@ -110,4 +110,8 @@ const char *get_basename(const char *);
 
 const char *buildid_to_string(const unsigned char[BUILDID_LEN]);
 
+const char *get_target_binary_name(int);
+
+const char *get_current_binary_name(void);
+
 #endif

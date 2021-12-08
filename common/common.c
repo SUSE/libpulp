@@ -19,8 +19,10 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <linux/limits.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "error_common.h"
 #include "ulp_common.h"
@@ -89,10 +91,53 @@ libpulp_strerror(ulp_error_t errnum)
 {
   static const char *const libpulp_errlist[] = __ULP_ERRLIST;
 
-  if (0xFF < errnum) {
+  if (0xFF < errnum &&
+      errnum < EUNKNOWN + (int)ARRAY_LENGTH(libpulp_errlist)) {
     return libpulp_errlist[errnum & 0xFF];
   }
   else {
     return strerror(errnum);
   }
+}
+
+/** @brief Get target program name
+ *
+ * For instance, assume that the program is named "binary", which the
+ * user launched with "./binary".  This function will return the string
+ * "binary".
+ *
+ * @return Target program binary's name.
+ */
+const char *
+get_target_binary_name(int pid)
+{
+  static char binary_name[PATH_MAX];
+
+  if (*binary_name == '\0') {
+    char fname[PATH_MAX];
+    char cmdline[PATH_MAX];
+
+    snprintf(fname, sizeof(fname), "/proc/%d/cmdline", pid);
+    FILE *fp = fopen(fname, "r");
+    fgets(cmdline, sizeof(cmdline), fp);
+    fclose(fp);
+
+    strncpy(binary_name, get_basename(cmdline), PATH_MAX - 1);
+  }
+
+  return binary_name;
+}
+
+/** @brief Get current program name
+ *
+ * For instance, assume that the program is named "binary", which the
+ * user launched with "./binary".  This function will return the string
+ * "binary".
+ *
+ * @return This program binary's name.
+ */
+const char *
+get_current_binary_name()
+{
+  return get_target_binary_name(getpid());
 }

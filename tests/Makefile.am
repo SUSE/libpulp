@@ -282,6 +282,9 @@ METADATA = \
   libparameters_livepatch3.dsc \
   libparameters_livepatch3.ulp \
   libparameters_livepatch3.rev \
+  libprocess_livepatch1.dsc \
+  libprocess_livepatch1.ulp \
+  libprocess_livepatch1.rev \
   librecursion_livepatch1.dsc \
   librecursion_livepatch1.ulp \
   librecursion_livepatch1.rev \
@@ -319,6 +322,7 @@ EXTRA_DIST = \
   libdozens_bsymbolic_livepatch1.in \
   libhundreds_bsymbolic_livepatch1.in \
   libparameters_livepatch1.in \
+  libprocess_livepatch1.in \
   libparameters_livepatch2.in \
   libparameters_livepatch3.in \
   librecursion_livepatch1.in \
@@ -354,6 +358,7 @@ check_PROGRAMS = \
   contract \
   exception_handling \
   access \
+  process \
   tls \
   buildid \
   manyprocesses
@@ -369,6 +374,10 @@ numserv_bsymbolic_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 parameters_SOURCES = parameters.c
 parameters_LDADD = libparameters.la
 parameters_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
+
+process_SOURCES = process.c
+process_CFLAGS = -fpatchable-function-entry=16,14 $(AM_CFLAGS)
+process_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
 syscall_restart_SOURCES = syscall_restart.c
 syscall_restart_LDADD = libparameters.la
@@ -452,6 +461,9 @@ manyprocesses_SOURCES = manyprocesses.c
 manyprocesses_LDADD = libmanyprocesses.la
 manyprocesses_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
+process_SOURCES = process.c
+process_DEPENDENCIES = $(POST_PROCESS)
+
 TESTS = \
   numserv.py \
   numserv_bsymbolic.py \
@@ -479,12 +491,13 @@ TESTS = \
   relative_path.py \
   revert_all.py \
   revert_and_patch.py \
+  process.py \
+  process_revert.py \
   manyprocesses.py
 
 XFAIL_TESTS = \
   blocked.py \
-  contract.py \
-  hidden.py
+  contract.py
 
 # Some tests must run serially because they may interfere with other
 # tests. We use *.log because automake rule that runs the tests are
@@ -531,3 +544,5 @@ libbuildid_livepatch1.ulp: libbuildid_livepatch1.dsc $(check_LTLIBRARIES)
 	$(ULP_PACKER) $< -o $@
 	rm -f $(libbuildid_la_OBJECTS) # Clean up object again
 	$(MAKE) CFLAGS="$(CFLAGS) -DRETVAL=1338" libbuildid.la # Compile new libbuildid.
+
+libprocess_livepatch1.ulp: process libprocess_livepatch1.dsc

@@ -32,6 +32,9 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#include "msg_queue.h"
+#include "ulp_common.h"
+
 /* This header should be included last, as it poisons some symbols.  */
 #include "error.h"
 
@@ -101,6 +104,9 @@ struct dl_iterate_arg
 
   /** The address of the symbol in the program. */
   void *symbol_addr;
+
+  /** The address bias where the library was loaded.  */
+  uintptr_t bias_addr;
 
   /** The TLS module index of the library.  */
   int tls_index;
@@ -238,6 +244,7 @@ dl_find_symbol(struct dl_phdr_info *info, size_t size, void *data)
     if (sym)
       args->symbol_addr = (void *)(info->dlpi_addr + sym->st_value);
 
+    args->bias_addr = info->dlpi_addr;
     /* Alert dl_iterate_phdr that we are finished.  */
     return 1;
   }
@@ -254,14 +261,28 @@ dl_find_symbol(struct dl_phdr_info *info, size_t size, void *data)
  *
  * @param library: name of the library where the symbol is from.
  * @param symbol: name of the wanted symbol
+ * @param old_faddr: Offset of symbol, as found during packing.
  *
  * @return the address where the symbol was allocated nn the program.
  */
 void *
-get_loaded_symbol_addr(const char *library, const char *symbol)
+get_loaded_symbol_addr(const char *library, const char *symbol,
+                       void *old_faddr)
 {
+  /* Check if the current info is the program's binary itself.  In that case
+   * we must handle things somewhat differently.  */
+  if (library == NULL || !strcmp(library, get_current_binary_name())) {
+    library = "";
+  }
+
   struct dl_iterate_arg arg = { .library = library, .symbol = symbol };
   dl_iterate_phdr(dl_find_symbol, &arg);
+
+  if (old_faddr != NULL && arg.symbol_addr != old_faddr) {
+    MSGQ_WARN(
+        "Symbol requested not found in .dymsym. Using address from .ulp");
+    return arg.bias_addr + old_faddr;
+  }
 
   return arg.symbol_addr;
 }
@@ -272,7 +293,7 @@ dl_find_base_addr(struct dl_phdr_info *info, size_t size, void *data)
   struct dl_iterate_arg *args = (struct dl_iterate_arg *)data;
 
   /* Highly improvable that any library will have this base address.  */
-  args->symbol_addr = (void *)0xFF;
+  args->bias_addr = 0xFF;
 
   /* Initialize TLS index with an incorrect value.  */
   args->tls_index = -1;
@@ -290,7 +311,7 @@ dl_find_base_addr(struct dl_phdr_info *info, size_t size, void *data)
   /* Check if the current info is the library we want to find the symbols.  */
   if (*info->dlpi_name != '\0' && strstr(info->dlpi_name, args->library)) {
     /* Found.  Set symbol_addr as the base address of library.  */
-    args->symbol_addr = (void *)info->dlpi_addr;
+    args->bias_addr = info->dlpi_addr;
     args->tls_index = info->dlpi_tls_modid;
 
     /* Alert dl_iterate that we are finished.  */
@@ -303,15 +324,28 @@ dl_find_base_addr(struct dl_phdr_info *info, size_t size, void *data)
 void *
 get_loaded_library_base_addr(const char *library)
 {
+
+  /* Check if the current info is the program's binary itself.  In that case
+   * we must handle things somewhat differently.  */
+  if (library == NULL || !strcmp(library, get_current_binary_name())) {
+    library = "";
+  }
+
   struct dl_iterate_arg arg = { .library = library };
   dl_iterate_phdr(dl_find_base_addr, &arg);
 
-  return arg.symbol_addr;
+  return (void *)arg.bias_addr;
 }
 
 int
 get_loaded_library_tls_index(const char *library)
 {
+  /* Check if the current info is the program's binary itself.  In that case
+   * we must handle things somewhat differently.  */
+  if (library == NULL || !strcmp(library, get_current_binary_name())) {
+    library = "";
+  }
+
   struct dl_iterate_arg arg = { .library = library };
   dl_iterate_phdr(dl_find_base_addr, &arg);
 
@@ -333,11 +367,12 @@ __ulp_asunsafe_begin(void)
    * Calling dlsym to interpose dlsym itself is not possible, so look
    * at the loaded dynamic symbols from "libdl.so" for the "dlsym" function.
    */
-  real_dlsym = (typeof(real_dlsym))get_loaded_symbol_addr("libdl.so", "dlsym");
+  real_dlsym =
+      (typeof(real_dlsym))get_loaded_symbol_addr("libdl.so", "dlsym", NULL);
   if (!real_dlsym) {
     /* Check if that is present in libc.  */
     real_dlsym =
-        (typeof(real_dlsym))get_loaded_symbol_addr("libc.so", "dlsym");
+        (typeof(real_dlsym))get_loaded_symbol_addr("libc.so", "dlsym", NULL);
   }
 
   libpulp_crash_assert(real_dlsym);

@@ -274,6 +274,32 @@ release_ulp_global_metadata(void)
   memset(meta, 0, sizeof(struct ulp_metadata));
 }
 
+/** @brief Get first dynobj in the dynobj process chain
+ *
+ *  @return The first dynobj in process.
+ */
+
+static struct ulp_dynobj *
+dynobj_first(struct ulp_process *process)
+{
+  return process->dynobj_main;
+}
+
+/** @brief Get the next dynobj in the dynobj process chain
+ *
+ *  @return The next dynobj in process.
+ */
+static struct ulp_dynobj *
+dynobj_next(struct ulp_process *process, struct ulp_dynobj *curr_obj)
+{
+  if (curr_obj == process->dynobj_main) {
+    return process->dynobj_targets;
+  }
+  else {
+    return curr_obj->next;
+  }
+}
+
 /* Parses the _DYNAMIC section of PROCESS, finds the DT_DEBUG entry,
  * from which the address of the chain of dynamically loaded objects
  * (link map) can be found, then reads it and stores it in PROCESS.
@@ -395,7 +421,7 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
   int i, num_symbols = 0, ret;
 
   /* If object has no link map attached to it, there is nothing we can do.  */
-  if (!obj->link_map.l_addr) {
+  if (!obj->link_map.l_name) {
     DEBUG("no link map object found");
     return ENOLINKMAP;
   }
@@ -404,7 +430,14 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
   ehdr_addr = obj->link_map.l_addr;
 
   /* Read ELF header from remote process.  */
-  ret = read_memory((char *)&ehdr, sizeof(ehdr), pid, ehdr_addr);
+  if (ehdr_addr == 0) {
+    /* If l_addr is zero, it means that there is no load bias.  In that case,
+     * the elf address is on address 0x400000 on x86_64.  */
+    ret = read_memory((char *)&ehdr, sizeof(ehdr), pid, 0x400000UL);
+  }
+  else {
+    ret = read_memory((char *)&ehdr, sizeof(ehdr), pid, ehdr_addr);
+  }
   if (ret != 0) {
     DEBUG("Unable to read ELF header from process %d\n", pid);
     return ETARGETHOOK;
@@ -418,6 +451,8 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
 
   /* Get first process header address.  */
   phdr_addr = ehdr_addr + ehdr.e_phoff;
+  if (ehdr_addr == 0)
+    phdr_addr += 0x400000UL;
 
   /* Iterate over each process header.  */
   for (i = 0; i < ehdr.e_phnum; i++) {
@@ -782,7 +817,7 @@ parse_main_dynobj(struct ulp_process *process)
   }
 
   obj->filename = malloc(PATH_MAX);
-  snprintf(obj->filename, PATH_MAX, "/proc/%d/exe", process->pid);
+  strcpy(obj->filename, get_target_binary_name(process->pid));
 
   obj->next = NULL;
 
@@ -801,6 +836,8 @@ parse_main_dynobj(struct ulp_process *process)
          libpulp_strerror(ret));
     return ret;
   }
+
+  parse_dynobj_elf_headers(process->pid, obj);
 
   return 0;
 }
@@ -1711,7 +1748,7 @@ check_patch_sanity(struct ulp_process *process)
   const unsigned char *buildid = NULL;
 
   /* check if the affected library is present in the process. */
-  for (d = process->dynobj_targets; d != NULL; d = d->next) {
+  for (d = dynobj_first(process); d != NULL; d = dynobj_next(process, d)) {
     bool buildid_match = false;
     bool name_match = false;
     const char *basename = strrchr(d->filename, '/');
@@ -1732,6 +1769,7 @@ check_patch_sanity(struct ulp_process *process)
     if (name_match && buildid_match)
       break;
   }
+
   if (!d) {
     if (buildid) {
       /* strdup because buildid_to_string returns a pointer to a static
@@ -1750,7 +1788,7 @@ check_patch_sanity(struct ulp_process *process)
       WARN("target library (%s) not loaded.", target);
     }
     DEBUG("available target libraries:");
-    for (d = process->dynobj_targets; d != NULL; d = d->next)
+    for (d = dynobj_first(process); d != NULL; d = dynobj_next(process, d))
       DEBUG("  %s (%s)", d->filename, buildid_to_string(d->build_id));
     return EBUILDID;
   }

@@ -44,7 +44,7 @@ int get_ulp_elf_metadata(const char *filename, struct ulp_object *obj);
 
 int get_object_metadata(Elf *elf, struct ulp_object *obj);
 
-int get_elf_tgt_addrs(Elf *elf, struct ulp_object *obj, Elf_Scn *st);
+int get_elf_tgt_addrs(Elf *, struct ulp_object *, Elf_Scn *st1, Elf_Scn *st2);
 
 int create_patch_metadata_file(struct ulp_metadata *ulp, const char *filename);
 
