@@ -22,7 +22,13 @@
 static int
 hidden_dozen(void)
 {
-  return 12;
+  /* Clang removes the symbol completely if it sees that it can inline the
+     function, even with -fno-inline or __attribute__((noinline)).  Even with
+     the volatile, it generates a jump to symbol rather than a function, which
+     means this function cannot be livepatched.  However, the hidden.py test
+     only check if this symbol is present in .symtab, so this is fine.  */
+  volatile int x = 12;
+  return x;
 }
 
 int
