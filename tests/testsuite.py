@@ -88,12 +88,12 @@ class spawn(pexpect.spawn):
     if testname[0] != '/':
       testname = './' + testname
 
-    if script == True:
-        # Run the wrapper script with dash.
-        testname = '/usr/bin/dash ' + testname
+    testname = '/usr/bin/sh -c ' + '\''+ testname + '\''
 
     # if TEST_THROUGH_VALGRIND environment variable is defined, append valgrind
-    # call on every command.
+    # call on testname. We actually call valgrind on the `sh` call, and it
+    # still catch memory issues while avoiding libpulp problems regarding
+    # the program actually being `valgrind` and not the test program.
     try:
         if os.environ['TESTS_THROUGH_VALGRIND'] == '1':
             testname = 'valgrind --leak-check=full ' + testname
