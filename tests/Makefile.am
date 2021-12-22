@@ -377,7 +377,7 @@ parameters_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
 process_SOURCES = process.c
 process_CFLAGS = -fpatchable-function-entry=16,14 $(AM_CFLAGS)
-process_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
+process_DEPENDENCIES = $(POST_PROCESS)
 
 syscall_restart_SOURCES = syscall_restart.c
 syscall_restart_LDADD = libparameters.la
@@ -460,9 +460,6 @@ buildid_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 manyprocesses_SOURCES = manyprocesses.c
 manyprocesses_LDADD = libmanyprocesses.la
 manyprocesses_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
-
-process_SOURCES = process.c
-process_DEPENDENCIES = $(POST_PROCESS)
 
 TESTS = \
   numserv.py \
