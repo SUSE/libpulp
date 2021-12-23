@@ -1687,7 +1687,8 @@ check_livepatch_functions_matches_metadata(void)
     symbol = dlsym(container_handle, new_fname);
 
     if (!symbol) {
-      WARN("symbol %s is not present in the livepatch container.", new_fname);
+      WARN("symbol %s is not present in the livepatch container: %s",
+           new_fname, dlerror());
       ret = EINVAL;
       break;
     }

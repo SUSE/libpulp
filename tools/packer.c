@@ -35,6 +35,9 @@
 #include "packer.h"
 #include "ulp_common.h"
 
+static int get_elf_tgt_ref_addrs(Elf *, struct ulp_reference *, Elf_Scn *,
+                                 Elf_Scn *);
+
 void
 free_metadata(struct ulp_metadata *ulp)
 {
@@ -170,12 +173,14 @@ get_build_id_note(Elf *elf)
 }
 
 int
-get_ulp_elf_metadata(const char *filename, struct ulp_object *obj)
+get_ulp_elf_metadata(const char *filename, struct ulp_metadata *ulp)
 {
   int fd, ret;
   Elf *elf;
   Elf_Scn *dynsym;
   Elf_Scn *symtab = NULL;
+  struct ulp_object *obj = ulp->objs;
+  struct ulp_reference *ref = ulp->refs;
 
   fd = 0;
   elf = load_elf(filename, &fd);
@@ -206,6 +211,12 @@ get_ulp_elf_metadata(const char *filename, struct ulp_object *obj)
     goto clean_elf;
   }
 
+  if (!get_elf_tgt_ref_addrs(elf, ref, dynsym, symtab)) {
+    WARN("Unable to get target reference addresses.");
+    ret = 0;
+    goto clean_elf;
+  }
+
   ret = 1;
 
 clean_elf:
@@ -225,6 +236,18 @@ get_object_metadata(Elf *elf, struct ulp_object *obj)
   return 1;
 }
 
+/** @brief Get offsets of symbols in target library
+ *
+ * This function gather the address of all to-be-patched functions in the
+ * target library.
+ *
+ * @param elf     The target library elf object.
+ * @param obj     Chain of objects.
+ * @param st1     Symbol table 1, usually .dymsym.
+ * @param st2     Symbol table 2, usually .symtab if present.
+ *
+ * @return 1
+ */
 int
 get_elf_tgt_addrs(Elf *elf, struct ulp_object *obj, Elf_Scn *st1, Elf_Scn *st2)
 {
@@ -238,6 +261,40 @@ get_elf_tgt_addrs(Elf *elf, struct ulp_object *obj, Elf_Scn *st1, Elf_Scn *st2)
        * available.  */
       unit->old_faddr = get_symbol_addr(elf, st2, unit->old_fname);
     }
+  }
+  return 1;
+}
+
+/** @brief Get offsets of references to symbol in target library
+ *
+ * When the user doesn't specify the offset of the target symbol in the target
+ * library when using the # syntax, try to find it by looking into the target
+ * library symbols.
+ *
+ * @param elf     The target library elf object.
+ * @param ref     Chain of references.
+ * @param st1     Symbol table 1, usually .dymsym.
+ * @param st2     Symbol table 2, usually .symtab if present.
+ *
+ * @return 1
+ */
+static int
+get_elf_tgt_ref_addrs(Elf *elf, struct ulp_reference *ref, Elf_Scn *st1,
+                      Elf_Scn *st2)
+{
+
+  while (ref != NULL) {
+    if (ref->target_offset == 0) {
+      ref->target_offset =
+          (uintptr_t)get_symbol_addr(elf, st1, ref->target_name);
+      if (ref->target_offset == 0 && st2 != NULL) {
+        /* In case we couldn't find the symbol there, look in the symtab, if
+         * available.  */
+        ref->target_offset =
+            (uintptr_t)get_symbol_addr(elf, st2, ref->target_name);
+      }
+    }
+    ref = ref->next;
   }
   return 1;
 }
@@ -496,16 +553,23 @@ parse_description(const char *filename, struct ulp_metadata *ulp)
 
         third = second + 1;
         second = strchr(third, ':');
-        *second = '\0';
-        ref->reference_name = strdup(third);
 
-        third = second + 1;
-        second = strchr(third, ':');
-        *second = '\0';
-        ref->target_offset = (intptr_t)strtol(third, NULL, 16);
+        /* Check if the user manually specified the offsets.  */
+        if (second == NULL)
+          ref->reference_name = strdup(third);
+        else {
+          *second = '\0';
+          ref->reference_name = strdup(third);
 
-        third = second + 1;
-        ref->patch_offset = (intptr_t)strtol(third, NULL, 16);
+          third = second + 1;
+
+          second = strchr(third, ':');
+          *second = '\0';
+          ref->target_offset = (intptr_t)strtol(third, NULL, 16);
+
+          third = second + 1;
+          ref->patch_offset = (intptr_t)strtol(third, NULL, 16);
+        }
 
         ref->next = ulp->refs;
         ulp->refs = ref;
@@ -794,7 +858,7 @@ run_packer(struct arguments *arguments)
   }
   DEBUG("target library: %s.", arguments->library);
 
-  if (!get_ulp_elf_metadata(arguments->library, ulp.objs)) {
+  if (!get_ulp_elf_metadata(arguments->library, &ulp)) {
     WARN("unable to parse target library.");
     goto main_error;
   }

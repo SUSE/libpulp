@@ -833,7 +833,17 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
   /* Now patch static data references in the live patch object */
   ref = ulp->refs;
   while (ref) {
-    uintptr_t patch_address = patch_base + ref->patch_offset;
+    uintptr_t patch_address;
+    if (ref->patch_offset == 0) {
+      /* In case the user did not specify the patch offset, try to find the
+         symbol's address by its name.  */
+      patch_address =
+          (uintptr_t)load_so_symbol(ref->reference_name, ulp->so_handler);
+      ref->patch_offset = patch_address - patch_base;
+    }
+    else {
+      patch_address = patch_base + ref->patch_offset;
+    }
     if (ref->tls) {
       tls_index ti = { .ti_module = tls_idx, .ti_offset = ref->target_offset };
       memcpy((void *)patch_address, &ti, sizeof(ti));
