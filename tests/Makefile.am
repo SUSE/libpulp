@@ -190,6 +190,7 @@ check_LTLIBRARIES += libdozens_livepatch1.la \
                      libaddress_livepatch1.la \
                      libcontract_livepatch1.la \
                      libaccess_livepatch1.la \
+                     libaccess_livepatch2.la \
                      libtls_livepatch1.la \
                      libbuildid_livepatch1.la \
                      libmanyprocesses_livepatch1.la
@@ -241,6 +242,9 @@ libcontract_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
 libaccess_livepatch1_la_SOURCES = libaccess_livepatch1.c
 libaccess_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
+
+libaccess_livepatch2_la_SOURCES = libaccess_livepatch2.c
+libaccess_livepatch2_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
 libtls_livepatch1_la_SOURCES = libtls_livepatch1.c
 libtls_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
@@ -303,6 +307,9 @@ METADATA = \
   libaccess_livepatch1.dsc \
   libaccess_livepatch1.ulp \
   libaccess_livepatch1.rev \
+  libaccess_livepatch2.dsc \
+  libaccess_livepatch2.ulp \
+  libaccess_livepatch2.rev \
   libtls_livepatch1.dsc \
   libtls_livepatch1.ulp \
   libtls_livepatch1.rev \
@@ -331,6 +338,7 @@ EXTRA_DIST = \
   libaddress_livepatch1.in \
   libcontract_livepatch1.in \
   libaccess_livepatch1.in \
+  libaccess_livepatch2.in \
   libtls_livepatch1.in \
   libbuildid_livepatch1.in \
   libmanyprocesses_livepatch1.in
@@ -482,6 +490,7 @@ TESTS = \
   exception_handling.py \
   missing_function.py \
   access.py \
+  access2.py \
   tls.py \
   buildid.py \
   libpulp_messages.py \

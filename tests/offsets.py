@@ -68,8 +68,10 @@ for line in ifile:
     poff = find_offset(patch, pname)
 
     # Replace offset template patterns with actual offsets
-    line = line.replace('__TARGET_OFFSET__', toff)
-    line = line.replace('__PATCH_OFFSET__', poff)
+    if toff is not None:
+        line = line.replace('__TARGET_OFFSET__', toff)
+    if poff is not None:
+        line = line.replace('__PATCH_OFFSET__', poff)
 
   # Write every line back to the output file
   ofile.write(line)
