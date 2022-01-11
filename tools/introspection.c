@@ -1355,10 +1355,12 @@ apply_patch(struct ulp_process *process, const char *metadata)
   if (ret)
     return ret;
 
-  if (context.rax == EAGAIN)
-    WARN("patching failed in libpulp.so: libc/libdl locks were busy");
-  else
-    WARN("patching failed in libpulp.so: %s", libpulp_strerror(context.rax));
+  if (context.rax != 0) {
+    if (context.rax == EAGAIN)
+      WARN("patching failed in libpulp.so: libc/libdl locks were busy");
+    else
+      WARN("patching failed in libpulp.so: %s", libpulp_strerror(context.rax));
+  }
 
   return context.rax;
 }
