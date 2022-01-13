@@ -88,7 +88,7 @@ debug_ulp_unit(struct ulp_unit *unit)
   debug_ulp_unit(unit->next);
 }
 
-static void
+void
 debug_ulp_object(struct ulp_object *obj)
 {
   DEBUG("");
@@ -818,6 +818,8 @@ parse_main_dynobj(struct ulp_process *process)
 
   obj->filename = malloc(PATH_MAX);
   strcpy(obj->filename, get_target_binary_name(process->pid));
+
+  DEBUG("process name = %s, process pid = %d", obj->filename, process->pid);
 
   obj->next = NULL;
 
@@ -1688,8 +1690,6 @@ check_livepatch_functions_matches_metadata(void)
     return EINVAL;
   }
 
-  debug_ulp_object(ulp.objs);
-
   /* Iterate over all unit objects in the metadata file.  */
   for (curr_unit = ulp.objs->units; curr_unit != NULL;
        curr_unit = curr_unit->next) {
@@ -1779,15 +1779,17 @@ check_patch_sanity(struct ulp_process *process)
       char *buildid_str = strdup(buildid_to_string(buildid));
       char *lp_buildid = strdup(buildid_to_string((void *)ulp.objs->build_id));
 
-      WARN("livepatch buildid mismatch for %s (%s)\n"
+      WARN("pid = %d, name = %s: livepatch buildid mismatch for %s (%s)\n"
            "    expected buildid: %s\n",
-           target, buildid_str, lp_buildid);
+           process->pid, get_target_binary_name(process->pid), target,
+           buildid_str, lp_buildid);
 
       free(buildid_str);
       free(lp_buildid);
     }
     else {
-      WARN("target library (%s) not loaded.", target);
+      WARN("pid = %d, name = %s: target library (%s) not loaded.",
+           process->pid, get_target_binary_name(process->pid), target);
     }
     DEBUG("available target libraries:");
     for (d = dynobj_first(process); d != NULL; d = dynobj_next(process, d))

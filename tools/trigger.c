@@ -206,15 +206,18 @@ trigger_many_ulps(int pid, int retries, const char *wildcard_path,
                   const char *library, bool check_stack)
 {
   const char *wildcard = get_basename(wildcard_path);
-  char *ulp_folder_path = dirname(strdup(wildcard_path));
+  char *wildcard_path_dup = strdup(wildcard_path);
+  char *ulp_folder_path = dirname(wildcard_path_dup);
   DIR *directory = opendir(ulp_folder_path);
   struct dirent *entry;
   char buffer[ULP_PATH_LEN];
 
+  int ret = 0;
+
   if (!directory) {
     FATAL("Unable to open directory: %s", ulp_folder_path);
-    free(ulp_folder_path);
-    return 1;
+    ret = 1;
+    goto wildcard_clean;
   }
 
   while ((entry = readdir(directory)) != NULL) {
@@ -262,9 +265,11 @@ trigger_many_ulps(int pid, int retries, const char *wildcard_path,
   }
 
   closedir(directory);
+  ret = 0;
 
-  free(ulp_folder_path);
-  return 0;
+wildcard_clean:
+  free(wildcard_path_dup);
+  return ret;
 }
 
 /** @brief Apply multiple live patches to all processes with libpulp loaded.
