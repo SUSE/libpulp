@@ -119,10 +119,10 @@ get_target_binary_name(int pid)
 
     snprintf(fname, sizeof(fname), "/proc/%d/cmdline", pid);
     FILE *fp = fopen(fname, "r");
-    fgets(cmdline, sizeof(cmdline), fp);
+    if (fgets(cmdline, sizeof(cmdline), fp) != NULL) {
+      strncpy(binary_name, get_basename(cmdline), PATH_MAX - 1);
+    }
     fclose(fp);
-
-    strncpy(binary_name, get_basename(cmdline), PATH_MAX - 1);
   }
 
   return binary_name;
