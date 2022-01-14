@@ -27,34 +27,32 @@ import testsuite
 # everytime it executes, run it in a loop. The amount of iterations
 # hardcoded is arbitrary
 errors = 0
-for attempt in range(32):
-  child = testsuite.spawn('deadlock', log=None)
 
-  child.expect('Waiting for input.')
+child = testsuite.spawn('deadlock', log=None)
 
-  child.sendline('')
-  child.expect('hello')
+child.expect('Waiting for input.')
 
-  # Applying a live patch to a process entails stopping all of its
-  # threads, then stealing one of them to jack into the process and call
-  # libpulp.so's routines that load and apply the live patch. These
-  # routines are called from the context of a signal-handler, and, as
-  # such, should not make calls to Asynchronous Signal Unsafe functions.
-  # However, libpulp calls dlopen, which is AS-Unsafe.
+child.sendline('')
+child.expect('hello')
+
+# Applying a live patch to a process entails stopping all of its
+# threads, then stealing one of them to jack into the process and call
+# libpulp.so's routines that load and apply the live patch. These
+# routines are called from the context of a signal-handler, and, as
+# such, should not make calls to Asynchronous Signal Unsafe functions.
+# However, libpulp calls dlopen, which is AS-Unsafe.
+for attempt in range(200):
+  print('  Attempt #' + str(attempt))
   try:
-    child.livepatch('libblocked_livepatch1.ulp', retries=10000, timeout=20)
+    child.livepatch('libblocked_livepatch1.ulp', timeout=10)
   except subprocess.TimeoutExpired:
     print('Deadlock detected.')
     errors = 1
+    break
+  except subprocess.CalledProcessError:
+    pass
   else:
-    child.sendline('')
-    child.expect('olleh', reject='hello')
-  finally:
-    # Always kill the child process
-    child.close(force=True)
-
-  # Stop the loop at the first time the deadlock occurs.
-  if errors:
     break
 
+child.close(force=True)
 exit(errors)
