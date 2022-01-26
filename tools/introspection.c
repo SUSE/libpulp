@@ -1686,7 +1686,8 @@ check_livepatch_functions_matches_metadata(void)
   container_handle = dlopen(so_filename, RTLD_LOCAL | RTLD_LAZY);
 
   if (!container_handle) {
-    WARN("failed to load container livepatch file in %s.", so_filename);
+    WARN("failed to load container livepatch file in %s: %s.", so_filename,
+         dlerror());
     return EINVAL;
   }
 
