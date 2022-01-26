@@ -298,8 +298,23 @@ trigger_many_processes(int retries, const char *ulp_folder_path,
 
   /* Iterate over the process list that have libpulp preloaded.  */
   for (curr_item = list; curr_item != NULL; curr_item = curr_item->next) {
-    int r = trigger_many_ulps(curr_item->pid, retries, ulp_folder_path,
-                              library, check_stack);
+    int r;
+
+    if (ulp_folder_path) {
+      /* If a path to ulp files were provided, trigger all files that match the
+         wildcard.  */
+      r = trigger_many_ulps(curr_item->pid, retries, ulp_folder_path, library,
+                            check_stack);
+    }
+    else {
+      /* No path or wildcard provided.  The user may have requested to
+         revert-all.  */
+      r = trigger_one_process(curr_item->pid, retries, NULL, library,
+                              check_stack);
+      if (r == 0)
+        globals.trigger_successes++;
+      globals.trigger_processes++;
+    }
 
     /* If the livepatch failed because the patch wasn't targeted to the
        proccess, we ignore because we are batch processing.  */
