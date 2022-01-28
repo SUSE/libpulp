@@ -65,7 +65,7 @@ for child in childs:
     child.expect('1-2-3-4-5-6-7-8');
     child.expect('1.0-2.0-3.0-4.0-5.0-6.0-7.0-8.0-9.0-10.0');
 
-childless_livepatch(wildcard='./libmanyprocesses*', verbose=True, revert_lib='libmanyprocesses.so.0')
+childless_livepatch(wildcard='./libmanyprocesses*.ulp', verbose=True, revert_lib='libmanyprocesses.so.0')
 
 for child in childs:
     child.sendline('')
