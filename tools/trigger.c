@@ -249,8 +249,8 @@ trigger_many_ulps(int pid, int retries, const char *wildcard_path,
       continue;
     }
 
-    if (strcmp(extension, ".ulp")) {
-      /* This is not an ULP file, skip.  */
+    if (strcmp(extension, ".ulp") != 0 && strcmp(extension, ".rev") != 0) {
+      /* This is not an ULP or REV file, skip.  */
       continue;
     }
 
