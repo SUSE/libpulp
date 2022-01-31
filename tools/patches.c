@@ -165,8 +165,8 @@ print_process_list(struct ulp_process *process_list, int print_buildid)
 
   process_item = process_list;
   while (process_item) {
-
-    printf("PID: %d\n", process_item->pid);
+    pid_t pid = process_item->pid;
+    printf("PID: %d, name: %s\n", pid, get_target_binary_name(pid));
 
     printf("  Live patches:\n");
     object_item = process_item->dynobj_patches;
