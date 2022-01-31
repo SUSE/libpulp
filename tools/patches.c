@@ -168,8 +168,6 @@ print_process_list(struct ulp_process *process_list, int print_buildid)
 
     printf("PID: %d\n", process_item->pid);
 
-    printf("  Global universe: %ld\n", process_item->global_universe);
-
     printf("  Live patches:\n");
     object_item = process_item->dynobj_patches;
     if (!object_item)
