@@ -868,7 +868,14 @@ ulp_state_update(struct ulp_metadata *ulp)
 
   a_patch->lib_name = strndup(get_basename(ulp->objs->name), ULP_PATH_LEN);
   if (!a_patch->lib_name) {
-    WARN("Unable to allocate filename buffer state.");
+    MSGQ_WARN("Unable to allocate filename buffer state.");
+    return 0;
+  }
+
+  a_patch->container_name =
+      strndup(get_basename(ulp->so_filename), ULP_PATH_LEN);
+  if (!a_patch->container_name) {
+    MSGQ_WARN("Unable to allocate filename buffer state.");
     return 0;
   }
 
@@ -1411,8 +1418,12 @@ dump_ulp_patching_state(void)
   int i;
 
   fprintf(stderr, "----- ULP state dump -----\n");
+  fprintf(stderr, "__ulp_state address: %lx\n", (unsigned long)&__ulp_state);
+
   for (a_patch = __ulp_state.patches; a_patch != NULL;
        a_patch = a_patch->next) {
+    fprintf(stderr, "* libname: %s\n", a_patch->lib_name);
+    fprintf(stderr, "* container: %s\n", a_patch->container_name);
     fprintf(stderr, "* PATCH 0x");
     for (i = 0; i < 32; i++) {
       fprintf(stderr, "%x.", a_patch->patch_id[i]);
