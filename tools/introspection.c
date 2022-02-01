@@ -110,7 +110,7 @@ debug_ulp_object(struct ulp_object *obj)
   do { \
     if (x) { \
       free(x); \
-      x = NULL; \
+      (x) = NULL; \
     } \
   } \
   while (0)
@@ -957,21 +957,8 @@ parse_lib_dynobj(struct ulp_process *process, struct link_map *link_map_addr)
       WARN("unexpected subset of libpulp symbols exposed by %s.", libname);
   }
 
-  /* Live patch objects. */
-  /* XXX: Searching for the '_livepatch' substring in the filename of
-   * a dynamically loaded object is rather frail. Alternatives:
-   *   A. Have live patch DSOs expose some predefined symbol.
-   *   B. Have libpulp mmap a .ulp or .rev file into memory.
-   */
-  if (strstr(obj->filename, "_livepatch")) {
-    obj->next = process->dynobj_patches;
-    process->dynobj_patches = obj;
-  }
-  /* All other libraries go into the targets list. */
-  else {
-    obj->next = process->dynobj_targets;
-    process->dynobj_targets = obj;
-  }
+  obj->next = process->dynobj_targets;
+  process->dynobj_targets = obj;
 
   return &obj->link_map;
 }
@@ -1964,3 +1951,103 @@ error_path_context:
   return -1;
 }
 #endif
+
+/** @brief Read applied patch linked list object from remote process
+ *
+ * The applied patches are maintained in libpulp.so in the __ulp_state object.
+ * Retrieve the patch list there from the remote process.
+ *
+ * @param addr Address to read, where ulp_applied_patch object is.
+ * @param pid  Pid of remote process.
+ *
+ * @return A `ulp_applied_patch` linked list.
+ */
+static struct ulp_applied_patch *
+read_ulp_applied_patch(Elf64_Addr addr, pid_t pid)
+{
+  struct ulp_applied_patch *a_state;
+
+  if (addr == 0)
+    return NULL;
+
+  a_state = calloc(1, sizeof(*a_state));
+  if (!a_state) {
+    WARN("error allocating memory.");
+    return NULL;
+  }
+
+  if (read_memory((char *)a_state, sizeof(*a_state), pid, addr)) {
+    WARN("error reading patch state.");
+    free(a_state);
+    return NULL;
+  }
+
+  if (a_state->lib_name != NULL) {
+    read_string((char **)&a_state->lib_name, pid,
+                (Elf64_Addr)a_state->lib_name);
+  }
+
+  if (a_state->container_name != NULL) {
+    read_string((char **)&a_state->container_name, pid,
+                (Elf64_Addr)a_state->container_name);
+  }
+
+  /* ulp_applied_unit and ulp_applied_patch is not used, so don't read it. But
+     set it to NULL to avoid dangling pointers.  */
+
+  a_state->units = NULL;
+  a_state->deps = NULL;
+
+  a_state->next = read_ulp_applied_patch((Elf64_Addr)a_state->next, pid);
+
+  return a_state;
+}
+
+/** @brief Release ulp_applied_patch object list
+ *
+ * @param p  The ulp_applied_patch linked list object.
+ */
+void
+release_ulp_applied_patch(struct ulp_applied_patch *p)
+{
+  if (p == NULL)
+    return;
+
+  release_ulp_applied_patch(p->next);
+
+  if (p->lib_name)
+    free((void *)p->lib_name);
+  if (p->container_name)
+    free((void *)p->container_name);
+
+  free(p);
+}
+
+/** @brief Read applied patch linked list object from remote process
+ *
+ * The applied patches are maintained in libpulp.so in the __ulp_state object.
+ * Retrieve the patch list there from the remote process.
+ *
+ * @param process Process to read from.
+ *
+ * @return A `ulp_applied_patch` linked list.
+ */
+struct ulp_applied_patch *
+ulp_read_state(struct ulp_process *process)
+{
+  struct ulp_patching_state state;
+  pid_t pid = process->pid;
+
+  if (!process->dynobj_libpulp->state) {
+    WARN("patching state address is NULL.");
+    return NULL;
+  }
+
+  if (read_memory((char *)&state, sizeof(state), pid,
+                  (Elf64_Addr)process->dynobj_libpulp->state)) {
+    WARN("Error reading patches state.");
+    return NULL;
+  }
+
+  return read_ulp_applied_patch((Elf64_Addr)state.patches, pid);
+}

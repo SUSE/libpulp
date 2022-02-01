@@ -27,26 +27,6 @@
 
 #include "ulp_common.h"
 
-/* TODO: check/remove these OLD structures */
-
-struct ulp_applied_patch
-{
-  unsigned char patch_id[32];
-  const char *lib_name;
-  struct ulp_applied_unit *units;
-  struct ulp_applied_patch *next;
-  struct ulp_dependency *deps;
-};
-
-struct ulp_applied_unit
-{
-  void *patched_addr;
-  void *target_addr;
-  char overwritten_bytes[14];
-  char jmp_type;
-  struct ulp_applied_unit *next;
-};
-
 /* ULP Structures */
 struct ulp_detour_root
 {

@@ -152,6 +152,25 @@ build_process_list(void)
   return list;
 }
 
+/** @brief Print all livepatches applied to library.
+ *
+ * @param patch   Patch object.
+ * @param libname Base name of library.
+ */
+void
+print_lib_patches(struct ulp_applied_patch *patch, const char *libname)
+{
+  /* Ensure that the basename was passed.  */
+  libname = get_basename(libname);
+
+  while (patch) {
+    if (!strcmp(libname, patch->lib_name)) {
+      printf("      livepatch: %s\n", patch->container_name);
+    }
+    patch = patch->next;
+  }
+}
+
 /** @brief Prints all the info collected about the processes in `process_list`.
  *
  * @param process_list List of processes.
@@ -166,16 +185,8 @@ print_process_list(struct ulp_process *process_list, int print_buildid)
   process_item = process_list;
   while (process_item) {
     pid_t pid = process_item->pid;
+    struct ulp_applied_patch *patch = ulp_read_state(process_item);
     printf("PID: %d, name: %s\n", pid, get_target_binary_name(pid));
-
-    printf("  Live patches:\n");
-    object_item = process_item->dynobj_patches;
-    if (!object_item)
-      printf("    (none)\n");
-    while (object_item) {
-      printf("    %s\n", object_item->filename);
-      object_item = object_item->next;
-    }
 
     printf("  Loaded libraries:\n");
     object_item = process_item->dynobj_targets;
@@ -188,8 +199,11 @@ print_process_list(struct ulp_process *process_list, int print_buildid)
       else
         printf("    in %s:\n", object_item->filename);
 
+      print_lib_patches(patch, object_item->filename);
+
       object_item = object_item->next;
     }
+    release_ulp_applied_patch(patch);
     process_item = process_item->next;
     printf("\n");
   }
