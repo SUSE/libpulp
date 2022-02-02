@@ -278,8 +278,7 @@ release_ulp_global_metadata(void)
  *
  *  @return The first dynobj in process.
  */
-
-static struct ulp_dynobj *
+struct ulp_dynobj *
 dynobj_first(struct ulp_process *process)
 {
   return process->dynobj_main;
@@ -289,7 +288,7 @@ dynobj_first(struct ulp_process *process)
  *
  *  @return The next dynobj in process.
  */
-static struct ulp_dynobj *
+struct ulp_dynobj *
 dynobj_next(struct ulp_process *process, struct ulp_dynobj *curr_obj)
 {
   if (curr_obj == process->dynobj_main) {
