@@ -163,6 +163,10 @@ int parse_libs_dynobj(struct ulp_process *process);
 struct link_map *parse_lib_dynobj(struct ulp_process *process,
                                   struct link_map *link_map_addr);
 
+struct ulp_dynobj *dynobj_first(struct ulp_process *);
+
+struct ulp_dynobj *dynobj_next(struct ulp_process *, struct ulp_dynobj *);
+
 int initialize_data_structures(struct ulp_process *process);
 
 int hijack_threads(struct ulp_process *process);
