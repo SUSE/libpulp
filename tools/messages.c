@@ -131,7 +131,15 @@ run_messages(struct arguments *arguments)
   ulp_verbose = arguments->verbose;
   ulp_quiet = arguments->quiet;
 
-  target->pid = arguments->pid;
+  if (isnumber(arguments->process_wildcard)) {
+    target->pid = atoi(arguments->process_wildcard);
+  }
+  else {
+    WARN("messages only accepts PID when passing -p.");
+    ret = 1;
+    goto ulp_process_clean;
+  }
+
   ret = initialize_data_structures(target);
   if (ret) {
     WARN("error gathering target process information.");

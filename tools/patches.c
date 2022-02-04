@@ -22,6 +22,7 @@
 #include <argp.h>
 #include <dirent.h>
 #include <errno.h>
+#include <fnmatch.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -125,7 +126,7 @@ insert_target_process(int pid, struct ulp_process **list)
  * Returns said list.
  */
 struct ulp_process *
-build_process_list(void)
+build_process_list(const char *wildcard)
 {
   long int pid;
 
@@ -133,6 +134,13 @@ build_process_list(void)
   struct dirent *subdir;
 
   struct ulp_process *list = NULL;
+
+  if (isnumber(wildcard)) {
+    /* If wildcard is actually a number, then treat it as a PID.  */
+    pid = atoi(wildcard);
+    insert_target_process(pid, &list);
+    return list;
+  }
 
   /* Build a list of all processes that have libpulp.so loaded. */
   slashproc = opendir("/proc");
@@ -145,6 +153,12 @@ build_process_list(void)
     /* Skip non-numeric directories in /proc. */
     if ((pid = strtol(subdir->d_name, NULL, 10)) == 0)
       continue;
+
+    const char *process_name = get_target_binary_name(pid);
+    /* Skip processes that does not match the wildcard. */
+    if (wildcard != NULL && fnmatch(wildcard, process_name, 0) != 0)
+      continue;
+
     /* Add live patchable process. */
     insert_target_process(pid, &list);
   }
@@ -346,12 +360,7 @@ run_patches(struct arguments *arguments)
    * If the PID argument has not been provided, check all live patchable
    * processes; otherwise, just the request process.
    */
-  if (arguments->pid == 0)
-    process_list = build_process_list();
-  else {
-    process_list = NULL;
-    insert_target_process(arguments->pid, &process_list);
-  }
+  process_list = build_process_list(arguments->process_wildcard);
 
   print_process_list(process_list, print_buildid);
   release_ulp_process(process_list);
