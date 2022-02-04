@@ -19,6 +19,7 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -60,7 +61,15 @@ run_check(struct arguments *arguments)
     goto ulp_process_clean;
   }
 
-  target->pid = arguments->pid;
+  if (isnumber(arguments->process_wildcard)) {
+    target->pid = atoi(arguments->process_wildcard);
+  }
+  else {
+    WARN("check does not support process wildcard");
+    ret = -1;
+    goto ulp_process_clean;
+  }
+
   ret = initialize_data_structures(target);
   if (ret) {
     WARN("error gathering target process information.");

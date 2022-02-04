@@ -19,6 +19,7 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <ctype.h>
 #include <linux/limits.h>
 #include <stdio.h>
 #include <string.h>
@@ -113,17 +114,23 @@ get_target_binary_name(int pid)
 {
   static char binary_name[PATH_MAX];
 
-  if (*binary_name == '\0') {
-    char fname[PATH_MAX];
-    char cmdline[PATH_MAX];
+  char fname[PATH_MAX];
+  char cmdline[PATH_MAX];
 
-    snprintf(fname, sizeof(fname), "/proc/%d/cmdline", pid);
-    FILE *fp = fopen(fname, "r");
-    if (fgets(cmdline, sizeof(cmdline), fp) != NULL) {
-      strncpy(binary_name, get_basename(cmdline), PATH_MAX - 1);
+  snprintf(fname, sizeof(fname), "/proc/%d/comm", pid);
+  FILE *fp = fopen(fname, "r");
+  if (fgets(cmdline, sizeof(cmdline), fp) != NULL) {
+    strncpy(binary_name, get_basename(cmdline), PATH_MAX - 1);
+
+    /* Remove any newlines from the string.  */
+    for (int i = 0; i < (PATH_MAX - 1) && binary_name[i] != '\0'; i++) {
+      if (binary_name[i] == '\n') {
+        binary_name[i] = '\0';
+        break;
+      }
     }
-    fclose(fp);
   }
+  fclose(fp);
 
   return binary_name;
 }
@@ -140,4 +147,26 @@ const char *
 get_current_binary_name()
 {
   return get_target_binary_name(getpid());
+}
+
+/** @brief Check if string is actually a number.
+ *
+ * @param str  The string to check.
+ *
+ * @return     True if `str` is a number, False if not.
+ */
+bool
+isnumber(const char *str)
+{
+  int i;
+
+  if (str == NULL || *str == '\0')
+    return false;
+
+  for (i = 0; str[i] != '\0'; i++) {
+    if (!isdigit(str[i]))
+      return false;
+  }
+
+  return true;
 }

@@ -27,7 +27,7 @@ struct ulp_process;
 
 const char *buildid_to_string(const unsigned char[BUILDID_LEN]);
 
-struct ulp_process *build_process_list(void);
+struct ulp_process *build_process_list(const char *wildcard);
 
 int run_patches(struct arguments *);
 

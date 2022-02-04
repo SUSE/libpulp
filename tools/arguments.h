@@ -45,7 +45,7 @@ struct arguments
   const char *livepatch;
   const char *library;
   const char *metadata;
-  pid_t pid;
+  const char *process_wildcard;
   command_t command;
   int retries;
   int quiet;

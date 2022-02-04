@@ -77,7 +77,7 @@ static struct argp_option options[] = {
   { "verbose", 'v', 0, 0, "Produce verbose output", 0 },
   { "quiet", 'q', 0, 0, "Don't produce any output", 0 },
   { 0, 0, 0, 0, "patches, check & trigger commands only:", 0 },
-  { "pid", 'p', "PID", 0, "Target process with PID", 0 },
+  { "process", 'p', "process", 0, "Target process name, wildcard, or PID", 0 },
   { 0, 0, 0, 0, "dump & patches command only:", 0 },
   { "buildid", 'b', 0, 0, "Print the build id", 0 },
   { 0, 0, 0, 0, "trigger command only:", 0 },
@@ -203,8 +203,8 @@ handle_end_of_arguments(const struct argp_state *state)
       break;
 
     case ULP_MESSAGES:
-      if (arguments->pid == 0)
-        argp_error(state, "pid is mandatory in 'messages' comamnd.");
+      if (arguments->process_wildcard == 0)
+        argp_error(state, "process is mandatory in 'messages' command.");
       break;
   }
 }
@@ -225,7 +225,7 @@ parser(int key, char *arg, struct argp_state *state)
       arguments->quiet = 1;
       break;
     case 'p':
-      arguments->pid = atoi(arg);
+      arguments->process_wildcard = arg;
       break;
     case 'b':
       arguments->buildid = 1;

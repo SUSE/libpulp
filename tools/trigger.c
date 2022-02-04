@@ -286,10 +286,11 @@ wildcard_clean:
  *  @return 0 on success, anything else on error.
  */
 static int
-trigger_many_processes(int retries, const char *ulp_folder_path,
-                       const char *library, bool check_stack)
+trigger_many_processes(const char *process_wildcard, int retries,
+                       const char *ulp_folder_path, const char *library,
+                       bool check_stack)
 {
-  struct ulp_process *list = build_process_list();
+  struct ulp_process *list = build_process_list(process_wildcard);
   struct ulp_process *curr_item;
   int ret = 0;
 
@@ -343,8 +344,12 @@ run_trigger(struct arguments *arguments)
   const char *library = arguments->library;
   const char *ulp_folder_path = arguments->args[0];
   int retry = arguments->retries;
-  pid_t pid = arguments->pid;
+  const char *process_wildcard = arguments->process_wildcard;
+  pid_t pid = 0;
   int ret;
+
+  if (isnumber(process_wildcard))
+    pid = atoi(process_wildcard);
 
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
   check_stack = arguments->check_stack;
@@ -353,7 +358,8 @@ run_trigger(struct arguments *arguments)
   if (pid > 0)
     ret = trigger_one_process(pid, retry, livepatch, library, check_stack);
   else {
-    ret = trigger_many_processes(retry, ulp_folder_path, library, check_stack);
+    ret = trigger_many_processes(process_wildcard, retry, ulp_folder_path,
+                                 library, check_stack);
   }
 
   return ret;

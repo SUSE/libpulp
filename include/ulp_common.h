@@ -135,4 +135,6 @@ const char *get_target_binary_name(int);
 
 const char *get_current_binary_name(void);
 
+bool isnumber(const char *str);
+
 #endif
