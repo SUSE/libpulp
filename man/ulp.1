@@ -1,0 +1,485 @@
+.\" libpulp - User-space Livepatching Library
+.\"
+.\" Copyright (C) 2021 SUSE Software Solutions GmbH
+.\"
+.\" This file is part of libpulp.
+.\"
+.\" libpulp is free software; you can redistribute it and/or
+.\" modify it under the terms of the GNU Lesser General Public
+.\" License as published by the Free Software Foundation; either
+.\" version 2.1 of the License, or (at your option) any later version.
+.\"
+.\" libpulp is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+.\" Lesser General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License
+.\" along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
+
+.TH ULP 1 "" "" "Libpulp Tools"
+.SH NAME
+ulp \- Userspace Livepatching Tool
+.SH SYNOPSIS
+.B ulp command
+[SWITCHES]...
+[ARGUMENTS]
+.I file
+.SH INTRODUCTION
+.B ulp
+consists of a set of tools used in the userspace livepatching process. Those
+include querying patch status, libpulp messages, applying and removing patches,
+and checking for livepatch capabilities within a process.
+.TP
+Commands currently supported by ulp are:
+.TP
+.B patches:
+list running programs that have livepatching capabilities loaded, as well the
+libraries that are livepatchable and the list of loaded patches.
+.TP
+.B check:
+check if a certain livepatch (file with .ulp extension) is applied to
+a running process.
+.TP
+.B dump:
+print the content of a livepatch (.ulp file) in human-readable form.
+.TP
+.B packer:
+compile the livepatch descriptor (.dsc file) into a livepatch
+(.ulp file). The later can be used to apply a livepatch to a running process
+using trigger.
+.TP
+.B trigger:
+apply or remove a list of livepatches to a list of running processes.
+.TP
+.B post:
+apply any post-processing needed to livepatch containers (.so files).
+.TP
+.B reverse:
+generate a reverse livepatch (.rev) which can be used to remove one livepatch.
+.TP
+.B messages:
+querry the libpulp internal message queue in a running process. This can be
+used to diagnose livepaching errors that occured internally in the target
+process.
+.TP
+.TP
+Detailed descriptions about how these commands work are provided in the next
+sections.
+
+.\"-------------------------------------------
+
+.SH PATCHES
+
+.TP
+.SH NAME
+ulp patches \- Show active live patches and libraries
+.TP
+.SH SYNOPSIS
+.B ulp patches
+.BR -p wildcard
+.TP
+.SH DESCRIPTION
+.B ulp patches show which libraries are livepatchable and which livepatches
+are loaded in process that matches either
+.I wildcard
+as name or with pid =
+.I wildcard.
+.TP
+.SH OPTIONS
+.TP
+.B -p
+.I wildcard
+Show processes which name matches the wildcard, or with pid = wildcard.
+.TP
+.SH EXIT STATUS
+.TP
+.B ulp patches
+exits 0 on success, anything else on error.
+
+.\"-------------------------------------------
+
+.SH CHECK
+
+.TP
+.SH NAME
+ulp check \- Apply a live patch
+.TP
+.SH SYNOPSIS
+.B ulp check
+[OPTION]...
+.BR -p pid
+.I file
+.TP
+.SH DESCRIPTION
+.B ulp check
+attaches to the target process specified by
+.I pid
+and checks whether the live patch described by the metadata
+.I file
+that it takes as argument has already been applied or not.
+.PP
+Only relevant processes can be inspected with
+.BR ulp check .
+More specifically, the following conditions must be met:
+.TP
+.B Attaching to the Target Process
+Libpulp uses ptrace to attach to target processes, thus only the owner of a
+process (or root) can apply a live patch to it. Moreover, on systems that have
+Linux Security Modules (LSM) enabled, some extra convincing might be required
+(see Ptrace access mode checking in
+.IR ptrace (2)).
+When
+.B ulp check
+is unable to attach to the target process, it exits in error.
+.TP
+.B Runtime support
+Applying a live patch requires functions from libpulp.so, which must have been
+loaded into the address space of the target process. Typically, this is
+accomplished with LD_PRELOAD (see
+.IR libpulp (7)).
+.TP
+.SH FATAL ERRORS
+If a problem happens during the execution of functions from libpulp.so, the
+target process might end up in an inconsistent state. When that happens
+.B ulp check
+exits with error code
+.BR -1 ,
+and the user is advised to kill the process.
+.TP
+.SH OPTIONS
+.TP
+.B -q, --quiet
+Do not produce any output.
+.TP
+.B -v, --verbose
+Produce verbose output.
+.TP
+.B -?, --help
+Display a lengthy usage message.
+.TP
+.B -usage
+Display a brief usage message.
+.TP
+.B -V --version
+Print program version and exit.
+.TP
+.SH BUGS
+.TP
+.B ulp check
+also returns -1 on non-fatal errors.
+.TP
+.SH EXIT STATUS
+.TP
+.B ulp check
+.\" XXX: ulp_check curretly returns -1 on non-fatal errors.
+exits 0 on success, 1 on error, and -1 on fatal errors. A fatal error is an
+indication that the target process should be killed, because it was probably
+left in an inconsistent state.
+
+.\"-------------------------------------------
+
+.SH DUMP
+.TP
+.SH NAME
+ulp dump \- Prints metadata information in human-readable format
+.TP
+.SH SYNOPSIS
+.TP
+.B ulp dump
+.I file
+.TP
+.SH DESCRIPTION
+.TP
+.B ulp dump
+parses the metadata
+.I file
+that it takes as argument, which is in binary format, then prints its content
+to the standard output in human-readable format.
+.PP
+.TP
+.SH EXIT STATUS
+.TP
+.B ulp dump
+exits 0 on success and 1 on error.
+
+.\"-------------------------------------------
+
+.SH PACKER
+.TP
+.SH NAME
+ulp packer \- Create live patch metadata
+.TP
+.SH SYNOPSIS
+.B ulp packer
+[OPTION]...
+.I file_wildcard
+.TP
+.SH DESCRIPTION
+.B ulp packer
+creates a live patch metadata file based on the live patch description
+.I file
+that it takes as argument.
+After parsing the description file,
+.B ulp packer
+validates that the target library and live patch objects referred to exist,
+then produces the metadata file required by live patching tools, such as
+.BR ulp
+.BR trigger (1)
+and
+.BR ulp
+.BR check (1).
+.PP
+The syntax of the description file is described in
+.IR libpulp (7).
+.PP
+By default, the output is written to stdout, but it can be optionally
+redirected to a specified file. See OPTIONS below.
+.TP
+.SH OPTIONS
+.TP
+.B -o, --output=FILENAME
+Instead of printing the results to the standard output, write them to FILENAME.
+.TP
+.B -p, --process=WILDCARD
+Patch any process which name matches the WILDCARD. A single PID is also
+supported by passing WILDCARD=PID of the target process.
+
+.B -l, --livepatch=FILENAME
+Instead of getting the path to the live patch object from the description file,
+use FILENAME.
+.TP
+.B -t, --target=FILENAME
+Instead of getting the path to the target library from the description file,
+use FILENAME.
+.TP
+.B -q, --quiet
+Do not produce any output.
+.TP
+.B -v, --verbose
+Produce verbose output.
+.TP
+.B -?, --help
+Display a lengthy usage message.
+.TP
+.B -usage
+Display a brief usage message.
+.TP
+.B -V --version
+Print program version and exit.
+.TP
+.SH EXIT STATUS
+.B ulp packer
+exits 0 on success and 1 on error.
+
+.\"-------------------------------------------
+
+.SH TRIGGER
+.TP
+.SH NAME
+ulp trigger \- Apply a live patch
+.TP
+.SH SYNOPSIS
+.B ulp trigger
+[OPTION]...
+.BR -p
+.I process_wildcard
+.I file_wildcard
+.TP
+.SH DESCRIPTION
+.B ulp trigger
+attaches to the target process specified by a set of process in
+.I process_wildcard
+or a single process with pid equals to
+.I process_wildcard
+and applies a set of livepatches described by the metadata
+.I file_wildcard
+that it takes as argument.
+After parsing the metadata file, several checks are performed to verify that
+the target process can receive the specified live patch:
+.TP
+.B Target Library
+A live patch replaces functions belonging to a shared library, thus,
+.B ulp trigger
+searches the memory space of the target process for its presence. When the
+library is not present,
+.B ulp trigger
+exits in error.
+.TP
+.B Replacement functions
+The metadata file contains a list of replacement functions, which must be
+present in the live patch object (DSO). If all functions are present, the live
+patching operation can proceed, otherwise
+.B ulp trigger
+exits in error.
+.TP
+.B Attaching to the Target Process
+Libpulp uses ptrace to attach to target processes, thus only the owner of a
+process (or root) can apply a live patch to it. Moreover, on systems that have
+Linux Security Modules (LSM) enabled, some extra convincing might be required
+(see Ptrace access mode checking in
+.IR ptrace (2)).
+When
+.B ulp trigger
+is unable to attach to the target process, it exits in error.
+.TP
+.B Runtime support
+Applying a live patch requires functions from libpulp.so, which must have been
+loaded into the address space of the target process. Typically, this is
+accomplished with LD_PRELOAD (see
+.IR libpulp (7)).
+.TP
+.B Forward progress
+After attaching to the target process with ptrace, Libpulp calls functions from
+libpulp.so. The execution of these functions happens from the context of a
+signal handler, thus
+.I AS-Unsafe
+functions are not allowed (see
+.IR attributes (7)).
+However, Libpulp requires the use of
+.IR malloc (3),
+.IR dlopen (3)
+and
+.IR dlsym (3),
+which are all
+.IR AS-Unsafe .
+In order to avoid deadlocks, libpulp.so checks that these functions are not in
+execution anywhere in the target process, before starting the live patching
+operation.
+.TP
+.SH FATAL ERRORS
+If a problem happens after Libpulp started replacing functions from the target
+process, the process might end up in an inconsistent state. When that happens
+.B ulp trigger
+exits with error code
+.BR -1 ,
+and the user is advised to kill the process.
+.TP
+.SH OPTIONS
+.TP
+.B -r, --retries=N
+To guarantee
+.BR "Forward Progress" ,
+Libpulp first checks whether trying to apply a live patch would cause a
+deadlock in the target process, or if it would be safe to do so. By default,
+.B ulp trigger
+performs this check a single time and exits in error if the check fails.
+However, the state of the relevant locks usually changes very quickly, thus,
+there is a high chance that trying again after a brief moment would allow the
+live patching operation to succeed without risk of deadlock. This option tells
+.B ulp trigger
+to try again
+.I N
+times.
+.TP
+.B -c, --check-stack
+Before applying the live patch to the target process, unwind the stacks of all
+threads and make sure that none of them have library calls in execution. If any
+thread is within the target library,
+.B ulp trigger
+aborts the live patching operation; on the other hand, if no threads are within
+the target library, the live patch can be applied with additional consistency
+guarantees.
+.TP
+.B -q, --quiet
+Do not produce any output.
+.TP
+.B -v, --verbose
+Produce verbose output.
+.TP
+.B -?, --help
+Display a lengthy usage message.
+.TP
+.B -usage
+Display a brief usage message.
+.TP
+.B -V --version
+Print program version and exit.
+.TP
+.SH EXIT STATUS
+.B ulp trigger
+exits 0 on success, 1 on error, and -1 on fatal errors. A fatal error is an
+indication that the target process should be killed, because it was probably
+left in an inconsistent state.
+
+.\"-------------------------------------------
+
+.SH POST
+.TP
+.SH NAME
+ulp post \- Post-process live patchable libraries
+.TP
+.SH SYNOPSIS
+.B ulp post
+.I file
+.TP
+.SH DESCRIPTION
+.B ulp post
+opens the library
+.I file
+passed as argument and replaces one-byte nops with multi-byte nop instructions
+at patchable function entries (see
+.IR gcc (1)).
+.TP
+.SH EXIT STATUS
+.B ulp post
+exits 0 on success, and 1 on error.
+
+.\"-------------------------------------------
+
+.SH REVERSE
+.TP
+.SH NAME
+ulp reverse \- Create live patch metadata
+.TP
+.SH SYNOPSIS
+.TP
+.B ulp reverse
+.I file
+.TP
+.SH DESCRIPTION
+.TP
+.B ulp reverse
+creates a live patch metadata used to revert the effects of the metadata
+.I file
+that it takes as argument.
+Live patch reversal does not require a live patch object file, because it does
+not add new replacement functions; rather, it causes the reverse-patched
+process to fallback to the functions that had been previously replaced. These
+functions are already present in the memory space of the target process.
+.PP
+.TP
+.SH EXIT STATUS
+.TP
+.B ulp reverse
+exits 0 on success and a positive integer on error.
+
+.\"-------------------------------------------
+
+.SH MESSAGES
+.TP
+.SH NAME
+ulp messages \- Querry internal messages from libpulp
+.TP
+.SH SYNOPSIS
+.TP
+.B ulp messages
+-p
+.I pid
+.TP
+.SH DESCRIPTION
+.TP
+.B ulp messages
+print all internal messages from libpulp message queue in process running
+with pid =
+.I pid
+Those messages are useful to debug any problem that may happens when a livepatch
+is applied.
+.TP
+Messages are output to stdout.
+.PP
+.TP
+.SH EXIT STATUS
+.TP
+.B ulp messages
+exits 0 on success, anything else on error.
