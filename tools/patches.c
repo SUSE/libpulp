@@ -28,6 +28,7 @@
 #include <string.h>
 #include <sys/param.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include "arguments.h"
 #include "config.h"
@@ -157,6 +158,11 @@ build_process_list(const char *wildcard)
     const char *process_name = get_target_binary_name(pid);
     /* Skip processes that does not match the wildcard. */
     if (wildcard != NULL && fnmatch(wildcard, process_name, 0) != 0)
+      continue;
+
+    /* If process is the ULP tool itself, skip it.  We cannot livepatch the
+       tool itself.  Gödel and Cantor would not be proud...  */
+    if (pid == getpid())
       continue;
 
     /* Add live patchable process. */
