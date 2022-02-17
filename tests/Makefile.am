@@ -490,6 +490,7 @@ TESTS = \
   revert_and_patch.py \
   process.py \
   process_revert.py \
+  livepatchable.py \
   manyprocesses.py
 
 XFAIL_TESTS = \

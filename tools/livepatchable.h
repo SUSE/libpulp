@@ -1,7 +1,7 @@
 /*
  *  libpulp - User-space Livepatching Library
  *
- *  Copyright (C) 2021 SUSE Software Solutions GmbH
+ *  Copyright (C) 2017-2022 SUSE Software Solutions GmbH
  *
  *  This file is part of libpulp.
  *
@@ -19,15 +19,11 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef POST_H
-#define POST_H
+#ifndef LIVEPATCHABLE_H
+#define LIVEPATCHABLE_H
 
 struct arguments;
-struct Elf_Scn;
-struct Elf;
 
-struct Elf_Scn *find_section_by_name(struct Elf *, const char *name);
+int run_livepatchable(struct arguments *);
 
-int run_post(struct arguments *);
-
-#endif /* POST_H */
+#endif /* LIVEPATCHABLE.H */
