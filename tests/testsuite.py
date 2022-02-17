@@ -40,6 +40,20 @@ testname = os.path.basename(testname[0])
 builddir = os.getcwd()
 ulptool = builddir + '/../tools/ulp'
 
+# Check if certain library is livepatchable.
+def is_library_livepatchable(library):
+  command = [ulptool, "livepatchable", library]
+
+  try:
+    tool = subprocess.run(command, timeout=10, stderr=subprocess.STDOUT)
+  except subprocess.TimeoutExpired:
+    print('ulp tool deadlock');
+    return False
+
+  if tool.returncode == 0:
+    return True
+  return False
+
 # Wrapper around pexpect.spawn that automatically sets userspace livepatching
 # requirements, such as LD_PRELOAD'ing libpulp.so, as well as extends its
 # functionality with live patching operations.

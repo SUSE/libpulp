@@ -42,8 +42,8 @@ static Elf *elf;
  * such section is found. Exits in error if the string table containing
  * sections names is not found.
  */
-static Elf_Scn *
-find_section_by_name(const char *name)
+Elf_Scn *
+find_section_by_name(Elf *elf, const char *name)
 {
   char *str;
   size_t string_table;
@@ -95,9 +95,9 @@ merge_nops_at_addr(Elf64_Addr addr, size_t amount)
   }
 
   /* Use the .symtab if available, otherwise, the .dynsym. */
-  scn = find_section_by_name(".symtab");
+  scn = find_section_by_name(elf, ".symtab");
   if (scn == NULL)
-    scn = find_section_by_name(".dynsym");
+    scn = find_section_by_name(elf, ".dynsym");
   if (scn == NULL)
     return;
   data = elf_getdata(scn, NULL);
@@ -141,7 +141,7 @@ nops_fixup(void)
   Elf64_Shdr *shdr;
   Elf64_Addr addr;
 
-  scn = find_section_by_name("__patchable_function_entries");
+  scn = find_section_by_name(elf, "__patchable_function_entries");
   if (scn == NULL)
     return;
   data = elf_getdata(scn, NULL);
@@ -183,7 +183,7 @@ run_post(struct arguments *arguments)
   assert(elf_flagelf(elf, ELF_C_SET, ELF_F_LAYOUT));
 
   /* Sanity check. */
-  scn = find_section_by_name("__patchable_function_entries");
+  scn = find_section_by_name(elf, "__patchable_function_entries");
   if (scn == NULL)
     errx(EXIT_FAILURE,
          "Section __patchable_function_entries not found.\n"
