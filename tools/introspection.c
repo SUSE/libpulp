@@ -46,6 +46,7 @@
  *   7. Restore the threads of the process with restore_threads();
  */
 
+#include <assert.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -60,8 +61,10 @@
 #include <unistd.h>
 
 #include "config.h"
+#include "elf-extra.h"
 #include "error_common.h"
 #include "introspection.h"
+#include "packer.h"
 #include "ulp_common.h"
 
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
@@ -1300,6 +1303,8 @@ apply_patch(struct ulp_process *process, const char *metadata)
   char full_path[PATH_MAX];
   unsigned full_path_size;
 
+  struct ulp_dynobj *dynobj_libpulp = process->dynobj_libpulp;
+
   DEBUG("beginning live patch application.");
 
   if (!process->all_threads_hijacked) {
@@ -1328,7 +1333,7 @@ apply_patch(struct ulp_process *process, const char *metadata)
 
   thread = process->main_thread;
   context = thread->context;
-  routine = process->dynobj_libpulp->trigger;
+  routine = dynobj_libpulp->trigger;
 
   DEBUG(">>> running libpulp functions within target process...");
   ret = run_and_redirect(thread->tid, &context, routine);
@@ -1459,6 +1464,100 @@ restore_threads(struct ulp_process *process)
   }
 
   return errors;
+}
+
+/** @brief Extract .ulp section from livepatch container .so
+ *
+ * Extract the content of the .ulp section within the livepatch container .so
+ * file into a temporary file, and returns the path to it.
+ *
+ * This function also injects the path to the livepatch container (.so) into
+ * the extracted metadata file.
+ *
+ * Returns a path to temporary file. The string must be free'd.
+ *
+ * @param livepatch  Path to livepatch container (.so)
+ * @param revert     Extract the revert patch instead.
+ *
+ * @return Path to temporary file containing the metadata.
+ * */
+
+char *
+extract_ulp_from_so(const char *livepatch, bool revert)
+{
+  FILE *file;
+  int fd;
+  const char *section = revert ? ".ulp.rev" : ".ulp";
+
+  Elf *elf = load_elf(livepatch, &fd);
+  if (elf == NULL) {
+    WARN("Unable to load elf file: %s", livepatch);
+    return NULL;
+  }
+
+  Elf_Scn *ulp_scn = get_elfscn_by_name(elf, section);
+  if (ulp_scn == NULL) {
+    WARN("Unable to get section .ulp from elf %s", livepatch);
+    unload_elf(&elf, &fd);
+    return NULL;
+  }
+
+  Elf_Data *ulp_data = elf_getdata(ulp_scn, NULL);
+  char *tmp_path = strdup(create_path_to_tmp_file());
+  file = fopen(tmp_path, "wb");
+  if (!file) {
+    WARN("Unable to open temporary file %s: %s", tmp_path, strerror(errno));
+    return NULL;
+  }
+
+  assert(ulp_data->d_buf != NULL && ulp_data->d_size > 0);
+
+  /* Get full path to patch container.  */
+  char *full_path = realpath(livepatch, NULL);
+  uint32_t path_size = strlen(full_path) + 1;
+
+  /* Create buffer large enough to hold the final metadata.  */
+  uint32_t meta_size = ulp_data->d_size + path_size + sizeof(uint32_t);
+  char *final_meta = (char *)malloc(meta_size);
+  char *meta_head = final_meta;
+
+  /* Copy the final metadata into final_meta buffer.  Things works here as
+   * follows:
+   *
+   * 1. Copy the first 1 + 32 bytes containing the patch type and patch id.
+   * 2. Copy the size of the path to the livepatch container file.
+   * 3. Copy the path to the livepatch container file.
+   * 4. Copy the remaining metadata stuff.
+   *
+   * We do it in this way so we don't have to carry the path to the patch
+   * container with the patch. This info can be retrieved from the path to
+   * patch and avoid problems regarding the application running in another path
+   * than the ulp tool.
+   * */
+  memcpy(meta_head, ulp_data->d_buf, 1 + 32);
+  meta_head += 1 + 32;
+  memcpy(meta_head, &path_size, sizeof(uint32_t));
+  meta_head += sizeof(uint32_t);
+  memcpy(meta_head, full_path, path_size);
+  meta_head += path_size;
+  memcpy(meta_head, ulp_data->d_buf + 1 + 32, ulp_data->d_size - (1 + 32));
+
+  if (fwrite(final_meta, sizeof(uint8_t), meta_size, file) != meta_size) {
+    unload_elf(&elf, &fd);
+    remove(tmp_path);
+    free(full_path);
+    free(final_meta);
+    WARN("Error writing to %s: %s", tmp_path, strerror(errno));
+    return NULL;
+  }
+
+  free(full_path);
+  free(final_meta);
+  unload_elf(&elf, &fd);
+  fflush(file);
+  fclose(file);
+
+  return tmp_path;
 }
 
 /* Takes LIVEPATCH as a path to a livepatch metadata file, opens it,
@@ -1648,6 +1747,7 @@ load_patch_info(const char *livepatch)
     prev_dep = dep;
   }
 
+  fclose(file);
   return 0;
 }
 

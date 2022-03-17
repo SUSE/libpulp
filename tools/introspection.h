@@ -185,6 +185,8 @@ int restore_threads(struct ulp_process *process);
 
 int read_global_universe(struct ulp_process *process);
 
+char *extract_ulp_from_so(const char *, bool);
+
 int load_patch_info(const char *livepatch);
 
 int check_patch_sanity();

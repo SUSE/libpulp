@@ -27,7 +27,7 @@ child.expect('Original TLS banner')
 child.expect('Banner changed from thread_func: 0')
 child.expect('Banner changed from thread_func: 1')
 
-child.livepatch('libtls_livepatch1.ulp')
+child.livepatch('.libs/libtls_livepatch1.so')
 
 child.sendline('')
 child.expect('String from live patch',

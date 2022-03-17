@@ -1,7 +1,7 @@
 /*
  *  libpulp - User-space Livepatching Library
  *
- *  Copyright (C) 2017-2021 SUSE Software Solutions GmbH
+ *  Copyright (C) 2019-2022 SUSE Software Solutions GmbH
  *
  *  This file is part of libpulp.
  *
@@ -19,43 +19,20 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef ARGUMENTS_H
-#define ARGUMENTS_H
+#include <gelf.h>
+#include <libelf.h>
+#include <link.h>
 
-#include "config.h"
+/* Extra ELF functions.  */
 
-#define ARGS_MAX 1
+Elf_Scn *get_elfscn_by_name(Elf *elf, const char *name);
 
-typedef enum
-{
-  ULP_NONE,
-  ULP_PATCHES,
-  ULP_CHECK,
-  ULP_DUMP,
-  ULP_PACKER,
-  ULP_TRIGGER,
-  ULP_POST,
-  ULP_REVERSE,
-  ULP_MESSAGES,
-  ULP_LIVEPATCHABLE,
-} command_t;
+Elf_Scn *get_elf_section(Elf *, ElfW(Word) sht_type);
 
-struct arguments
-{
-  const char *args[ARGS_MAX];
-  const char *livepatch;
-  const char *library;
-  const char *metadata;
-  const char *process_wildcard;
-  command_t command;
-  int retries;
-  int quiet;
-  int verbose;
-  int buildid;
-  int revert;
-#if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
-  int check_stack;
-#endif
-};
+Elf *load_elf(const char *path, int *fd);
 
-#endif
+void unload_elf(Elf **, int *fd);
+
+int embed_patch_metadata_into_elf(Elf *elfinput, const char *elf_path,
+                                  const char *metadata,
+                                  const char *section_name);

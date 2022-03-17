@@ -184,6 +184,7 @@ check_LTLIBRARIES += libdozens_livepatch1.la \
                      libparameters_livepatch1.la \
                      libparameters_livepatch2.la \
                      libparameters_livepatch3.la \
+                     libprocess_livepatch1.la \
                      librecursion_livepatch1.la \
                      libblocked_livepatch1.la \
                      libpagecross_livepatch1.la \
@@ -224,6 +225,9 @@ libparameters_livepatch2_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
 libparameters_livepatch3_la_SOURCES = libparameters_livepatch3.c
 libparameters_livepatch3_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
+
+libprocess_livepatch1_la_SOURCES = libprocess_livepatch1.c
+libprocess_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
 librecursion_livepatch1_la_SOURCES = librecursion_livepatch1.c
 librecursion_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
@@ -286,9 +290,6 @@ METADATA = \
   libparameters_livepatch3.dsc \
   libparameters_livepatch3.ulp \
   libparameters_livepatch3.rev \
-  libprocess_livepatch1.dsc \
-  libprocess_livepatch1.ulp \
-  libprocess_livepatch1.rev \
   librecursion_livepatch1.dsc \
   librecursion_livepatch1.ulp \
   librecursion_livepatch1.rev \
@@ -318,7 +319,10 @@ METADATA = \
   libbuildid_livepatch1.rev \
   libmanyprocesses_livepatch1.dsc \
   libmanyprocesses_livepatch1.ulp \
-  libmanyprocesses_livepatch1.rev
+  libmanyprocesses_livepatch1.rev \
+  libprocess_livepatch1.dsc \
+  libprocess_livepatch1.ulp \
+  libprocess_livepatch1.rev
 
 EXTRA_DIST = \
   libdozens_livepatch1.in \
@@ -329,7 +333,6 @@ EXTRA_DIST = \
   libdozens_bsymbolic_livepatch1.in \
   libhundreds_bsymbolic_livepatch1.in \
   libparameters_livepatch1.in \
-  libprocess_livepatch1.in \
   libparameters_livepatch2.in \
   libparameters_livepatch3.in \
   librecursion_livepatch1.in \
@@ -341,7 +344,8 @@ EXTRA_DIST = \
   libaccess_livepatch2.in \
   libtls_livepatch1.in \
   libbuildid_livepatch1.in \
-  libmanyprocesses_livepatch1.in
+  libmanyprocesses_livepatch1.in \
+  libprocess_livepatch1.in
 
 clean-local:
 	rm -f $(METADATA)
@@ -386,6 +390,7 @@ parameters_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 process_SOURCES = process.c
 process_CFLAGS = -fpatchable-function-entry=16,14 $(AM_CFLAGS)
 process_DEPENDENCIES = $(POST_PROCESS)
+process_LDFLAGS = $(AM_LDFLAGS)
 
 syscall_restart_SOURCES = syscall_restart.c
 syscall_restart_LDADD = libparameters.la
@@ -548,8 +553,9 @@ endif
 libbuildid_livepatch1.ulp: libbuildid_livepatch1.dsc $(check_LTLIBRARIES)
 	rm -f $(libbuildid_la_OBJECTS) # Clean up objects
 	$(MAKE) libbuildid.la # Force compile libbuildid.la
-	$(ULP_PACKER) $< -o $@
+	$(ULP_PACKER) $<
 	rm -f $(libbuildid_la_OBJECTS) # Clean up object again
 	$(MAKE) CFLAGS="$(CFLAGS) -DRETVAL=1338" libbuildid.la # Compile new libbuildid.
+	echo Maintained for legacy reasons > $@
 
 libprocess_livepatch1.ulp: process libprocess_livepatch1.dsc
