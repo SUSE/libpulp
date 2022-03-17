@@ -36,7 +36,7 @@ child.sendline('')
 child.expect('1338');
 
 try:
-    child.livepatch('libbuildid_livepatch1.ulp')
+    child.livepatch('.libs/libbuildid_livepatch1.so')
 except subprocess.CalledProcessError:
     errorcode = 0
 

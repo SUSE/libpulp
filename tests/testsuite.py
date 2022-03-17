@@ -233,7 +233,7 @@ class spawn(pexpect.spawn):
   # are optional, are the same that the Trigger tool provides (see its --help
   # output for more information).
   def livepatch(self, filename=None, timeout=10, retries=1,
-                verbose=True, quiet=False, revert_lib=None):
+                verbose=True, quiet=False, revert=False, revert_lib=None):
 
     # Check sanity of command-line arguments
     self.sanity(pid=self.pid)
@@ -241,6 +241,8 @@ class spawn(pexpect.spawn):
 
     # Build command-line from arguments
     command = [ulptool, "trigger", '-p', str(self.pid)]
+    if revert is True:
+      command.append("--revert")
     if revert_lib is not None:
       command.append("--revert-all")
       command.append(revert_lib)
@@ -267,8 +269,10 @@ class spawn(pexpect.spawn):
     # The trigger tool returns 0 on success, so use check_returncode(),
     # which asserts that, and raises CalledProcessError otherwise.
     tool.check_returncode()
-
-    self.print('Live patch applied/reverted successfully.')
+    if revert == True:
+      self.print('Live patch reverted successfully.')
+    else:
+      self.print('Live patch applied successfully.')
 
   # Check if a live patch is already applied. The path to the live patch
   # metadata must be passed through 'filename'. The remaining parameters, which

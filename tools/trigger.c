@@ -70,14 +70,20 @@ static struct
  *  @return 0 on success, anything else on error.
  */
 static int
-trigger_one_process(int pid, int retries, const char *livepatch,
-                    const char *revert_library, bool check_stack)
+trigger_one_process(int pid, int retries, const char *container_path,
+                    const char *revert_library, bool check_stack, bool revert)
 {
+  char *livepatch = NULL;
   struct ulp_process *target = calloc(1, sizeof(struct ulp_process));
   int result;
   int ret;
 
   target->pid = pid;
+
+  /* Extract the livepatch metadata from .so file.  */
+  if (container_path) {
+    livepatch = extract_ulp_from_so(container_path, revert);
+  }
 
   if (livepatch && load_patch_info(livepatch)) {
     WARN("error parsing the metadata file (%s).", livepatch);
@@ -184,6 +190,11 @@ target_clean:
   release_ulp_process(target);
 metadata_clean:
   release_ulp_global_metadata();
+  /* Remove temporary file.  */
+  if (livepatch) {
+    remove(livepatch);
+    free(livepatch);
+  }
   return ret;
 }
 
@@ -203,7 +214,7 @@ metadata_clean:
  */
 static int
 trigger_many_ulps(int pid, int retries, const char *wildcard_path,
-                  const char *library, bool check_stack)
+                  const char *library, bool check_stack, bool revert)
 {
   const char *wildcard = get_basename(wildcard_path);
   char *wildcard_path_dup = strdup(wildcard_path);
@@ -249,8 +260,8 @@ trigger_many_ulps(int pid, int retries, const char *wildcard_path,
       continue;
     }
 
-    if (strcmp(extension, ".ulp") != 0 && strcmp(extension, ".rev") != 0) {
-      /* This is not an ULP or REV file, skip.  */
+    if (strcmp(extension, ".so") != 0) {
+      /* This is not an .so file, skip.  */
       continue;
     }
 
@@ -259,7 +270,8 @@ trigger_many_ulps(int pid, int retries, const char *wildcard_path,
       continue;
     }
 
-    if (trigger_one_process(pid, retries, buffer, library, check_stack) == 0)
+    if (trigger_one_process(pid, retries, buffer, library, check_stack,
+                            revert) == 0)
       globals.trigger_successes++;
     globals.trigger_processes++;
   }
@@ -288,7 +300,7 @@ wildcard_clean:
 static int
 trigger_many_processes(const char *process_wildcard, int retries,
                        const char *ulp_folder_path, const char *library,
-                       bool check_stack)
+                       bool check_stack, bool revert)
 {
   struct ulp_process *list = build_process_list(process_wildcard);
   struct ulp_process *curr_item;
@@ -305,13 +317,13 @@ trigger_many_processes(const char *process_wildcard, int retries,
       /* If a path to ulp files were provided, trigger all files that match the
          wildcard.  */
       r = trigger_many_ulps(curr_item->pid, retries, ulp_folder_path, library,
-                            check_stack);
+                            check_stack, revert);
     }
     else {
       /* No path or wildcard provided.  The user may have requested to
          revert-all.  */
       r = trigger_one_process(curr_item->pid, retries, NULL, library,
-                              check_stack);
+                              check_stack, revert);
       if (r == 0)
         globals.trigger_successes++;
       globals.trigger_processes++;
@@ -345,6 +357,7 @@ run_trigger(struct arguments *arguments)
   const char *ulp_folder_path = arguments->args[0];
   int retry = arguments->retries;
   const char *process_wildcard = arguments->process_wildcard;
+  bool revert = (arguments->revert > 0);
   pid_t pid = 0;
   int ret;
 
@@ -356,10 +369,11 @@ run_trigger(struct arguments *arguments)
 #endif
 
   if (pid > 0)
-    ret = trigger_one_process(pid, retry, livepatch, library, check_stack);
+    ret = trigger_one_process(pid, retry, livepatch, library, check_stack,
+                              revert);
   else {
     ret = trigger_many_processes(process_wildcard, retry, ulp_folder_path,
-                                 library, check_stack);
+                                 library, check_stack, revert);
   }
 
   return ret;

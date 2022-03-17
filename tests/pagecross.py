@@ -28,7 +28,7 @@ child.expect('Waiting for input.')
 child.sendline('')
 child.expect('default');
 
-child.livepatch('libpagecross_livepatch1.ulp')
+child.livepatch('.libs/libpagecross_livepatch1.so')
 
 child.sendline('')
 child.expect('patched', reject='default');

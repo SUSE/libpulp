@@ -32,7 +32,8 @@ noinst_HEADERS = \
   post.h \
   revert.h \
   messages.h \
-  livepatchable.h
+  livepatchable.h \
+  elf-extra.h
 
 ulp_SOURCES = \
   ulp.c \
@@ -47,7 +48,8 @@ ulp_SOURCES = \
   messages.c \
   introspection.c \
   ptrace.c \
-  livepatchable.c
+  livepatchable.c \
+  elf-extra.c
 ulp_LDADD = $(top_builddir)/common/libcommon.la -lelf -ldl $(LIBUNWIND_LIBS)
 
 # Ensure access to the include directory

@@ -42,7 +42,8 @@ extern struct ulp_metadata ulp;
 int
 run_check(struct arguments *arguments)
 {
-  const char *livepatch;
+  const char *container;
+  char *livepatch;
   int ret;
   int check;
   int result;
@@ -53,7 +54,14 @@ run_check(struct arguments *arguments)
   ulp_verbose = arguments->verbose;
   ulp_quiet = arguments->quiet;
 
-  livepatch = arguments->args[0];
+  container = arguments->args[0];
+  livepatch = extract_ulp_from_so(container, false);
+
+  if (!livepatch) {
+    WARN("error extracting .ulp section from %s", container);
+    ret = 1;
+    goto ulp_process_clean;
+  }
 
   if (load_patch_info(livepatch)) {
     WARN("error parsing the metadata file (%s).", livepatch);
@@ -126,6 +134,8 @@ run_check(struct arguments *arguments)
   ret = result;
 
 ulp_process_clean:
+  remove(livepatch);
+  free(livepatch);
   release_ulp_process(target);
   return ret;
 }

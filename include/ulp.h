@@ -67,13 +67,13 @@ int load_so_handlers(struct ulp_metadata *ulp);
 
 int unload_metadata(struct ulp_metadata *ulp);
 
-struct ulp_metadata *load_metadata();
+struct ulp_metadata *load_metadata(int *err);
 
 int parse_metadata(struct ulp_metadata *ulp);
 
 void *load_so(char *obj);
 
-int load_patch();
+int load_patch(void);
 
 int ulp_can_revert_patch(const unsigned char *id);
 

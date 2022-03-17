@@ -19,6 +19,7 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include <err.h>
 #include <fcntl.h>
 #include <gelf.h>
@@ -29,6 +30,9 @@
 #include <string.h>
 
 #include "arguments.h"
+#include "elf-extra.h"
+#include "error_common.h"
+#include "introspection.h"
 #include "packer.h"
 #include "revert.h"
 
@@ -39,7 +43,7 @@ write_reverse_patch(struct ulp_metadata *ulp, const char *filename)
   char type = 2;
   struct ulp_object *obj;
   int c;
-
+#if 0
   if (filename == NULL)
     file = fopen(OUT_REVERSE_NAME, "w");
   else
@@ -48,18 +52,35 @@ write_reverse_patch(struct ulp_metadata *ulp, const char *filename)
     WARN("unable to open output metadata file.");
     return 0;
   };
+#endif
+
+  const char *tmp_path = create_path_to_tmp_file();
+  file = fopen(tmp_path, "w");
+
+  if (!file) {
+    WARN("unable to open output metadata temp file to %s: %s.", tmp_path,
+         strerror(errno));
+    return 0;
+  };
 
   /* Patch type -> 2 means revert-patch */
   fwrite(&type, sizeof(uint8_t), 1, file);
 
   /* Patch id (32b) */
   fwrite(&ulp->patch_id, sizeof(char), 32, file);
+
+  /* Don't write these informations yet.  This will be written when extracting
+     the metadata from the livepatch container.  But keep the code here so that
+     someone reading this code knows that more information will be added into
+     the metadata file.  */
+#if 0
   /* patch .so filename */
-  c = strlen(ulp->so_filename);
+  c = strlen(ulp->so_filename) + 1;
   /* patch .so filename length */
   fwrite(&c, sizeof(uint32_t), 1, file);
   /* patch .so filename */
   fwrite(ulp->so_filename, sizeof(char), c, file);
+#endif
 
   obj = ulp->objs;
   /* object build id length */
@@ -78,6 +99,13 @@ write_reverse_patch(struct ulp_metadata *ulp, const char *filename)
   fwrite(obj->name, sizeof(char), c, file);
 
   fclose(file);
+  if (embed_patch_metadata_into_elf(NULL, filename, tmp_path, ".ulp.rev")) {
+    WARN("Unable to embed patch metadata into %s", filename);
+    remove(tmp_path);
+    return 0;
+  }
+
+  remove(tmp_path);
   return 1;
 }
 
@@ -171,19 +199,29 @@ int
 run_reverse(struct arguments *arguments)
 {
   struct ulp_metadata ulp = { 0 };
-  /* .metadata is passed in .o from packer.  */
-  const char *filename = arguments->metadata;
-  const char *metadata = arguments->args[0];
+  const char *container = arguments->args[0];
+  char *tmp_metadata;
 
-  if (!parse_metadata(metadata, &ulp)) {
+  tmp_metadata = extract_ulp_from_so(container, false);
+  if (!tmp_metadata) {
+    WARN("Unable to extract .ulp section from %s: %s", container,
+         strerror(errno));
+    return 1;
+  }
+
+  if (!parse_metadata(tmp_metadata, &ulp)) {
     WARN("Error parsing ulp metadata.\n");
     return 1;
   }
 
-  if (!write_reverse_patch(&ulp, filename)) {
+  if (!write_reverse_patch(&ulp, container)) {
     WARN("Error gerenating reverse live patch.\n");
+    remove(tmp_metadata);
+    free(tmp_metadata);
     return 2;
   }
   free_metadata(&ulp);
+  remove(tmp_metadata);
+  free(tmp_metadata);
   return 0;
 }

@@ -28,12 +28,12 @@ child.expect('Waiting for input.')
 child.sendline('hundred')
 child.expect('100')
 
-child.livepatch('libhundreds_livepatch1.ulp')
+child.livepatch('.libs/libhundreds_livepatch1.so')
 
 child.sendline('hundred')
 child.expect('200', reject='100')
 
-child.livepatch('libhundreds_livepatch2.ulp')
+child.livepatch('.libs/libhundreds_livepatch2.so')
 
 child.sendline('hundred')
 child.expect('300', reject=['100', '200'])
@@ -43,7 +43,7 @@ child.livepatch(revert_lib="libhundreds.so.0")
 child.sendline('hundred')
 child.expect('100', reject=['200', '300', '400']);
 
-child.livepatch('libhundreds_livepatch3.ulp')
+child.livepatch('.libs/libhundreds_livepatch3.so')
 
 child.sendline('hundred')
 child.expect('400', reject=['100', '200', '300'])

@@ -28,7 +28,7 @@ child.expect('Waiting for input.')
 # After printing the greeting message, the target process makes a call
 # to fgets, which calls the read syscall. Applying a live patch will
 # interrupt the syscall.
-child.livepatch('libparameters_livepatch1.ulp')
+child.livepatch('.libs/libparameters_livepatch1.so')
 
 # Send a newline, which should be received by the read syscall if it has
 # been successfully restarted by libpulp. If the syscall has not been

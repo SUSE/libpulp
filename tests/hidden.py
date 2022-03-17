@@ -28,7 +28,7 @@ child.expect('Waiting for input.')
 child.sendline('dozen')
 child.expect('12');
 
-child.livepatch('libdozens_livepatch99.ulp')
+child.livepatch('.libs/libdozens_livepatch99.so')
 
 child.sendline('dozen')
 child.expect('13', reject='12');

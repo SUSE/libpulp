@@ -1,7 +1,7 @@
 /*
  *  libpulp - User-space Livepatching Library
  *
- *  Copyright (C) 2017-2021 SUSE Software Solutions GmbH
+ *  Copyright (C) 2020-2021 SUSE Software Solutions GmbH
  *
  *  This file is part of libpulp.
  *
@@ -19,43 +19,18 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef ARGUMENTS_H
-#define ARGUMENTS_H
+#include <stdio.h>
 
-#include "config.h"
-
-#define ARGS_MAX 1
-
-typedef enum
+void
+new_int_params(int a, int b, int c, int d, int e, int f, int g, int h)
 {
-  ULP_NONE,
-  ULP_PATCHES,
-  ULP_CHECK,
-  ULP_DUMP,
-  ULP_PACKER,
-  ULP_TRIGGER,
-  ULP_POST,
-  ULP_REVERSE,
-  ULP_MESSAGES,
-  ULP_LIVEPATCHABLE,
-} command_t;
+  printf("%d-%d-%d-%d-%d-%d-%d-%d\n", h, g, f, e, d, c, b, a);
+}
 
-struct arguments
+void
+new_float_params(float a, float b, float c, float d, float e, float f, float g,
+                 float h, float i, float j)
 {
-  const char *args[ARGS_MAX];
-  const char *livepatch;
-  const char *library;
-  const char *metadata;
-  const char *process_wildcard;
-  command_t command;
-  int retries;
-  int quiet;
-  int verbose;
-  int buildid;
-  int revert;
-#if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
-  int check_stack;
-#endif
-};
-
-#endif
+  printf("%.1f-%.1f-%.1f-%.1f-%.1f-%.1f-%.1f-%.1f-%.1f-%.1f\n", j, i, h, g, f,
+         e, d, c, b, a);
+}

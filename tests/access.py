@@ -26,7 +26,7 @@ child = testsuite.spawn(testsuite.testname)
 child.expect('Original banner')
 child.expect('Banner changed from main')
 
-child.livepatch('libaccess_livepatch1.ulp')
+child.livepatch('.libs/libaccess_livepatch1.so')
 
 child.sendline('')
 child.expect('String from live patch',

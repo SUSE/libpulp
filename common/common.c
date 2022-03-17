@@ -22,7 +22,9 @@
 #include <ctype.h>
 #include <linux/limits.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/random.h>
 #include <unistd.h>
 
 #include "error_common.h"
@@ -169,4 +171,38 @@ isnumber(const char *str)
   }
 
   return true;
+}
+
+/** @brief Creates a path to a temporary file.
+ *
+ * This function creates a path to a temporary file. The string returned is not
+ * malloc'ed, so if you want to save the string somewhere you should `strdup`
+ * it.
+ *
+ * @return Path to a temporary file.
+ *
+ */
+const char *
+create_path_to_tmp_file(void)
+{
+  const char *tmp_prefix = "/tmp/ulp-";
+  static char buffer[24];
+  FILE *f;
+
+  /* Loop until we find an unused path.  If we are running multiple packer
+     instances, we could eventually get a clash. */
+  bool conflict = false;
+  do {
+    unsigned token;
+    getrandom(&token, sizeof(unsigned), 0);
+    snprintf(buffer, 24, "%s%u", tmp_prefix, token);
+    f = fopen(buffer, "w");
+    if (f == NULL)
+      conflict = true;
+  }
+  while (conflict);
+
+  fclose(f);
+
+  return buffer;
 }

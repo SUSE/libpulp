@@ -315,7 +315,7 @@ load_metadata(int *err)
 }
 
 int
-read_data(int from, void *to, size_t count)
+read_data(int from, void *to, size_t count, int line)
 {
   size_t done;
   ssize_t ret;
@@ -341,7 +341,7 @@ read_data(int from, void *to, size_t count)
     }
   }
   if (done != count) {
-    MSGQ_WARN("Not enough data to read()");
+    MSGQ_WARN("line %d: Not enough data to read()", line);
     return 1;
   }
 
@@ -413,7 +413,7 @@ parse_metadata(struct ulp_metadata *ulp)
   ulp->objs = NULL;
 
 #define READ(from, to, count) \
-  if (read_data(from, to, count)) \
+  if (read_data(from, to, count, __LINE__)) \
     return EUNKNOWN;
 
   /* read metadata header information */

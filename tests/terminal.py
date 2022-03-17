@@ -53,7 +53,7 @@ for i in range(32):
   # its parent (terminal.c), thus, child.is_patch_applied and
   # child.livepatch cannot be used.
   ret = subprocess.run([ulptool, '-q', '-p', pid, "check",
-      'libblocked_livepatch1.ulp'])
+      '.libs/libblocked_livepatch1.so'])
   # The Check tool returns 0 when the given live patch has not been
   # applied, which is the expected output here. Anything else is treated
   # as a hard error (99), because detecting errors in the Check tool

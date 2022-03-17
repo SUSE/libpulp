@@ -19,6 +19,7 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include <err.h>
 #include <fcntl.h>
 #include <gelf.h>
@@ -27,9 +28,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "arguments.h"
 #include "config.h"
+#include "elf-extra.h"
 #include "introspection.h"
 #include "md4.h"
 #include "packer.h"
@@ -73,64 +76,6 @@ free_metadata(struct ulp_metadata *ulp)
   }
 }
 
-void
-unload_elf(Elf **elf, int *fd)
-{
-  if (*fd > 0)
-    close(*fd);
-  if (elf)
-    elf_end(*elf);
-  *fd = 0;
-  *elf = NULL;
-}
-
-Elf *
-load_elf(const char *obj, int *fd)
-{
-  Elf *elf;
-
-  *fd = open(obj, O_RDONLY);
-  if (*fd == -1) {
-    WARN("error opening %s: %s", obj, strerror(errno));
-    return NULL;
-  }
-
-  elf = elf_begin(*fd, ELF_C_READ, NULL);
-  if (!elf) {
-    WARN("error invoking elf_begin()");
-    close(*fd);
-    return NULL;
-  }
-  return elf;
-}
-
-static Elf_Scn *
-get_elf_section(Elf *elf, ElfW(Word) sht_type)
-{
-  size_t i, nsecs;
-  Elf_Scn *s;
-  GElf_Shdr sh;
-
-  if (elf_getshdrnum(elf, &nsecs)) {
-    WARN("error invoking elf_getshdrnum()");
-    return NULL;
-  }
-
-  for (i = 0; i < nsecs; i++) {
-    s = elf_getscn(elf, i);
-    if (!s) {
-      WARN("error invoking elf_getscn()");
-      return NULL;
-    }
-    gelf_getshdr(s, &sh);
-
-    if (sh.sh_type == sht_type) {
-      return s;
-    }
-  }
-  return NULL;
-}
-
 Elf_Scn *
 get_dynsym(Elf *elf)
 {
@@ -146,30 +91,7 @@ get_symtab(Elf *elf)
 Elf_Scn *
 get_build_id_note(Elf *elf)
 {
-  size_t i, nsecs, shstrndx;
-  Elf_Scn *s;
-  GElf_Shdr sh;
-  char *sec_name;
-
-  if (elf_getshdrnum(elf, &nsecs)) {
-    err(1, "Error invoking elf_getshdrnum()");
-  }
-
-  for (i = 0; i < nsecs; i++) {
-    s = elf_getscn(elf, i);
-    if (!s) {
-      err(1, "Error invoking elf_getscn()");
-    }
-    gelf_getshdr(s, &sh);
-
-    if (sh.sh_type == SHT_NOTE) {
-      elf_getshdrstrndx(elf, &shstrndx);
-      sec_name = elf_strptr(elf, shstrndx, sh.sh_name);
-      if (strcmp(sec_name, ".note.gnu.build-id") == 0)
-        return s;
-    }
-  }
-  return NULL;
+  return get_elfscn_by_name(elf, ".note.gnu.build-id");
 }
 
 int
@@ -315,7 +237,7 @@ create_patch_metadata_file(struct ulp_metadata *ulp, const char *filename)
   else
     file = fopen(filename, "w");
   if (!file) {
-    WARN("unable to open output metadata file.");
+    WARN("unable to open output metadata file: %s", strerror(errno));
     return 0;
   };
 
@@ -324,11 +246,18 @@ create_patch_metadata_file(struct ulp_metadata *ulp, const char *filename)
 
   /* Patch id (first 32b) */
   fwrite(ulp->patch_id, sizeof(char), 32, file);
+
+  /* Don't write these informations yet.  This will be written when extracting
+     the metadata from the livepatch container.  But keep the code here so that
+     someone reading this code knows that more information will be added into
+     the metadata file.  */
+#if 0
   c = strlen(ulp->so_filename) + 1;
   /* patch .so filename length */
   fwrite(&c, sizeof(uint32_t), 1, file);
   /* patch .so filename */
   fwrite(ulp->so_filename, sizeof(char), c, file);
+#endif
 
   obj = ulp->objs;
   /* object build id length */
@@ -877,12 +806,22 @@ run_packer(struct arguments *arguments)
     goto main_error;
   }
 
-  if (!create_patch_metadata_file(&ulp, arguments->metadata))
+  const char *tmp_path = create_path_to_tmp_file();
+
+  if (!create_patch_metadata_file(&ulp, tmp_path))
     goto main_error;
 
+  if (embed_patch_metadata_into_elf(NULL, arguments->livepatch, tmp_path,
+                                    ".ulp"))
+    goto tmpfile_clean;
+
+  remove(tmp_path);
   free_metadata(&ulp);
-  WARN("metadata file generated successfully.");
+  WARN("metadata embedded into libepatch container.");
   return 0;
+
+tmpfile_clean:
+  remove(tmp_path);
 
 main_error:
   free_metadata(&ulp);

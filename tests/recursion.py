@@ -28,7 +28,7 @@ child.expect('Waiting for input.')
 child.sendline('45')
 child.expect('1134903170');
 
-child.livepatch('librecursion_livepatch1.ulp')
+child.livepatch('.libs/librecursion_livepatch1.so')
 
 child.sendline('45')
 child.expect('2537720636', reject='1134903170');

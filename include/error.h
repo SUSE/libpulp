@@ -53,7 +53,7 @@ void libpulp_assert_func(const char *file, const char *func, int line,
 /** @brief Macro which passes the current file, function and line number for
  * logging.  */
 #define libpulp_assert(expr) \
-  libpulp_assert_func(__FILE__, __func__, __LINE__, (unsigned long)expr)
+  libpulp_assert_func(__FILE__, __func__, __LINE__, (unsigned long)(expr))
 
 /** @brief Libpulp's version of `errx`
  *

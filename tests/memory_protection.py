@@ -29,7 +29,7 @@ child.expect('Waiting for input.')
 child.sendline('')
 child.expect('pristine');
 
-child.livepatch('libaddress_livepatch1.ulp')
+child.livepatch('.libs/libaddress_livepatch1.so')
 
 # Try to touch code memory after live patching
 child.sendline('')

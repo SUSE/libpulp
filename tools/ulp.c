@@ -73,6 +73,7 @@ static const char doc[] =
 
 /* switches that don't have a shorthand.  */
 #define ULP_OP_REVERT_ALL 256
+#define ULP_OP_REVERT 257
 
 static struct argp_option options[] = {
   { 0, 0, 0, 0, "Options:", 0 },
@@ -89,6 +90,9 @@ static struct argp_option options[] = {
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
   { "check-stack", 'c', 0, 0, "Check the call stack before live patching", 0 },
 #endif
+  { 0, 0, 0, 0, "trigger & dump commands only:", 0 },
+  { "revert", ULP_OP_REVERT, 0, 0,
+    "revert livepatch / dump reverse patch info.", 0 },
   { 0, 0, 0, 0, "packer & reverse commands only:", 0 },
   { "output", 'o', "FILE", 0, "Write output to FILE", 0 },
   { 0, 0, 0, 0, "packer command only:", 0 },
@@ -172,6 +176,10 @@ handle_end_of_arguments(const struct argp_state *state)
     case ULP_TRIGGER:
       if (arguments->library) {
         /* revert-all was passed to trigger.  */
+        if (arguments->revert)
+          argp_error(state,
+                     "--revert and --revert-all can not be used together.");
+
         if (state->arg_num < 1)
           argp_error(state, "Too few arguments.");
 
@@ -260,6 +268,9 @@ parser(int key, char *arg, struct argp_state *state)
       break;
     case ULP_OP_REVERT_ALL:
       arguments->library = get_basename(arg);
+      break;
+    case ULP_OP_REVERT:
+      arguments->revert = 1;
       break;
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
     case 'c':

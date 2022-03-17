@@ -25,10 +25,10 @@ child = testsuite.spawn('redzone', timeout=50)
 
 child.expect('Waiting for input.')
 
-child.livepatch('libblocked_livepatch1.ulp')
+child.livepatch('.libs/libblocked_livepatch1.so')
 
 # Check live patch, which should not touch the redzone
-child.is_patch_applied('libblocked_livepatch1.ulp')
+child.is_patch_applied('.libs/libblocked_livepatch1.so')
 
 # Read error output, if any
 child.readline()

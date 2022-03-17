@@ -19,11 +19,11 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdbool.h>
-#include <stdint.h>
-
 #ifndef _ULP_LIB_COMMON_
 #define _ULP_LIB_COMMON_
+
+#include <stdbool.h>
+#include <stdint.h>
 
 #define OUT_PATCH_NAME "metadata.ulp"
 #define OUT_REVERSE_NAME "reverse.ulp"
@@ -136,5 +136,7 @@ const char *get_target_binary_name(int);
 const char *get_current_binary_name(void);
 
 bool isnumber(const char *str);
+
+const char *create_path_to_tmp_file(void);
 
 #endif

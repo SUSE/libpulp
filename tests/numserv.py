@@ -37,9 +37,9 @@ child.sendline('hundred')
 child.expect('100');
 
 if not bsymbolic:
-  child.livepatch('libdozens_livepatch1.ulp')
+  child.livepatch('.libs/libdozens_livepatch1.so')
 else:
-  child.livepatch('libdozens_bsymbolic_livepatch1.ulp')
+  child.livepatch('.libs/libdozens_bsymbolic_livepatch1.so')
 
 child.sendline('dozen')
 child.expect('13', reject='12');
@@ -48,9 +48,9 @@ child.sendline('hundred')
 child.expect('100');
 
 if not bsymbolic:
-  child.livepatch('libhundreds_livepatch1.ulp')
+  child.livepatch('.libs/libhundreds_livepatch1.so')
 else:
-  child.livepatch('libhundreds_bsymbolic_livepatch1.ulp')
+  child.livepatch('.libs/libhundreds_bsymbolic_livepatch1.so')
 
 child.sendline('dozen')
 child.expect('13', reject='12');
