@@ -77,19 +77,19 @@ write_byte(char byte, int pid, Elf64_Addr addr)
  * Returns 0 if the operation succeeds; 1 otherwise.
  */
 int
-write_string(const char *buffer, int pid, Elf64_Addr addr, int length)
+write_string(const char *buffer, int pid, Elf64_Addr addr, int size)
 {
   int i;
 
   /* Invalidate tlb because we are commiting changes to memory.  */
   tlb = 0;
 
-  for (i = 0; i < length && buffer[i] != '\0'; i++) {
+  for (i = 0; i < size && buffer[i] != '\0'; i++) {
     if (write_byte(buffer[i], pid, addr + i))
       return 1;
   }
 
-  if (i < length)
+  if (i < size)
     if (write_byte('\0', pid, addr + i))
       return 1;
 

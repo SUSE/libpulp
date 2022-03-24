@@ -25,13 +25,13 @@ child = testsuite.spawn('recursion', timeout=60)
 
 child.expect('Waiting for input.')
 
-child.sendline('45')
-child.expect('1134903170');
+child.sendline('40')
+child.expect('102334155');
 
 child.livepatch('.libs/librecursion_livepatch1.so')
 
-child.sendline('45')
-child.expect('2537720636', reject='1134903170');
+child.sendline('40')
+child.expect('228826127', reject='102334155');
 
 child.close(force=True)
 exit(0)
