@@ -30,6 +30,9 @@
 
 #define WARN(format, ...) fprintf(stderr, "ulp: " format "\n", ##__VA_ARGS__)
 
+/* Use a 512kb buffer for metadata.  This should be enough for most case
+ * scenarios.  */
+#define ULP_METADATA_BUF_LEN (512 * 1024)
 #define ULP_PATH_LEN 256
 #define RED_ZONE_LEN 128
 

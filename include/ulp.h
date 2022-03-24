@@ -54,8 +54,6 @@ int __ulp_apply_patch();
 
 void __ulp_print();
 
-void *__ulp_get_path_buffer_addr();
-
 /* functions */
 void free_metadata(struct ulp_metadata *ulp);
 

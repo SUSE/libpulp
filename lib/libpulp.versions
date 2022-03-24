@@ -21,11 +21,11 @@
     dlinfo;
     __ulp_revert_all;
     __ulp_trigger;
-    __ulp_path_buffer;
     __ulp_check_patched;
     __ulp_state;
     __ulp_get_global_universe;
     __ulp_msg_queue;
+    __ulp_metadata_buffer;
   local:
     *;
 };

@@ -938,24 +938,25 @@ parse_lib_dynobj(struct ulp_process *process, struct link_map *link_map_addr)
   /* Only libpulp.so should have those symbols exported.  */
   if (strstr(libname, "libpulp.so")) {
     obj->trigger = get_loaded_symbol_addr(obj, pid, "__ulp_trigger");
-    obj->path_buffer = get_loaded_symbol_addr(obj, pid, "__ulp_path_buffer");
     obj->check = get_loaded_symbol_addr(obj, pid, "__ulp_check_patched");
     obj->state = get_loaded_symbol_addr(obj, pid, "__ulp_state");
     obj->global =
         get_loaded_symbol_addr(obj, pid, "__ulp_get_global_universe");
     obj->msg_queue = get_loaded_symbol_addr(obj, pid, "__ulp_msg_queue");
     obj->revert_all = get_loaded_symbol_addr(obj, pid, "__ulp_revert_all");
+    obj->metadata_buffer =
+        get_loaded_symbol_addr(obj, pid, "__ulp_metadata_buffer");
 
     /* libpulp must expose all these symbols. */
-    if (obj->trigger && obj->path_buffer && obj->check && obj->state &&
-        obj->global && obj->revert_all) {
+    if (obj->trigger && obj->check && obj->state && obj->global &&
+        obj->revert_all && obj->metadata_buffer) {
       obj->next = NULL;
       process->dynobj_libpulp = obj;
       DEBUG("(libpulp found)");
     }
     /* No other library should expose these symbols. */
-    else if (obj->trigger || obj->path_buffer || obj->check || obj->state ||
-             obj->global || obj->revert_all)
+    else if (obj->trigger || obj->check || obj->state || obj->global ||
+             obj->revert_all || obj->metadata_buffer)
       WARN("unexpected subset of libpulp symbols exposed by %s.", libname);
   }
 
@@ -1046,7 +1047,7 @@ set_id_buffer(struct ulp_process *process, unsigned char *patch_id)
   }
 
   thread = process->main_thread;
-  path_addr = process->dynobj_libpulp->path_buffer;
+  path_addr = process->dynobj_libpulp->metadata_buffer;
 
   for (i = 0; i < 32; i++) {
     if (write_byte(patch_id[i], thread->tid, path_addr + i)) {
@@ -1058,17 +1059,11 @@ set_id_buffer(struct ulp_process *process, unsigned char *patch_id)
   return 0;
 }
 
-/*
- * Writes PATH into libpulp's '__ulp_path_buffer'. This operation is a
- * pre-condition to apply a new live patch. On success, returns 0.
- */
 int
-set_path_buffer(struct ulp_process *process, const char *path)
+set_string_buffer(struct ulp_process *process, const char *string)
 {
   struct ulp_thread *thread;
   Elf64_Addr path_addr;
-
-  DEBUG("advertising live patch location to libpulp.");
 
   if (!process->all_threads_hijacked) {
     WARN("not all threads hijacked.");
@@ -1076,18 +1071,72 @@ set_path_buffer(struct ulp_process *process, const char *path)
   }
 
   thread = process->main_thread;
-  path_addr = process->dynobj_libpulp->path_buffer;
+  path_addr = process->dynobj_libpulp->metadata_buffer;
 
-  if (write_string(path, thread->tid, path_addr, ULP_PATH_LEN))
-    return 1;
+  if (write_string(string, thread->tid, path_addr, strlen(string))) {
+    WARN("Unable to write string in __ulp_metadata_buffer");
+    return ETARGETHOOK;
+  }
 
   return 0;
+}
+
+/** @brief Writes the metadata into libpulp's '__ulp_metadata_buffer'.
+ *
+ * This operation is a pre-condition to apply a new live patch.
+ *
+ * @param process   ulp_process object.
+ * @param metadata  path to metadata file.
+ * @return 0 on success, anything else on failure.
+ */
+int
+set_metadata_buffer(struct ulp_process *process, const char *metadata)
+{
+  FILE *file;
+  static char buf[ULP_METADATA_BUF_LEN];
+  long file_size;
+  long n, i;
+
+  struct ulp_thread *thread;
+  Elf64_Addr metadata_addr;
+
+  file = fopen(metadata, "rb");
+  if (!file) {
+    return ENOENT;
+  }
+
+  /* Get file size.  */
+  fseek(file, 0, SEEK_END);
+  file_size = ftell(file);
+  fseek(file, 0, SEEK_SET);
+
+  if (file_size >= ULP_METADATA_BUF_LEN) {
+    WARN("Metadata content too large.");
+    fclose(file);
+    return EOVERFLOW;
+  }
+
+  n = fread(buf, sizeof(char), file_size, file);
+
+  /* Ensure that we read the entire file.  */
+  assert(n == file_size);
+
+  thread = process->main_thread;
+  metadata_addr = process->dynobj_libpulp->metadata_buffer;
+
+  for (i = 0; i < n; i++) {
+    if (write_byte(buf[i], thread->tid, metadata_addr + i)) {
+      return EUNKNOWN;
+    }
+  }
+
+  return ENONE;
 }
 
 /*
  * Attaches to all threads in PROCESS, which causes them to stop. After
  * that, other introspection routines, such as set_id_buffer() and
- * set_path_buffer(), can be used. On success, returns 0. If anything
+ * set_metadata_buffer(), can be used. On success, returns 0. If anything
  * goes wrong during hijacking, try to restore the original state of the
  * program; if that succeeds, return 1, and -1 otherwise.
  *
@@ -1300,9 +1349,6 @@ apply_patch(struct ulp_process *process, const char *metadata)
   struct user_regs_struct context;
   ElfW(Addr) routine;
 
-  char full_path[PATH_MAX];
-  unsigned full_path_size;
-
   struct ulp_dynobj *dynobj_libpulp = process->dynobj_libpulp;
 
   DEBUG("beginning live patch application.");
@@ -1312,21 +1358,7 @@ apply_patch(struct ulp_process *process, const char *metadata)
     return EUNKNOWN;
   }
 
-  /* The target program can be running in other directory where CWD is,
-     therefore it is a good idea to pass the full path to the metadata
-     info to avoid potential problems.  */
-  if (!realpath(metadata, full_path)) {
-    WARN("unable to retrieve full path to %s", metadata);
-    return errno;
-  }
-
-  full_path_size = strlen(full_path) + 1; /* Include '\0'.  */
-  if (full_path_size >= ULP_PATH_LEN) {
-    WARN("full path to metadata file is too large");
-    return EINVAL;
-  }
-
-  if (set_path_buffer(process, full_path)) {
+  if (set_metadata_buffer(process, metadata)) {
     WARN("unable to write live patch path into target process memory.");
     return ETARGETHOOK;
   }
@@ -1373,7 +1405,7 @@ revert_patches_from_lib(struct ulp_process *process, const char *lib_name)
     return EUNKNOWN;
   }
 
-  if (set_path_buffer(process, lib_name)) {
+  if (set_string_buffer(process, lib_name)) {
     WARN("unable to write library name into target process memory.");
     return ETARGETHOOK;
   }
