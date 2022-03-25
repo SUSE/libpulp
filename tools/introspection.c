@@ -1086,46 +1086,29 @@ set_string_buffer(struct ulp_process *process, const char *string)
  * This operation is a pre-condition to apply a new live patch.
  *
  * @param process   ulp_process object.
- * @param metadata  path to metadata file.
+ * @param metadata  buffer containing metadata.
+ * @param size      size of the metadata.
  * @return 0 on success, anything else on failure.
  */
-int
-set_metadata_buffer(struct ulp_process *process, const char *metadata)
+static int
+set_metadata_buffer(struct ulp_process *process, void *metadata, size_t size)
 {
-  FILE *file;
-  static char buf[ULP_METADATA_BUF_LEN];
-  long file_size;
-  long n, i;
+  size_t i;
+  char *cmetadata = metadata;
 
   struct ulp_thread *thread;
   Elf64_Addr metadata_addr;
 
-  file = fopen(metadata, "rb");
-  if (!file) {
-    return ENOENT;
-  }
-
-  /* Get file size.  */
-  fseek(file, 0, SEEK_END);
-  file_size = ftell(file);
-  fseek(file, 0, SEEK_SET);
-
-  if (file_size >= ULP_METADATA_BUF_LEN) {
+  if (size >= ULP_METADATA_BUF_LEN) {
     WARN("Metadata content too large.");
-    fclose(file);
     return EOVERFLOW;
   }
-
-  n = fread(buf, sizeof(char), file_size, file);
-
-  /* Ensure that we read the entire file.  */
-  assert(n == file_size);
 
   thread = process->main_thread;
   metadata_addr = process->dynobj_libpulp->metadata_buffer;
 
-  for (i = 0; i < n; i++) {
-    if (write_byte(buf[i], thread->tid, metadata_addr + i)) {
+  for (i = 0; i < size; i++) {
+    if (write_byte(cmetadata[i], thread->tid, metadata_addr + i)) {
       return EUNKNOWN;
     }
   }
@@ -1342,7 +1325,7 @@ patch_applied(struct ulp_process *process, unsigned char *id, int *result)
  * called after successful thread hijacking.
  */
 int
-apply_patch(struct ulp_process *process, const char *metadata)
+apply_patch(struct ulp_process *process, void *metadata, size_t metadata_size)
 {
   int ret;
   struct ulp_thread *thread;
@@ -1358,7 +1341,7 @@ apply_patch(struct ulp_process *process, const char *metadata)
     return EUNKNOWN;
   }
 
-  if (set_metadata_buffer(process, metadata)) {
+  if (set_metadata_buffer(process, metadata, metadata_size)) {
     WARN("unable to write live patch path into target process memory.");
     return ETARGETHOOK;
   }
@@ -1501,47 +1484,40 @@ restore_threads(struct ulp_process *process)
 /** @brief Extract .ulp section from livepatch container .so
  *
  * Extract the content of the .ulp section within the livepatch container .so
- * file into a temporary file, and returns the path to it.
+ * file into a buffer passed by reference through `out`, and returns the size
+ * of it.
  *
  * This function also injects the path to the livepatch container (.so) into
  * the extracted metadata file.
  *
- * Returns a path to temporary file. The string must be free'd.
- *
  * @param livepatch  Path to livepatch container (.so)
  * @param revert     Extract the revert patch instead.
+ * @param out        Buffer containing the .ulp section, passed by reference.
  *
- * @return Path to temporary file containing the metadata.
+ * @return Size of the metadata content.
  * */
-
-char *
-extract_ulp_from_so(const char *livepatch, bool revert)
+size_t
+extract_ulp_from_so_to_mem(const char *livepatch, bool revert, char **out)
 {
-  FILE *file;
   int fd;
   const char *section = revert ? ".ulp.rev" : ".ulp";
 
   Elf *elf = load_elf(livepatch, &fd);
   if (elf == NULL) {
     WARN("Unable to load elf file: %s", livepatch);
-    return NULL;
+    *out = NULL;
+    return 0;
   }
 
   Elf_Scn *ulp_scn = get_elfscn_by_name(elf, section);
   if (ulp_scn == NULL) {
     WARN("Unable to get section .ulp from elf %s", livepatch);
     unload_elf(&elf, &fd);
-    return NULL;
+    *out = NULL;
+    return 0;
   }
 
   Elf_Data *ulp_data = elf_getdata(ulp_scn, NULL);
-  char *tmp_path = strdup(create_path_to_tmp_file());
-  file = fopen(tmp_path, "wb");
-  if (!file) {
-    WARN("Unable to open temporary file %s: %s", tmp_path, strerror(errno));
-    return NULL;
-  }
-
   assert(ulp_data->d_buf != NULL && ulp_data->d_size > 0);
 
   /* Get full path to patch container.  */
@@ -1550,6 +1526,11 @@ extract_ulp_from_so(const char *livepatch, bool revert)
 
   /* Create buffer large enough to hold the final metadata.  */
   uint32_t meta_size = ulp_data->d_size + path_size + sizeof(uint32_t);
+  if (meta_size >= ULP_METADATA_BUF_LEN) {
+    WARN("metadata content is too large: has %u bytes, expected less than %u.",
+         meta_size, ULP_METADATA_BUF_LEN);
+    return EOVERFLOW;
+  }
   char *final_meta = (char *)malloc(meta_size);
   char *meta_head = final_meta;
 
@@ -1574,22 +1555,273 @@ extract_ulp_from_so(const char *livepatch, bool revert)
   meta_head += path_size;
   memcpy(meta_head, ulp_data->d_buf + 1 + 32, ulp_data->d_size - (1 + 32));
 
-  if (fwrite(final_meta, sizeof(uint8_t), meta_size, file) != meta_size) {
-    unload_elf(&elf, &fd);
+  free(full_path);
+  unload_elf(&elf, &fd);
+
+  *out = final_meta;
+  return meta_size;
+}
+
+/** @brief Extract .ulp section from livepatch container .so
+ *
+ * Extract the content of the .ulp section within the livepatch container .so
+ * file into a temporary file, and returns the path to it.
+ *
+ * This function also injects the path to the livepatch container (.so) into
+ * the extracted metadata file.
+ *
+ * Returns a path to temporary file. The string must be free'd.
+ *
+ * @param livepatch  Path to livepatch container (.so)
+ * @param revert     Extract the revert patch instead.
+ *
+ * @return Path to temporary file containing the metadata.
+ * */
+char *
+extract_ulp_from_so_to_disk(const char *livepatch, bool revert)
+{
+  FILE *file;
+  char *buf;
+  size_t meta_size;
+
+  meta_size = extract_ulp_from_so_to_mem(livepatch, revert, &buf);
+
+  if (meta_size == 0 || buf == NULL) {
+    return NULL;
+  }
+
+  char *tmp_path = strdup(create_path_to_tmp_file());
+  file = fopen(tmp_path, "wb");
+  if (!file) {
+    free(tmp_path);
+    WARN("Unable to open temporary file %s: %s", tmp_path, strerror(errno));
+    return NULL;
+  }
+
+  if (fwrite(buf, sizeof(uint8_t), meta_size, file) != meta_size) {
     remove(tmp_path);
-    free(full_path);
-    free(final_meta);
+    fclose(file);
+    free(buf);
+    free(tmp_path);
     WARN("Error writing to %s: %s", tmp_path, strerror(errno));
     return NULL;
   }
 
-  free(full_path);
-  free(final_meta);
-  unload_elf(&elf, &fd);
+  free(buf);
   fflush(file);
   fclose(file);
 
   return tmp_path;
+}
+
+/** Used to keep track of how many bytes we have consumed.  We cannot surpass
+ *  ULP_METADATA_BUF_LEN.  */
+static long cur;
+static long meta_len;
+static long __attribute__((noinline))
+read_from_mem(void *to, size_t size, long count, void *from)
+{
+#define REMAINING_BUF(x) (meta_len - x)
+
+  char *cfrom = from;
+  long final_cnt = count * size;
+
+  if (final_cnt > REMAINING_BUF(cur))
+    final_cnt = REMAINING_BUF(cur);
+
+  memcpy(to, cfrom + cur, final_cnt);
+  cur += final_cnt;
+
+  return count;
+
+#undef REMAINING_BUF
+}
+
+int
+load_patch_info_from_mem(void *src, size_t size)
+{
+  meta_len = size;
+  cur = 0;
+
+  uint32_t c;
+  uint32_t i, j;
+  struct ulp_object *obj;
+  struct ulp_unit *unit, *prev_unit = NULL;
+  struct ulp_dependency *dep, *prev_dep = NULL;
+
+  DEBUG("reading live patch metadata from memory");
+
+  /* read metadata header information */
+  ulp.objs = NULL;
+
+  if (read_from_mem(&ulp.type, sizeof(uint8_t), 1, src) < 1) {
+    WARN("Unable to read patch type.");
+    return EINVALIDULP;
+  }
+
+  if (read_from_mem(&ulp.patch_id, sizeof(char), 32, src) < 32) {
+    WARN("Unable to read patch id.");
+    return EINVALIDULP;
+  }
+
+  if (read_from_mem(&c, sizeof(uint32_t), 1, src) < 1) {
+    WARN("Unable to read so filename length.");
+    return EINVALIDULP;
+  }
+
+  ulp.so_filename = calloc(c + 1, sizeof(char));
+  if (!ulp.so_filename) {
+    WARN("Unable to allocate so filename buffer.");
+    return EINVALIDULP;
+  }
+
+  if (read_from_mem(ulp.so_filename, sizeof(char), c, src) < c) {
+    WARN("Unable to read so filename.");
+    return EINVALIDULP;
+  }
+
+  if (*ulp.so_filename == '\0') {
+    WARN("livepatch container path is empty.");
+    return EINVALIDULP;
+  }
+
+  obj = calloc(1, sizeof(struct ulp_object));
+  if (!obj) {
+    WARN("Unable to allocate memory for the patch objects.");
+    return ENOMEM;
+  }
+
+  ulp.objs = obj;
+  obj->units = NULL;
+
+  if (read_from_mem(&c, sizeof(uint32_t), 1, src) < 1) {
+    WARN("Unable to read build id length (trigger).");
+    return EINVALIDULP;
+  }
+  obj->build_id_len = c;
+  obj->build_id = calloc(c, sizeof(char));
+  if (!obj->build_id) {
+    WARN("Unable to allocate build id buffer.");
+    return EINVALIDULP;
+  }
+
+  if (read_from_mem(obj->build_id, sizeof(char), c, src) < c) {
+    WARN("Unable to read build id.");
+    return EINVALIDULP;
+  }
+
+  obj->build_id_check = 0;
+
+  if (read_from_mem(&c, sizeof(uint32_t), 1, src) < 1) {
+    WARN("Unable to read object name length.");
+    return EINVALIDULP;
+  }
+
+  /* shared object: fill data + read patching units */
+  obj->name = calloc(c + 1, sizeof(char));
+  if (!obj->name) {
+    WARN("Unable to allocate object name buffer.");
+    return EINVALIDULP;
+  }
+
+  if (read_from_mem(obj->name, sizeof(char), c, src) < c) {
+    WARN("Unable to read object name.");
+    return EINVALIDULP;
+  }
+
+  if (ulp.type == 2) {
+    /*
+     * Reverse patches do not have patching units nor dependencies,
+     * so return right away.
+     */
+    return 0;
+  }
+
+  if (read_from_mem(&obj->nunits, sizeof(uint32_t), 1, src) < 1) {
+    WARN("Unable to read number of patching units.");
+    return 1;
+  }
+
+  /* read all patching units for object */
+  for (j = 0; j < obj->nunits; j++) {
+    unit = calloc(1, sizeof(struct ulp_unit));
+    if (!unit) {
+      WARN("Unable to allocate memory for the patch units.");
+      return ENOMEM;
+    }
+
+    if (read_from_mem(&c, sizeof(uint32_t), 1, src) < 1) {
+      WARN("Unable to read unit old function name length.");
+      return EINVALIDULP;
+    }
+
+    unit->old_fname = calloc(c + 1, sizeof(char));
+    if (!unit->old_fname) {
+      WARN("Unable to allocate unit old function name buffer.");
+      return EINVALIDULP;
+    }
+
+    if (read_from_mem(unit->old_fname, sizeof(char), c, src) < c) {
+      WARN("Unable to read unit old function name.");
+      return EINVALIDULP;
+    }
+
+    if (read_from_mem(&c, sizeof(uint32_t), 1, src) < 1) {
+      WARN("Unable to read unit new function name length.");
+      return EINVALIDULP;
+    }
+
+    unit->new_fname = calloc(c + 1, sizeof(char));
+    if (!unit->new_fname) {
+      WARN("Unable to allocate unit new function name buffer.");
+      return EINVALIDULP;
+    }
+
+    if (read_from_mem(unit->new_fname, sizeof(char), c, src) < c) {
+      WARN("Unable to read unit new function name.");
+      return EINVALIDULP;
+    }
+
+    if (read_from_mem(&unit->old_faddr, sizeof(void *), 1, src) < 1) {
+      WARN("Unable to read old function address.");
+      return EINVALIDULP;
+    }
+
+    if (obj->units) {
+      prev_unit->next = unit;
+    }
+    else {
+      obj->units = unit;
+    }
+    prev_unit = unit;
+  }
+
+  /* read dependencies */
+  if (read_from_mem(&c, sizeof(uint32_t), 1, src) < 1) {
+    WARN("Unable to read number of dependencies.");
+    return EINVALIDULP;
+  }
+
+  for (i = 0; i < c; i++) {
+    dep = calloc(1, sizeof(struct ulp_dependency));
+    if (!dep) {
+      WARN("Unable to allocate memory for dependency state.");
+      return ENOMEM;
+    }
+    if (read_from_mem(&dep->dep_id, sizeof(char), 32, src) < 32) {
+      WARN("Unable to read dependency patch id.");
+      return EINVALIDULP;
+    }
+    if (ulp.deps) {
+      prev_dep->next = dep;
+    }
+    else {
+      ulp.deps = dep;
+    }
+    prev_dep = dep;
+  }
+
+  return 0;
 }
 
 /* Takes LIVEPATCH as a path to a livepatch metadata file, opens it,
@@ -1597,7 +1829,7 @@ extract_ulp_from_so(const char *livepatch, bool revert)
  * returns 0.
  */
 int
-load_patch_info(const char *livepatch)
+load_patch_info_from_disk(const char *livepatch)
 {
   uint32_t c;
   uint32_t i, j;

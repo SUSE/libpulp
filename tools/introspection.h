@@ -177,7 +177,7 @@ int set_path_buffer(struct ulp_process *process, const char *path);
 
 int patch_applied(struct ulp_process *process, unsigned char *id, int *result);
 
-int apply_patch(struct ulp_process *process, const char *metadata);
+int apply_patch(struct ulp_process *process, void *metadata, size_t size);
 
 int revert_patches_from_lib(struct ulp_process *, const char *);
 
@@ -185,9 +185,13 @@ int restore_threads(struct ulp_process *process);
 
 int read_global_universe(struct ulp_process *process);
 
-char *extract_ulp_from_so(const char *, bool);
+char *extract_ulp_from_so_to_disk(const char *, bool);
 
-int load_patch_info(const char *livepatch);
+size_t extract_ulp_from_so_to_mem(const char *, bool, char **);
+
+int load_patch_info_from_disk(const char *livepatch);
+
+int load_patch_info_from_mem(void *src, size_t size);
 
 int check_patch_sanity();
 

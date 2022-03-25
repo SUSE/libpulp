@@ -74,22 +74,22 @@ int
 run_dump(struct arguments *arguments)
 {
   char *livepatch;
+  size_t livepatch_size;
   bool revert = arguments->revert;
 
-  livepatch = extract_ulp_from_so(arguments->args[0], revert);
+  livepatch_size =
+      extract_ulp_from_so_to_mem(arguments->args[0], revert, &livepatch);
   if (!livepatch) {
     WARN("Unable to extract metadata file from %s", arguments->args[0]);
     return 1;
   }
 
-  if (load_patch_info(livepatch)) {
+  if (load_patch_info_from_mem(livepatch, livepatch_size)) {
     WARN("error parsing the metadata file (%s).", arguments->args[0]);
-    remove(livepatch);
     free(livepatch);
     return 1;
   }
   dump_metadata(&ulp, arguments->buildid);
-  remove(livepatch);
   free(livepatch);
   return 0;
 }

@@ -74,6 +74,7 @@ trigger_one_process(int pid, int retries, const char *container_path,
                     const char *revert_library, bool check_stack, bool revert)
 {
   char *livepatch = NULL;
+  size_t livepatch_size = 0;
   struct ulp_process *target = calloc(1, sizeof(struct ulp_process));
   int result;
   int ret;
@@ -82,10 +83,11 @@ trigger_one_process(int pid, int retries, const char *container_path,
 
   /* Extract the livepatch metadata from .so file.  */
   if (container_path) {
-    livepatch = extract_ulp_from_so(container_path, revert);
+    livepatch_size =
+        extract_ulp_from_so_to_mem(container_path, revert, &livepatch);
   }
 
-  if (livepatch && load_patch_info(livepatch)) {
+  if (livepatch && load_patch_info_from_mem(livepatch, livepatch_size)) {
     WARN("error parsing the metadata file (%s).", livepatch);
     ret = TRIGGER_ERR_UNKNOWN;
     goto metadata_clean;
@@ -152,7 +154,7 @@ trigger_one_process(int pid, int retries, const char *container_path,
     }
 
     if (livepatch) {
-      result = apply_patch(target, livepatch);
+      result = apply_patch(target, livepatch, livepatch_size);
       if (result == -1) {
         FATAL(
             "fatal error during live patch application (hijacked execution).");
@@ -192,7 +194,6 @@ metadata_clean:
   release_ulp_global_metadata();
   /* Remove temporary file.  */
   if (livepatch) {
-    remove(livepatch);
     free(livepatch);
   }
   return ret;
