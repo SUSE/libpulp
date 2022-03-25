@@ -202,7 +202,7 @@ run_reverse(struct arguments *arguments)
   const char *container = arguments->args[0];
   char *tmp_metadata;
 
-  tmp_metadata = extract_ulp_from_so(container, false);
+  tmp_metadata = extract_ulp_from_so_to_disk(container, false);
   if (!tmp_metadata) {
     WARN("Unable to extract .ulp section from %s: %s", container,
          strerror(errno));

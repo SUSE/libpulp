@@ -44,6 +44,7 @@ run_check(struct arguments *arguments)
 {
   const char *container;
   char *livepatch;
+  size_t livepatch_size;
   int ret;
   int check;
   int result;
@@ -55,7 +56,8 @@ run_check(struct arguments *arguments)
   ulp_quiet = arguments->quiet;
 
   container = arguments->args[0];
-  livepatch = extract_ulp_from_so(container, false);
+
+  livepatch_size = extract_ulp_from_so_to_mem(container, false, &livepatch);
 
   if (!livepatch) {
     WARN("error extracting .ulp section from %s", container);
@@ -63,7 +65,7 @@ run_check(struct arguments *arguments)
     goto ulp_process_clean;
   }
 
-  if (load_patch_info(livepatch)) {
+  if (load_patch_info_from_mem(livepatch, livepatch_size)) {
     WARN("error parsing the metadata file (%s).", livepatch);
     ret = 1;
     goto ulp_process_clean;
@@ -134,7 +136,6 @@ run_check(struct arguments *arguments)
   ret = result;
 
 ulp_process_clean:
-  remove(livepatch);
   free(livepatch);
   release_ulp_process(target);
   return ret;
