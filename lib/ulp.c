@@ -93,7 +93,7 @@ revert_all_patches_from_lib(const char *lib_name)
 
   /* Paranoid: check if the path buffer didn't overflow.  */
   if ((ptrdiff_t)(lib_basename - lib_name) >= ULP_PATH_LEN) {
-    MSGQ_WARN("Path buffer overflow, aborting revert...");
+    WARN("Path buffer overflow, aborting revert...");
     return EOVERFLOW;
   }
 
@@ -237,7 +237,7 @@ unload_handlers(struct ulp_metadata *ulp)
 {
   int status = 1;
   if (ulp->so_handler && dlclose(ulp->so_handler)) {
-    MSGQ_WARN("Error unloading patch so handler: %s", ulp->so_filename);
+    WARN("Error unloading patch so handler: %s", ulp->so_filename);
     status = 0;
   }
   return status;
@@ -252,7 +252,7 @@ load_so_symbol(char *fname, void *handle)
   func = dlsym(handle, fname);
   error = dlerror();
   if (error) {
-    MSGQ_WARN("Unable to load function %s: %s.", fname, error);
+    WARN("Unable to load function %s: %s.", fname, error);
     return NULL;
   }
 
@@ -265,7 +265,7 @@ load_so_handlers(struct ulp_metadata *ulp)
   ulp->so_handler = load_so(ulp->so_filename);
 
   if (!ulp->so_handler) {
-    MSGQ_WARN("Unable to load patch dl handler.");
+    WARN("Unable to load patch dl handler.");
     unload_handlers(ulp);
     return 0;
   }
@@ -292,7 +292,7 @@ load_metadata(int *err)
 
   ulp = calloc(1, sizeof(struct ulp_metadata));
   if (!ulp) {
-    MSGQ_WARN("Unable to allocate memory for ulp metadata");
+    WARN("Unable to allocate memory for ulp metadata");
     *err = errno;
     return NULL;
   }
@@ -300,7 +300,7 @@ load_metadata(int *err)
   __ulp_metadata_ref = ulp;
   *err = parse_metadata(ulp);
   if (*err) {
-    MSGQ_WARN("Error parsing metadata.\n");
+    WARN("Error parsing metadata.\n");
     return NULL;
   };
 
@@ -330,12 +330,12 @@ read_data(int from, void *to, size_t count, int line)
       continue; /* Try again. */
     }
     else {
-      MSGQ_WARN("Error in call to read()");
+      WARN("Error in call to read()");
       return 1;
     }
   }
   if (done != count) {
-    MSGQ_WARN("line %d: Not enough data to read()", line);
+    WARN("line %d: Not enough data to read()", line);
     return 1;
   }
 
@@ -384,25 +384,18 @@ read_line(int fd, char *buf, size_t len)
   return -1;
 }
 
-/** Used to keep track of how many bytes we have consumed.  We cannot surpass
- *  ULP_METADATA_BUF_LEN.  */
-static long cur;
-static long __attribute__((noinline))
-read_data_from_mem(void *from, void *to, long count)
+void *
+load_so(char *obj)
 {
-#define REMAINING_BUF(x) (ULP_METADATA_BUF_LEN - x)
+  void *patch_obj;
 
-  char *cfrom = from;
+  patch_obj = dlopen(obj, RTLD_LAZY);
+  if (!patch_obj) {
+    WARN("Unable to load shared object %s: %s.", obj, dlerror());
+    return NULL;
+  }
 
-  if (count > REMAINING_BUF(cur))
-    count = REMAINING_BUF(cur);
-
-  memcpy(to, cfrom + cur, count);
-  cur += count;
-
-  return count;
-
-#undef REMAINING_BUF
+  return patch_obj;
 }
 
 /** @brief Parse metadata file in __ulp_metadata_buffer.
@@ -413,208 +406,20 @@ read_data_from_mem(void *from, void *to, long count)
  * @param ulp  The metadata output object
  * @return 0   0 if success, anything else if failure.
  */
-
 int
 parse_metadata(struct ulp_metadata *ulp)
 {
-  uint32_t c;
-  uint32_t i, j;
-  struct ulp_object *obj;
-  struct ulp_unit *unit, *prev_unit = NULL;
-  struct ulp_dependency *dep, *prev_dep = NULL;
-  struct ulp_reference *ref, *prev_ref = NULL;
-  int ret;
-
   /* Initialize pointer and counter to keep track of metadata buffer parsing.
    */
   void *src = __ulp_metadata_buffer;
-  cur = 0;
+  size_t meta_size = ULP_METADATA_BUF_LEN;
+  int ret;
 
-  MSGQ_DEBUG("Parsing metadata buffer...");
+  ret = parse_metadata_from_mem(ulp, src, meta_size);
 
-  ulp->objs = NULL;
-
-#define READ(from, to, count) \
-  if (!read_data_from_mem(from, to, count)) { \
-    ret = EOVERFLOW; \
-    goto metadata_clean; \
-  }
-
-  /* read metadata header information */
-  READ(src, &ulp->type, 1 * sizeof(uint8_t));
-  READ(src, &ulp->patch_id, 32 * sizeof(char));
-
-  /* if this is a patch revert, we don't need extra information */
-  if (ulp->type == 2) {
-    ret = 0;
+  if (ret != ENONE || ulp->type == 2)
     goto metadata_clean;
-  }
 
-  /* read livepatch DSO filename */
-  READ(src, &c, 1 * sizeof(uint32_t));
-  ulp->so_filename = calloc(c + 1, sizeof(char));
-  if (!ulp->so_filename) {
-    MSGQ_WARN("Unable to allocate so filename buffer.");
-    ret = errno;
-    goto metadata_clean;
-  }
-  READ(src, ulp->so_filename, c * sizeof(char));
-
-  obj = calloc(1, sizeof(struct ulp_object));
-  if (!obj) {
-    MSGQ_WARN("Unable to allocate memory for the patch objects.");
-    ret = errno;
-    goto metadata_clean;
-  }
-  obj->units = NULL;
-
-  /* read the length of the target library's build-id */
-  READ(src, &c, 1 * sizeof(uint32_t));
-  obj->build_id_len = c;
-
-  /* read the build-id of the target library */
-  obj->build_id = calloc(c, sizeof(char));
-  if (!obj->build_id) {
-    MSGQ_WARN("Unable to allocate build id buffer.");
-    ret = errno;
-    goto metadata_clean;
-  }
-  READ(src, obj->build_id, c * sizeof(char));
-  obj->build_id_check = 0;
-
-  /* read the length of the target library's name */
-  READ(src, &c, 1 * sizeof(uint32_t));
-
-  ulp->objs = obj;
-
-  /* shared object: fill data + read patching units */
-  obj->name = calloc(c + 1, sizeof(char));
-  if (!obj->name) {
-    MSGQ_WARN("Unable to allocate object name buffer.");
-    ret = errno;
-    goto metadata_clean;
-  }
-  READ(src, obj->name, c * sizeof(char));
-
-  /* read the number of patching units */
-  READ(src, &obj->nunits, 1 * sizeof(uint32_t));
-
-  /* read all patching units for object */
-  for (j = 0; j < obj->nunits; j++) {
-    unit = calloc(1, sizeof(struct ulp_unit));
-    if (!unit) {
-      MSGQ_WARN("Unable to allocate memory for the patch units.");
-      ret = errno;
-      goto metadata_clean;
-    }
-
-    /* read the name of the old function in this unit */
-    READ(src, &c, 1 * sizeof(uint32_t));
-    unit->old_fname = calloc(c + 1, sizeof(char));
-    if (!unit->old_fname) {
-      MSGQ_WARN("Unable to allocate unit old function name buffer.");
-      ret = errno;
-      goto metadata_clean;
-    }
-    READ(src, unit->old_fname, c * sizeof(char));
-
-    /* read the name of the new function in this unit */
-    READ(src, &c, 1 * sizeof(uint32_t));
-    unit->new_fname = calloc(c + 1, sizeof(char));
-    if (!unit->new_fname) {
-      MSGQ_WARN("Unable to allocate unit new function name buffer.");
-      ret = errno;
-      goto metadata_clean;
-    }
-    READ(src, unit->new_fname, c * sizeof(char));
-
-    /* read the address of the old function in this unit */
-    READ(src, &unit->old_faddr, 1 * sizeof(void *));
-
-    /* update the list of units */
-    if (obj->units) {
-      prev_unit->next = unit;
-    }
-    else {
-      obj->units = unit;
-    }
-    prev_unit = unit;
-  }
-
-  /* read number of dependencies */
-  READ(src, &c, 1 * sizeof(uint32_t));
-
-  /* read all dependencies */
-  for (i = 0; i < c; i++) {
-    dep = calloc(1, sizeof(struct ulp_dependency));
-    if (!dep) {
-      MSGQ_WARN("Unable to allocate memory for dependency state.");
-      ret = errno;
-      goto metadata_clean;
-    }
-    READ(src, &dep->dep_id, 32 * sizeof(char));
-    if (ulp->deps) {
-      prev_dep->next = dep;
-    }
-    else {
-      ulp->deps = dep;
-    }
-    prev_dep = dep;
-  }
-
-  /* read number of static data items */
-  READ(src, &ulp->nrefs, 1 * sizeof(uint32_t));
-
-  /* read all static data reference items */
-  for (i = 0; i < ulp->nrefs; i++) {
-    ref = calloc(1, sizeof(struct ulp_reference));
-    if (!ref) {
-      MSGQ_WARN("Unable to allocate memory for static data reference.");
-      ret = errno;
-      goto metadata_clean;
-    }
-
-    /* read local variable name */
-    READ(src, &c, 1 * sizeof(uint32_t));
-    ref->target_name = calloc(c, sizeof(char));
-    if (!ref->target_name) {
-      MSGQ_WARN("Unable to allocate memory for static data reference name.");
-      ret = errno;
-      goto metadata_clean;
-    }
-    READ(src, ref->target_name, c * sizeof(char));
-
-    /* read reference name */
-    READ(src, &c, 1 * sizeof(uint32_t));
-    ref->reference_name = calloc(c, sizeof(char));
-    if (!ref->reference_name) {
-      MSGQ_WARN("Unable to allocate memory for static data reference name.");
-      ret = errno;
-      goto metadata_clean;
-    }
-    READ(src, ref->reference_name, c * sizeof(char));
-
-    /* read reference offset within the target library */
-    READ(src, &ref->target_offset, sizeof(uintptr_t));
-
-    /* read reference offset within the patch object */
-    READ(src, &ref->patch_offset, sizeof(uintptr_t));
-
-    /* read if variable is tls within the patch object */
-    READ(src, &ref->tls, sizeof(bool));
-
-    if (ulp->refs) {
-      prev_ref->next = ref;
-    }
-    else {
-      ulp->refs = ref;
-    }
-    prev_ref = ref;
-  }
-
-#undef READ
-
-  cur = 0;
   ret = check_patch_sanity(ulp);
   if (ret)
     goto metadata_clean;
@@ -624,26 +429,9 @@ parse_metadata(struct ulp_metadata *ulp)
     goto metadata_clean;
   }
 
-  ret = 0;
-
 metadata_clean:
-  cur = 0;
   memset(src, 0, ULP_METADATA_BUF_LEN);
   return ret;
-}
-
-void *
-load_so(char *obj)
-{
-  void *patch_obj;
-
-  patch_obj = dlopen(obj, RTLD_LAZY);
-  if (!patch_obj) {
-    MSGQ_WARN("Unable to load shared object %s: %s.", obj, dlerror());
-    return NULL;
-  }
-
-  return patch_obj;
 }
 
 int
@@ -670,7 +458,7 @@ load_patch()
 
       ret = ulp_apply_all_units(ulp);
       if (ret) {
-        MSGQ_WARN("FATAL ERROR while applying patch units\n");
+        WARN("FATAL ERROR while applying patch units\n");
         libpulp_exit(ret);
       }
 
@@ -684,7 +472,7 @@ load_patch()
 
       ret = ulp_revert_patch(ulp->patch_id);
       if (ret) {
-        MSGQ_WARN("Unable to revert patch.");
+        WARN("Unable to revert patch.");
         break;
       }
 
@@ -692,11 +480,11 @@ load_patch()
 
     default: /* load patch metadata error */
       if (!patch) {
-        MSGQ_WARN("load patch metadata error");
+        WARN("load patch metadata error");
         ret = ENOMETA;
       }
       else {
-        MSGQ_WARN("Unknown load metadata status");
+        WARN("Unknown load metadata status");
         ret = EUNKNOWN;
       }
   }
@@ -716,7 +504,7 @@ ulp_can_revert_patch(const unsigned char *id)
   /* check if patch exists */
   applied_patch = ulp_get_applied_patch(id);
   if (!applied_patch) {
-    MSGQ_WARN("Can't revert because patch was not applied");
+    WARN("Can't revert because patch was not applied");
     return ENOTAPPLIED;
   }
 
@@ -772,7 +560,7 @@ push_new_root()
 
   root = calloc(1, sizeof(struct ulp_detour_root));
   if (!root) {
-    MSGQ_WARN("unable to allocate memory for ulp detour root");
+    WARN("unable to allocate memory for ulp detour root");
     return NULL;
   }
 
@@ -824,12 +612,12 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
 
     if (!(push_new_detour(__ulp_global_universe, ulp->patch_id, root,
                           new_fun))) {
-      MSGQ_WARN("error setting ulp data structure\n");
+      WARN("error setting ulp data structure\n");
       return EUNKNOWN;
     }
 
     if (!(ulp_patch_addr(old_fun, new_fun, true))) {
-      MSGQ_WARN("error patching address %p", old_fun);
+      WARN("error patching address %p", old_fun);
       return EUNKNOWN;
     }
 
@@ -857,8 +645,7 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
   target_base = (uintptr_t)get_loaded_library_base_addr(target_basename);
   tls_idx = get_loaded_library_tls_index(target_basename);
   if (target_base == 0xFF) {
-    MSGQ_WARN("Unable to find target library load address of %s",
-              target_basename);
+    WARN("Unable to find target library load address of %s", target_basename);
     return ENOADDRESS;
   }
 
@@ -866,11 +653,11 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
   memset(map_ptr, 0, sizeof(struct link_map));
   retcode = dlinfo(ulp->so_handler, RTLD_DI_LINKMAP, &map_ptr);
   if (retcode == -1) {
-    MSGQ_WARN("Error in call to dlinfo: %s", dlerror());
+    WARN("Error in call to dlinfo: %s", dlerror());
     return EUNKNOWN;
   }
   if (map_ptr->l_addr == 0) {
-    MSGQ_WARN("Unable to find target library load address: %s", dlerror());
+    WARN("Unable to find target library load address: %s", dlerror());
     return ENOADDRESS;
   }
   patch_base = map_ptr->l_addr;
@@ -915,7 +702,7 @@ ulp_state_update(struct ulp_metadata *ulp)
 
   a_patch = calloc(1, sizeof(struct ulp_applied_patch));
   if (!a_patch) {
-    MSGQ_WARN("Unable to allocate memory to update ulp state.");
+    WARN("Unable to allocate memory to update ulp state.");
     return 0;
   }
 
@@ -923,21 +710,21 @@ ulp_state_update(struct ulp_metadata *ulp)
 
   a_patch->lib_name = strndup(get_basename(ulp->objs->name), ULP_PATH_LEN);
   if (!a_patch->lib_name) {
-    MSGQ_WARN("Unable to allocate filename buffer state.");
+    WARN("Unable to allocate filename buffer state.");
     return 0;
   }
 
   a_patch->container_name =
       strndup(get_basename(ulp->so_filename), ULP_PATH_LEN);
   if (!a_patch->container_name) {
-    MSGQ_WARN("Unable to allocate filename buffer state.");
+    WARN("Unable to allocate filename buffer state.");
     return 0;
   }
 
   for (dep = ulp->deps; dep != NULL; dep = dep->next) {
     a_dep = calloc(1, sizeof(struct ulp_dependency));
     if (!a_dep) {
-      MSGQ_WARN("Unable to allocate memory to ulp state dependency.");
+      WARN("Unable to allocate memory to ulp state dependency.");
       return 0;
     }
 
@@ -955,15 +742,14 @@ ulp_state_update(struct ulp_metadata *ulp)
   while (unit != NULL) {
     a_unit = calloc(1, sizeof(struct ulp_applied_unit));
     if (!a_unit) {
-      MSGQ_WARN("Unable to allocate memory to update ulp state (unit).");
+      WARN("Unable to allocate memory to update ulp state (unit).");
       return 0;
     }
 
     a_unit->patched_addr = get_loaded_symbol_addr(
         basename_target, unit->old_fname, unit->old_faddr);
     if (!a_unit->patched_addr) {
-      MSGQ_WARN("Symbol %s not found in %s.", unit->old_fname,
-                basename_target);
+      WARN("Symbol %s not found in %s.", unit->old_fname, basename_target);
       return 0;
     }
 
@@ -1057,7 +843,7 @@ check_patch_sanity(struct ulp_metadata *ulp)
   if (ret)
     return ret;
   if (ulp_get_applied_patch(ulp->patch_id)) {
-    MSGQ_WARN("Patch was already applied\n");
+    WARN("Patch was already applied\n");
     return EAPPLIED;
   }
 
@@ -1081,7 +867,7 @@ check_patch_dependencies(struct ulp_metadata *ulp)
 
   for (dep = ulp->deps; dep != NULL; dep = dep->next) {
     if (dep->patch_id_check == 0) {
-      MSGQ_WARN("Patch does not match dependencies.");
+      WARN("Patch does not match dependencies.");
       return EDEPEND;
     }
   }
@@ -1161,7 +947,7 @@ int
 all_build_ids_checked(struct ulp_metadata *ulp)
 {
   if (!ulp->objs->build_id_check) {
-    MSGQ_WARN("Could not match patch target build id %s.", ulp->objs->name);
+    WARN("Could not match patch target build id %s.", ulp->objs->name);
     return 0;
   }
   return 1;
@@ -1210,7 +996,7 @@ __ulp_manage_universes(unsigned long idx)
 
   root = get_detour_root_by_index((unsigned int)idx);
   if (!root) {
-    MSGQ_WARN("FATAL ERROR While Live Patching.");
+    WARN("FATAL ERROR While Live Patching.");
     libpulp_exit(-1);
   }
 
@@ -1250,7 +1036,7 @@ push_new_detour(unsigned long universe, unsigned char *patch_id,
 
   detour = calloc(1, sizeof(struct ulp_detour));
   if (!detour) {
-    MSGQ_WARN("Unable to acllocate memory for ulp detour");
+    WARN("Unable to acllocate memory for ulp detour");
     return 0;
   }
 
@@ -1301,7 +1087,7 @@ ulp_patch_addr(void *old_faddr, void *new_faddr, int enable)
   page_size = getpagesize();
   page_mask = ~(page_size - 1);
   if (ULP_NOPS_LEN > page_size) {
-    MSGQ_WARN("Nop padding area unexpectedly large.");
+    WARN("Nop padding area unexpectedly large.");
     return 0;
   }
 
@@ -1316,17 +1102,17 @@ ulp_patch_addr(void *old_faddr, void *new_faddr, int enable)
   prot1 = memory_protection_get(page1);
   prot2 = memory_protection_get(page2);
   if (prot1 == -1 || prot2 == -1) {
-    MSGQ_WARN("Memory protection read error");
+    WARN("Memory protection read error");
     return 0;
   }
 
   /* Set the writable bit on affected pages. */
   if (mprotect((void *)page1, page_size, prot1 | PROT_WRITE)) {
-    MSGQ_WARN("Memory protection set error (1st page)");
+    WARN("Memory protection set error (1st page)");
     return 0;
   }
   if (mprotect((void *)page2, page_size, prot2 | PROT_WRITE)) {
-    MSGQ_WARN("Memory protection set error (2nd page)");
+    WARN("Memory protection set error (2nd page)");
     return 0;
   }
 
@@ -1341,11 +1127,11 @@ ulp_patch_addr(void *old_faddr, void *new_faddr, int enable)
 
   /* Restore the previous access protection. */
   if (mprotect((void *)page1, page_size, prot1)) {
-    MSGQ_WARN("Memory protection restore error (1st page)");
+    WARN("Memory protection restore error (1st page)");
     return 0;
   }
   if (mprotect((void *)page2, page_size, prot2)) {
-    MSGQ_WARN("Memory protection restore error (2nd page)");
+    WARN("Memory protection restore error (2nd page)");
     return 0;
   }
 
@@ -1374,7 +1160,7 @@ ulp_revert_patch(unsigned char *id)
 
   if (ulp_revert_all_units(id)) {
     if (!ulp_state_remove(patch)) {
-      MSGQ_WARN("Problem updating state. Program may be inconsistent.");
+      WARN("Problem updating state. Program may be inconsistent.");
       return ESTATE;
     }
   }

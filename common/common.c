@@ -206,3 +206,285 @@ create_path_to_tmp_file(void)
 
   return buffer;
 }
+
+/** Used to keep track of how many bytes we have consumed.  We cannot surpass
+ *  ULP_METADATA_BUF_LEN.  */
+static long cur;
+static long meta_len;
+static long __attribute__((noinline))
+read_from_mem(void *to, size_t size, long count, void *from)
+{
+#define REMAINING_BUF(x) (meta_len - x)
+
+  char *cfrom = from;
+  long final_cnt = count * size;
+
+  if (final_cnt > REMAINING_BUF(cur))
+    final_cnt = REMAINING_BUF(cur);
+
+  memcpy(to, cfrom + cur, final_cnt);
+  cur += final_cnt;
+
+  return final_cnt;
+
+#undef REMAINING_BUF
+}
+
+int
+parse_metadata_from_mem(struct ulp_metadata *ulp, void *src, size_t size)
+{
+  meta_len = size;
+  cur = 0;
+
+  uint32_t c;
+  uint32_t i, j;
+  struct ulp_object *obj;
+  struct ulp_unit *unit, *prev_unit = NULL;
+  struct ulp_dependency *dep, *prev_dep = NULL;
+  struct ulp_reference *ref, *prev_ref = NULL;
+
+  DEBUG("reading live patch metadata from memory");
+
+  /* read metadata header information */
+  ulp->objs = NULL;
+
+  if (read_from_mem(&ulp->type, sizeof(uint8_t), 1, src) < 1) {
+    WARN("Unable to read patch type.");
+    return EINVALIDULP;
+  }
+
+  if (read_from_mem(&ulp->patch_id, sizeof(char), 32, src) < 32) {
+    WARN("Unable to read patch id.");
+    return EINVALIDULP;
+  }
+
+  if (read_from_mem(&c, sizeof(uint32_t), 1, src) < 1) {
+    WARN("Unable to read so filename length.");
+    return EINVALIDULP;
+  }
+
+  ulp->so_filename = calloc(c + 1, sizeof(char));
+  if (!ulp->so_filename) {
+    WARN("Unable to allocate so filename buffer.");
+    return EINVALIDULP;
+  }
+
+  if (read_from_mem(ulp->so_filename, sizeof(char), c, src) < c) {
+    WARN("Unable to read so filename.");
+    return EINVALIDULP;
+  }
+
+  if (*ulp->so_filename == '\0') {
+    WARN("livepatch container path is empty.");
+    return EINVALIDULP;
+  }
+
+  obj = calloc(1, sizeof(struct ulp_object));
+  if (!obj) {
+    WARN("Unable to allocate memory for the patch objects.");
+    return ENOMEM;
+  }
+
+  ulp->objs = obj;
+  obj->units = NULL;
+
+  if (read_from_mem(&c, sizeof(uint32_t), 1, src) < 1) {
+    WARN("Unable to read build id length (trigger).");
+    return EINVALIDULP;
+  }
+  obj->build_id_len = c;
+  obj->build_id = calloc(c, sizeof(char));
+  if (!obj->build_id) {
+    WARN("Unable to allocate build id buffer.");
+    return EINVALIDULP;
+  }
+
+  if (read_from_mem(obj->build_id, sizeof(char), c, src) < c) {
+    WARN("Unable to read build id.");
+    return EINVALIDULP;
+  }
+
+  obj->build_id_check = 0;
+
+  if (read_from_mem(&c, sizeof(uint32_t), 1, src) < 1) {
+    WARN("Unable to read object name length.");
+    return EINVALIDULP;
+  }
+
+  /* shared object: fill data + read patching units */
+  obj->name = calloc(c + 1, sizeof(char));
+  if (!obj->name) {
+    WARN("Unable to allocate object name buffer.");
+    return EINVALIDULP;
+  }
+
+  if (read_from_mem(obj->name, sizeof(char), c, src) < c) {
+    WARN("Unable to read object name.");
+    return EINVALIDULP;
+  }
+
+  if (ulp->type == 2) {
+    /*
+     * Reverse patches do not have patching units nor dependencies,
+     * so return right away.
+     */
+    return 0;
+  }
+
+  if (read_from_mem(&obj->nunits, sizeof(uint32_t), 1, src) < 1) {
+    WARN("Unable to read number of patching units.");
+    return 1;
+  }
+
+  /* read all patching units for object */
+  for (j = 0; j < obj->nunits; j++) {
+    unit = calloc(1, sizeof(struct ulp_unit));
+    if (!unit) {
+      WARN("Unable to allocate memory for the patch units.");
+      return ENOMEM;
+    }
+
+    if (read_from_mem(&c, sizeof(uint32_t), 1, src) < 1) {
+      WARN("Unable to read unit old function name length.");
+      return EINVALIDULP;
+    }
+
+    unit->old_fname = calloc(c + 1, sizeof(char));
+    if (!unit->old_fname) {
+      WARN("Unable to allocate unit old function name buffer.");
+      return EINVALIDULP;
+    }
+
+    if (read_from_mem(unit->old_fname, sizeof(char), c, src) < c) {
+      WARN("Unable to read unit old function name.");
+      return EINVALIDULP;
+    }
+
+    if (read_from_mem(&c, sizeof(uint32_t), 1, src) < 1) {
+      WARN("Unable to read unit new function name length.");
+      return EINVALIDULP;
+    }
+
+    unit->new_fname = calloc(c + 1, sizeof(char));
+    if (!unit->new_fname) {
+      WARN("Unable to allocate unit new function name buffer.");
+      return EINVALIDULP;
+    }
+
+    if (read_from_mem(unit->new_fname, sizeof(char), c, src) < c) {
+      WARN("Unable to read unit new function name.");
+      return EINVALIDULP;
+    }
+
+    if (read_from_mem(&unit->old_faddr, sizeof(void *), 1, src) < 1) {
+      WARN("Unable to read old function address.");
+      return EINVALIDULP;
+    }
+
+    if (obj->units) {
+      prev_unit->next = unit;
+    }
+    else {
+      obj->units = unit;
+    }
+    prev_unit = unit;
+  }
+
+  /* read dependencies */
+  if (read_from_mem(&c, sizeof(uint32_t), 1, src) < 1) {
+    WARN("Unable to read number of dependencies.");
+    return EINVALIDULP;
+  }
+
+  for (i = 0; i < c; i++) {
+    dep = calloc(1, sizeof(struct ulp_dependency));
+    if (!dep) {
+      WARN("Unable to allocate memory for dependency state.");
+      return ENOMEM;
+    }
+    if (read_from_mem(&dep->dep_id, sizeof(char), 32, src) < 32) {
+      WARN("Unable to read dependency patch id.");
+      return EINVALIDULP;
+    }
+    if (ulp->deps) {
+      prev_dep->next = dep;
+    }
+    else {
+      ulp->deps = dep;
+    }
+    prev_dep = dep;
+  }
+
+  /* read number of static data items */
+  if (read_from_mem(&ulp->nrefs, sizeof(uint32_t), 1, src) < 4) {
+    WARN("Unable to read the number of static data references in livepatch");
+    return EINVALIDULP;
+  }
+
+  /* read all static data reference items */
+  for (i = 0; i < ulp->nrefs; i++) {
+    ref = calloc(1, sizeof(struct ulp_reference));
+    if (!ref) {
+      WARN("Unable to allocate memory for static data reference.");
+      return errno;
+    }
+
+    /* read local variable name */
+    if (read_from_mem(&c, sizeof(uint32_t), 1, src) < 4) {
+      WARN("Unable to read local variable name.");
+      return EINVALIDULP;
+    }
+    ref->target_name = calloc(c, sizeof(char));
+    if (!ref->target_name) {
+      WARN("Unable to allocate memory for static data reference name.");
+      return errno;
+    }
+    if (read_from_mem(ref->target_name, sizeof(char), c, src) < c) {
+      WARN("Unable to read target variable name.");
+      return EINVALIDULP;
+    }
+
+    /* read reference name */
+    if (read_from_mem(&c, sizeof(uint32_t), 1, src) < 4) {
+      WARN("Unable to read reference name size");
+      return EINVALIDULP;
+    }
+    ref->reference_name = calloc(c, sizeof(char));
+    if (!ref->reference_name) {
+      WARN("Unable to allocate memory for static data reference name.");
+      return errno;
+    }
+    if (read_from_mem(ref->reference_name, sizeof(char), c, src) < c) {
+      WARN("Unable to read reference name.");
+      return EINVALIDULP;
+    }
+
+    /* read reference offset within the target library */
+    if (read_from_mem(&ref->target_offset, sizeof(uintptr_t), 1, src) < 8) {
+      WARN("Unable to read target offset within target library");
+      return EINVALIDULP;
+    }
+
+    /* read reference offset within the patch object */
+    if (read_from_mem(&ref->patch_offset, sizeof(uintptr_t), 1, src) < 8) {
+      WARN("Unable to read patch offset.");
+      return EINVALIDULP;
+    }
+
+    /* read if variable is tls within the patch object */
+    if (read_from_mem(&ref->tls, sizeof(bool), 1, src) < 1) {
+      WARN("Unable to read TLS field.");
+      return EINVALIDULP;
+    }
+
+    if (ulp->refs) {
+      prev_ref->next = ref;
+    }
+    else {
+      ulp->refs = ref;
+    }
+    prev_ref = ref;
+  }
+
+  return 0;
+}

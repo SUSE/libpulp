@@ -31,29 +31,6 @@
 extern int ulp_verbose;
 extern int ulp_quiet;
 
-#undef WARN // Defined in ulp_common.h
-
-#define FATAL(format, ...) \
-  do { \
-    fprintf(stderr, "ulp: " format "\n", ##__VA_ARGS__); \
-    fprintf(stderr, "PROGRAM POTENTIALLY LEFT IN INCONSISTENT STATE."); \
-  } \
-  while (0)
-
-#define WARN(format, ...) \
-  do { \
-    if (!ulp_quiet) \
-      fprintf(stderr, "ulp: " format "\n", ##__VA_ARGS__); \
-  } \
-  while (0)
-
-#define DEBUG(format, ...) \
-  do { \
-    if (ulp_verbose) \
-      fprintf(stderr, "ulp: " format "\n", ##__VA_ARGS__); \
-  } \
-  while (0)
-
 struct ulp_process
 {
   int pid;

@@ -21,7 +21,9 @@
 
 #include "elf-extra.h"
 #include "error_common.h"
+#include "introspection.h" //For WARN.
 #include "ulp_common.h"
+
 #include <assert.h>
 #include <fcntl.h>
 #include <stdio.h>

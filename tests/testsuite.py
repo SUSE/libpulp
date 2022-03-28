@@ -266,6 +266,9 @@ class spawn(pexpect.spawn):
       self.print('Live patching timed out.')
       raise
 
+    self.print("---- Messages in libpulp.so ----")
+    self.print(self.get_libpulp_messages())
+
     # The trigger tool returns 0 on success, so use check_returncode(),
     # which asserts that, and raises CalledProcessError otherwise.
     tool.check_returncode()
