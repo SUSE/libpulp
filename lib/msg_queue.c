@@ -31,31 +31,16 @@
 
 struct msg_queue __ulp_msg_queue;
 
-/* Push a message into the message queue.
- *
- * @param format - printf like string.
- * */
+static char msg[MSGQ_BUFFER_MAX];
 
-void
-msgq_push(const char *format, ...)
+static void
+msgq_strpush(const char *msg, size_t msg_size)
 {
-  static char msg[MSGQ_BUFFER_MAX];
-
-  va_list arglist;
-  int msg_size;
-
   /* Write the msg_queue values in variables for briefness.  */
   int top = __ulp_msg_queue.top;
   int bottom = __ulp_msg_queue.bottom;
   int distance = __ulp_msg_queue.distance;
   char *buffer = __ulp_msg_queue.buffer;
-
-  /* Expand the format string with the arguments provided. vsnprintf will
-   * return the size of the string, therefore, the size of the object will
-   * be +1 because of the null character in the end of the string.  */
-  va_start(arglist, format);
-  msg_size = vsnprintf(msg, MSGQ_BUFFER_MAX, format, arglist) + 1;
-  va_end(arglist);
 
   /* In case the message is empty or it is too large for the buffer, don't
    * bother even trying to insert it.  */
@@ -105,4 +90,66 @@ msgq_push(const char *format, ...)
   __ulp_msg_queue.top = top;
   __ulp_msg_queue.bottom = bottom;
   __ulp_msg_queue.distance = distance;
+}
+
+/* Push a message into the message queue.
+ *
+ * @param format - printf like string.
+ * */
+void
+msgq_push(const char *format, ...)
+{
+  va_list arglist;
+  size_t msg_size;
+
+  /* Expand the format string with the arguments provided. vsnprintf will
+   * return the size of the string, therefore, the size of the object will
+   * be +1 because of the null character in the end of the string.  */
+  va_start(arglist, format);
+  msg_size = vsnprintf(msg, MSGQ_BUFFER_MAX, format, arglist) + 1;
+  va_end(arglist);
+
+  msgq_strpush(msg, msg_size);
+}
+
+/* Push a message into the message queue.
+ *
+ * @param format - printf like string.
+ * */
+void
+msgq_vpush(const char *format, va_list arglist)
+{
+  size_t msg_size;
+
+  /* Expand the format string with the arguments provided. vsnprintf will
+   * return the size of the string, therefore, the size of the object will
+   * be +1 because of the null character in the end of the string.  */
+  msg_size = vsnprintf(msg, MSGQ_BUFFER_MAX, format, arglist) + 1;
+
+  msgq_strpush(msg, msg_size);
+}
+
+/** @brief Post a warning message in libpulp's circular buffer.
+ *
+ * Implement this here because we have a common library that is compiled once
+ * for both libpulp.so and tools.
+ *
+ * @param format  printf formated message
+ */
+void
+ulp_warn(const char *format, ...)
+{
+  va_list args;
+  va_start(args, format);
+  msgq_vpush(format, args);
+  va_end(args);
+}
+
+void
+ulp_debug(const char *format, ...)
+{
+  va_list args;
+  va_start(args, format);
+  msgq_vpush(format, args);
+  va_end(args);
 }

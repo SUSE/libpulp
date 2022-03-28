@@ -28,8 +28,6 @@
 #define OUT_PATCH_NAME "metadata.ulp"
 #define OUT_REVERSE_NAME "reverse.ulp"
 
-#define WARN(format, ...) fprintf(stderr, "ulp: " format "\n", ##__VA_ARGS__)
-
 /* Use a 512kb buffer for metadata.  This should be enough for most case
  * scenarios.  */
 #define ULP_METADATA_BUF_LEN (512 * 1024)
@@ -140,6 +138,21 @@ const char *get_current_binary_name(void);
 
 bool isnumber(const char *str);
 
+int parse_metadata_from_mem(struct ulp_metadata *, void *, size_t);
+
 const char *create_path_to_tmp_file(void);
+
+void ulp_warn(const char *, ...);
+void ulp_debug(const char *, ...);
+
+#define FATAL(format, ...) \
+  do { \
+    fprintf(stderr, "ulp: " format "\n", ##__VA_ARGS__); \
+    fprintf(stderr, "PROGRAM POTENTIALLY LEFT IN INCONSISTENT STATE."); \
+  } \
+  while (0)
+
+#define WARN(format, ...) ulp_warn("ulp: " format "\n", ##__VA_ARGS__)
+#define DEBUG(format, ...) ulp_debug("ulp: " format "\n", ##__VA_ARGS__)
 
 #endif

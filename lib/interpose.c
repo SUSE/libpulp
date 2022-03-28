@@ -279,8 +279,7 @@ get_loaded_symbol_addr(const char *library, const char *symbol,
   dl_iterate_phdr(dl_find_symbol, &arg);
 
   if (old_faddr != NULL && arg.symbol_addr != old_faddr) {
-    MSGQ_WARN(
-        "Symbol requested not found in .dymsym. Using address from .ulp");
+    WARN("Symbol requested not found in .dymsym. Using address from .ulp");
     return arg.bias_addr + old_faddr;
   }
 
