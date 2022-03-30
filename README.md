@@ -112,26 +112,22 @@ The following tools comprise the tool set of Libpulp:
  * _Post_: This tool converts sequences of one-byte nops at the entry of
    patchable functions into multi-byte nops.
 
- * _Packer_: This tool creates the live patch metadata out of a description file
-   and from the targeted library. The description file syntax is described in
+ * _Packer_: This tool integrates the live patch metadata out of a description file
+   into a livepatch container (.so file). The description file syntax is described in
    its own [section](#description-file-syntax).
 
- * _Trigger_: This tool is used to introspect into the to-be-patched process and
-   trigger the live patching process.
+ * _Trigger_: This tool is used to apply or revert a livepatch, or a series of
+   livepatches.
 
  * _Check_: This tool introspects into a target process and verifies if a given
    patch was applied.
 
- * _Dump_: This tool parses and dumps the contents of a live patch metadata file.
+ * _Dump_: This tool parses and dumps the contents of a live patch container.
 
- * _Ulp_: This tool searches the system for live-patchable processes and report
-   their state.
+ * _Patches_: This tool checks which processes has livepatching capabilities
+   loaded, as well as showing which livepatches are applied.
 
- * _Dispatcher_: This tool retrieves the to-be-patched library from the live
-   patch metadata file and verifies all the running process which have the
-   target library loaded. If the argument "patch" is supplied, it invokes the
-   trigger tool for every process in the list. If the argument "check" is
-   supplied, it only verifies if the given process was previously patched.
+ * _Messages_: This tool retrieves the libpulp.so internal messages.
 
 #### tests
 
