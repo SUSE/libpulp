@@ -835,6 +835,7 @@ run_packer(struct arguments *arguments)
 {
   struct ulp_metadata ulp;
   const char *description = arguments->args[0];
+  int ret = 0;
 
   /* Set the verbosity level in the common introspection infrastructure. */
   ulp_verbose = arguments->verbose;
@@ -847,6 +848,7 @@ run_packer(struct arguments *arguments)
   DEBUG("parsing the description file (%s).", description);
   if (!parse_description(description, &ulp)) {
     WARN("unable to parse description file (%s).", description);
+    ret = 1;
     goto main_error;
   }
 
@@ -862,6 +864,7 @@ run_packer(struct arguments *arguments)
 
   if (!get_ulp_elf_metadata(arguments->library, &ulp)) {
     WARN("unable to parse target library.");
+    ret = 1;
     goto main_error;
   }
 
@@ -876,32 +879,41 @@ run_packer(struct arguments *arguments)
 
   if (write_patch_id(&ulp, description, arguments->livepatch)) {
     WARN("unable to generate live patch ID.");
+    ret = 1;
     goto main_error;
   }
 
   const char *tmp_path = create_path_to_tmp_file();
 
-  if (!create_patch_metadata_file(&ulp, tmp_path))
+  if (!create_patch_metadata_file(&ulp, tmp_path)) {
+    ret = 1;
     goto main_error;
+  }
 
   if (embed_patch_metadata_into_elf(NULL, arguments->livepatch, tmp_path,
-                                    ".ulp"))
-    goto tmpfile_clean;
-
-  if (!write_reverse_patch(&ulp, arguments->livepatch)) {
-    WARN("Error gerenating reverse live patch.\n");
+                                    ".ulp")) {
+    ret = 1;
     goto tmpfile_clean;
   }
 
-  free_metadata(&ulp);
-  WARN("metadata embedded into libepatch container.");
-  return 0;
+  remove(tmp_path);
+
+  if (!write_reverse_patch(&ulp, arguments->livepatch)) {
+    WARN("Error gerenating reverse live patch.\n");
+    ret = 1;
+    goto tmpfile_clean;
+  }
 
 tmpfile_clean:
   remove(tmp_path);
 
 main_error:
   free_metadata(&ulp);
-  WARN("metadata file generation failed.");
-  return 1;
+  if (ret == 0) {
+    WARN("metadata successfully embedded into livepatch container");
+  }
+  else {
+    WARN("metadata file generation failed.");
+  }
+  return ret;
 }

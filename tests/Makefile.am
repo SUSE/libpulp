@@ -484,7 +484,8 @@ TESTS = \
   process.py \
   process_revert.py \
   livepatchable.py \
-  manyprocesses.py
+  manyprocesses.py \
+  tempfiles.py
 
 XFAIL_TESTS = \
   blocked.py \
@@ -497,14 +498,21 @@ XFAIL_TESTS = \
 # manyprocesses must run serially because it touches all processes
 # looking for libraries to patch, and for that it locks the ptrace
 # lock.
+#
+# tempfiles must run serially AFTER all tests because it checks if
+# garbage were not left in filesystem after the testsuite was run.
 
 SERIAL_TESTS = \
-  manyprocesses.log
+  manyprocesses.log \
+  tempfiles.log
 
 # Remove the test itself from the dependency list.
 MANYPROCESSES_DEPS = $(filter-out $(SERIAL_TESTS),$(TEST_LOGS))
+TEMPFILES_DEPS = $(MANYPROCESSES_DEPS) manyprocesses.log
 
 manyprocesses.log: $(MANYPROCESSES_DEPS)
+
+tempfiles.log: $(TEMPFILES_DEPS)
 
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON) -B
