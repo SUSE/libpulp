@@ -38,11 +38,11 @@ list running programs that have livepatching capabilities loaded, as well the
 libraries that are livepatchable and the list of loaded patches.
 .TP
 .B check:
-check if a certain livepatch (file with .ulp extension) is applied to
+check if a certain livepatch (.so) is applied to
 a running process.
 .TP
 .B dump:
-print the content of a livepatch (.ulp file) in human-readable form.
+print the content of a livepatch (.so) in human-readable form.
 .TP
 .B packer:
 compile the livepatch descriptor (.dsc file) into a livepatch
@@ -54,9 +54,6 @@ apply or remove a list of livepatches to a list of running processes.
 .TP
 .B post:
 apply any post-processing needed to livepatch containers (.so files).
-.TP
-.B reverse:
-generate a reverse livepatch (.rev) which can be used to remove one livepatch.
 .TP
 .B messages:
 querry the libpulp internal message queue in a running process. This can be
