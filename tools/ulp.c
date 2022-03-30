@@ -37,7 +37,6 @@
 #include "packer.h"
 #include "patches.h"
 #include "post.h"
-#include "revert.h"
 #include "trigger.h"
 
 static error_t parser(int, char *, struct argp_state *);
@@ -65,7 +64,6 @@ static const char doc[] =
 "   trigger                   Applies the live patch in ARG1 to the process\n"
 "                             with PID\n"
 "   post                      Post process patch container (.so file) in ARG1.\n"
-"   reverse                   Create reverse livepatch from metadata in ARG1.\n"
 "   messages                  Print livepatch information contained in libpulp.\n"
 "   livepatchable             Check if .so library in ARG1 is livepatchable.\n";
 
@@ -93,7 +91,7 @@ static struct argp_option options[] = {
   { 0, 0, 0, 0, "trigger & dump commands only:", 0 },
   { "revert", ULP_OP_REVERT, 0, 0,
     "revert livepatch / dump reverse patch info.", 0 },
-  { 0, 0, 0, 0, "packer & reverse commands only:", 0 },
+  { 0, 0, 0, 0, "packer commands only:", 0 },
   { "output", 'o', "FILE", 0, "Write output to FILE", 0 },
   { 0, 0, 0, 0, "packer command only:", 0 },
   { "livepatch", 'l', "LIVEPATCH", 0,
@@ -123,15 +121,10 @@ command_from_string(const char *str)
   };
 
   static const struct entry entries[] = {
-    { "patches", ULP_PATCHES },
-    { "check", ULP_CHECK },
-    { "dump", ULP_DUMP },
-    { "packer", ULP_PACKER },
-    { "trigger", ULP_TRIGGER },
-    { "post", ULP_POST },
-    { "reverse", ULP_REVERSE },
-    { "messages", ULP_MESSAGES },
-    { "livepatchable", ULP_LIVEPATCHABLE },
+    { "patches", ULP_PATCHES },   { "check", ULP_CHECK },
+    { "dump", ULP_DUMP },         { "packer", ULP_PACKER },
+    { "trigger", ULP_TRIGGER },   { "post", ULP_POST },
+    { "messages", ULP_MESSAGES }, { "livepatchable", ULP_LIVEPATCHABLE },
   };
 
   size_t i;
@@ -203,8 +196,7 @@ handle_end_of_arguments(const struct argp_state *state)
       }
       break;
 
-    /* Currently, DUMP, POST & REVERT does the same checks.  */
-    case ULP_REVERSE:
+    /* Currently, DUMP & POST does the same checks.  */
     case ULP_POST:
     case ULP_DUMP:
       if (state->arg_num < 2)
@@ -338,10 +330,6 @@ main(int argc, char **argv)
 
     case ULP_POST:
       ret = run_post(&arguments);
-      break;
-
-    case ULP_REVERSE:
-      ret = run_reverse(&arguments);
       break;
 
     case ULP_MESSAGES:

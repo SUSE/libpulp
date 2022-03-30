@@ -64,7 +64,3 @@ CONVENIENCE_LDFLAGS = -rpath $(libdir) $(AM_LDFLAGS)
 	echo .libs/$(basename $<).so
 	$(ULP_PACKER) $< #-o $@
 	echo Maintained here for legacy reasons > $@
-
-%.rev: %.ulp
-	$(ULP_REVERSE) .libs/$(basename $<).so #-o $@
-	echo Maintained here for legacy reasons > $@

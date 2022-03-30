@@ -30,7 +30,6 @@ noinst_HEADERS = \
   patches.h \
   dump.h \
   post.h \
-  revert.h \
   messages.h \
   livepatchable.h \
   elf-extra.h
@@ -44,7 +43,6 @@ ulp_SOURCES = \
   md4.c \
   trigger.c \
   post.c \
-  revert.c \
   messages.c \
   introspection.c \
   ptrace.c \
