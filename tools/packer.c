@@ -757,6 +757,79 @@ write_patch_id(struct ulp_metadata *ulp, const char *description,
   return 0;
 }
 
+static int
+write_reverse_patch(struct ulp_metadata *ulp, const char *filename)
+{
+  FILE *file;
+  char type = 2;
+  struct ulp_object *obj;
+  int c;
+#if 0
+  if (filename == NULL)
+    file = fopen(OUT_REVERSE_NAME, "w");
+  else
+    file = fopen(filename, "w");
+  if (!file) {
+    WARN("unable to open output metadata file.");
+    return 0;
+  };
+#endif
+
+  const char *tmp_path = create_path_to_tmp_file();
+  file = fopen(tmp_path, "w");
+
+  if (!file) {
+    WARN("unable to open output metadata temp file to %s: %s.", tmp_path,
+         strerror(errno));
+    return 0;
+  };
+
+  /* Patch type -> 2 means revert-patch */
+  fwrite(&type, sizeof(uint8_t), 1, file);
+
+  /* Patch id (32b) */
+  fwrite(&ulp->patch_id, sizeof(char), 32, file);
+
+  /* Don't write these informations yet.  This will be written when extracting
+     the metadata from the livepatch container.  But keep the code here so that
+     someone reading this code knows that more information will be added into
+     the metadata file.  */
+#if 0
+  /* patch .so filename */
+  c = strlen(ulp->so_filename) + 1;
+  /* patch .so filename length */
+  fwrite(&c, sizeof(uint32_t), 1, file);
+  /* patch .so filename */
+  fwrite(ulp->so_filename, sizeof(char), c, file);
+#endif
+
+  obj = ulp->objs;
+  /* object build id length */
+  fwrite(&obj->build_id_len, sizeof(uint32_t), 1, file);
+  /* object build id */
+  fwrite(obj->build_id, sizeof(char), obj->build_id_len, file);
+
+  if (!obj->name) {
+    WARN("to be patched object has no name\n");
+    return 0;
+  }
+  c = strlen(obj->name);
+  /* object name length */
+  fwrite(&c, sizeof(uint32_t), 1, file);
+  /* object name */
+  fwrite(obj->name, sizeof(char), c, file);
+
+  fclose(file);
+  if (embed_patch_metadata_into_elf(NULL, filename, tmp_path, ".ulp.rev")) {
+    WARN("Unable to embed patch metadata into %s", filename);
+    remove(tmp_path);
+    return 0;
+  }
+
+  remove(tmp_path);
+  return 1;
+}
+
 int
 run_packer(struct arguments *arguments)
 {
@@ -815,7 +888,11 @@ run_packer(struct arguments *arguments)
                                     ".ulp"))
     goto tmpfile_clean;
 
-  remove(tmp_path);
+  if (!write_reverse_patch(&ulp, arguments->livepatch)) {
+    WARN("Error gerenating reverse live patch.\n");
+    goto tmpfile_clean;
+  }
+
   free_metadata(&ulp);
   WARN("metadata embedded into libepatch container.");
   return 0;

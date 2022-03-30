@@ -35,7 +35,6 @@ typedef enum
   ULP_PACKER,
   ULP_TRIGGER,
   ULP_POST,
-  ULP_REVERSE,
   ULP_MESSAGES,
   ULP_LIVEPATCHABLE,
 } command_t;

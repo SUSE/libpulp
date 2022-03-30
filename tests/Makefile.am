@@ -262,67 +262,46 @@ libmanyprocesses_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 METADATA = \
   libdozens_livepatch1.dsc \
   libdozens_livepatch1.ulp \
-  libdozens_livepatch1.rev \
   libdozens_livepatch99.dsc \
   libdozens_livepatch99.ulp \
-  libdozens_livepatch99.rev \
   libhundreds_livepatch1.dsc \
   libhundreds_livepatch1.ulp \
-  libhundreds_livepatch1.rev \
   libhundreds_livepatch2.dsc \
   libhundreds_livepatch2.ulp \
-  libhundreds_livepatch2.rev \
   libhundreds_livepatch3.dsc \
   libhundreds_livepatch3.ulp \
-  libhundreds_livepatch3.rev \
   libdozens_bsymbolic_livepatch1.dsc \
   libdozens_bsymbolic_livepatch1.ulp \
-  libdozens_bsymbolic_livepatch1.rev \
   libhundreds_bsymbolic_livepatch1.dsc \
   libhundreds_bsymbolic_livepatch1.ulp \
-  libhundreds_bsymbolic_livepatch1.rev \
   libparameters_livepatch1.dsc \
   libparameters_livepatch1.ulp \
-  libparameters_livepatch1.rev \
   libparameters_livepatch2.dsc \
   libparameters_livepatch2.ulp \
-  libparameters_livepatch2.rev \
   libparameters_livepatch3.dsc \
   libparameters_livepatch3.ulp \
-  libparameters_livepatch3.rev \
   librecursion_livepatch1.dsc \
   librecursion_livepatch1.ulp \
-  librecursion_livepatch1.rev \
   libblocked_livepatch1.dsc \
   libblocked_livepatch1.ulp \
-  libblocked_livepatch1.rev \
   libpagecross_livepatch1.dsc \
   libpagecross_livepatch1.ulp \
-  libpagecross_livepatch1.rev \
   libaddress_livepatch1.dsc \
   libaddress_livepatch1.ulp \
-  libaddress_livepatch1.rev \
   libcontract_livepatch1.dsc \
   libcontract_livepatch1.ulp \
-  libcontract_livepatch1.rev \
   libaccess_livepatch1.dsc \
   libaccess_livepatch1.ulp \
-  libaccess_livepatch1.rev \
   libaccess_livepatch2.dsc \
   libaccess_livepatch2.ulp \
-  libaccess_livepatch2.rev \
   libtls_livepatch1.dsc \
   libtls_livepatch1.ulp \
-  libtls_livepatch1.rev \
   libbuildid_livepatch1.dsc \
   libbuildid_livepatch1.ulp \
-  libbuildid_livepatch1.rev \
   libmanyprocesses_livepatch1.dsc \
   libmanyprocesses_livepatch1.ulp \
-  libmanyprocesses_livepatch1.rev \
   libprocess_livepatch1.dsc \
-  libprocess_livepatch1.ulp \
-  libprocess_livepatch1.rev
+  libprocess_livepatch1.ulp
 
 EXTRA_DIST = \
   libdozens_livepatch1.in \
