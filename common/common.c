@@ -194,14 +194,19 @@ create_path_to_tmp_file(void)
   bool conflict = false;
   do {
     unsigned token;
-    getrandom(&token, sizeof(unsigned), 0);
+    (void)getrandom(&token, sizeof(unsigned), 0);
     snprintf(buffer, 24, "%s%u", tmp_prefix, token);
-    f = fopen(buffer, "w");
-    if (f == NULL)
+    f = fopen(buffer, "r");
+    if (f) {
       conflict = true;
+      fclose(f);
+    }
   }
   while (conflict);
 
+  /* Create file so other packer instances do not hold it.  */
+  f = fopen(buffer, "w");
+  fwrite("", 1, 0, f);
   fclose(f);
 
   return buffer;
