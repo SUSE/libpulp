@@ -90,7 +90,7 @@ ulp_warn(const char *format, ...)
 void
 ulp_debug(const char *format, ...)
 {
-  if (!ulp_verbose) {
+  if (ulp_verbose) {
     va_list args;
     va_start(args, format);
     vfprintf(stderr, format, args);
@@ -1527,14 +1527,14 @@ extract_ulp_from_so_to_mem(const char *livepatch, bool revert, char **out)
 
   Elf *elf = load_elf(livepatch, &fd);
   if (elf == NULL) {
-    WARN("Unable to load elf file: %s", livepatch);
     *out = NULL;
     return 0;
   }
 
   Elf_Scn *ulp_scn = get_elfscn_by_name(elf, section);
   if (ulp_scn == NULL) {
-    WARN("Unable to get section .ulp from elf %s", livepatch);
+    WARN("Unable to get section .ulp from elf %s: %s", livepatch,
+         elf_errmsg(-1));
     unload_elf(&elf, &fd);
     *out = NULL;
     return 0;
@@ -1552,7 +1552,7 @@ extract_ulp_from_so_to_mem(const char *livepatch, bool revert, char **out)
   if (meta_size >= ULP_METADATA_BUF_LEN) {
     WARN("metadata content is too large: has %u bytes, expected less than %u.",
          meta_size, ULP_METADATA_BUF_LEN);
-    return EOVERFLOW;
+    return 0;
   }
   char *final_meta = (char *)malloc(meta_size);
   char *meta_head = final_meta;

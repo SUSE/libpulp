@@ -484,6 +484,7 @@ TESTS = \
   process.py \
   process_revert.py \
   livepatchable.py \
+  revert_with_invalid.py \
   manyprocesses.py \
   tempfiles.py
 
