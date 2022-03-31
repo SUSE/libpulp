@@ -233,11 +233,13 @@ class spawn(pexpect.spawn):
   # are optional, are the same that the Trigger tool provides (see its --help
   # output for more information).
   def livepatch(self, filename=None, timeout=10, retries=1,
-                verbose=True, quiet=False, revert=False, revert_lib=None):
+                verbose=True, quiet=False, revert=False, revert_lib=None,
+                sanity=True):
 
     # Check sanity of command-line arguments
-    self.sanity(pid=self.pid)
-    self.sanity(filename=filename)
+    if sanity is True:
+      self.sanity(pid=self.pid)
+      self.sanity(filename=filename)
 
     # Build command-line from arguments
     command = [ulptool, "trigger", '-p', str(self.pid)]
@@ -271,7 +273,8 @@ class spawn(pexpect.spawn):
 
     # The trigger tool returns 0 on success, so use check_returncode(),
     # which asserts that, and raises CalledProcessError otherwise.
-    tool.check_returncode()
+    if sanity is True:
+      tool.check_returncode()
     if revert == True:
       self.print('Live patch reverted successfully.')
     else:

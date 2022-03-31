@@ -85,6 +85,10 @@ trigger_one_process(int pid, int retries, const char *container_path,
   if (container_path) {
     livepatch_size =
         extract_ulp_from_so_to_mem(container_path, revert, &livepatch);
+    if (livepatch == NULL || livepatch_size == 0) {
+      ret = ENOMETA;
+      goto metadata_clean;
+    }
   }
 
   if (livepatch && load_patch_info_from_mem(livepatch, livepatch_size)) {
