@@ -194,7 +194,12 @@ create_path_to_tmp_file(void)
   bool conflict = false;
   do {
     unsigned token;
-    (void)getrandom(&token, sizeof(unsigned), 0);
+    ssize_t n = getrandom(&token, sizeof(unsigned), 0);
+    if (n != sizeof(unsigned)) {
+      WARN("Failure in getrandom()");
+      return NULL;
+    }
+
     snprintf(buffer, 24, "%s%u", tmp_prefix, token);
     f = fopen(buffer, "r");
     if (f) {
