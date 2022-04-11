@@ -1,0 +1,4 @@
+__ABS_BUILDDIR__/.libs/libprocess_access_livepatch1.so
+@__ABS_BUILDDIR__/process_access
+banner_set:new_banner_set
+#banner:ulpr_banner
