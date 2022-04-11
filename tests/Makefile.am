@@ -194,6 +194,7 @@ check_LTLIBRARIES += libdozens_livepatch1.la \
                      libaccess_livepatch2.la \
                      libtls_livepatch1.la \
                      libbuildid_livepatch1.la \
+                     libprocess_access_livepatch1.la \
                      libmanyprocesses_livepatch1.la
 
 libdozens_livepatch1_la_SOURCES = libdozens_livepatch1.c
@@ -256,6 +257,9 @@ libtls_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 libbuildid_livepatch1_la_SOURCES = libbuildid_livepatch1.c
 libbuildid_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
+libprocess_access_livepatch1_la_SOURCES = process_access_livepatch1.c
+libprocess_access_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
+
 libmanyprocesses_livepatch1_la_SOURCES = libmanyprocesses_livepatch1.c
 libmanyprocesses_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
@@ -301,7 +305,9 @@ METADATA = \
   libmanyprocesses_livepatch1.dsc \
   libmanyprocesses_livepatch1.ulp \
   libprocess_livepatch1.dsc \
-  libprocess_livepatch1.ulp
+  libprocess_livepatch1.ulp \
+  libprocess_access_livepatch1.dsc \
+  libprocess_access_livepatch1.ulp
 
 EXTRA_DIST = \
   libdozens_livepatch1.in \
@@ -324,7 +330,8 @@ EXTRA_DIST = \
   libtls_livepatch1.in \
   libbuildid_livepatch1.in \
   libmanyprocesses_livepatch1.in \
-  libprocess_livepatch1.in
+  libprocess_livepatch1.in \
+  libprocess_access_livepatch1.in
 
 clean-local:
 	rm -f $(METADATA)
@@ -352,6 +359,7 @@ check_PROGRAMS = \
   process \
   tls \
   buildid \
+  process_access \
   manyprocesses
 
 numserv_SOURCES = numserv.c
@@ -449,6 +457,10 @@ buildid_SOURCES = buildid.c
 buildid_LDADD = libbuildid.la
 buildid_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
+process_access_SOURCES = process_access.c
+process_access_CFLAGS = -fpatchable-function-entry=16,14 $(AM_CFLAGS)
+process_access_DEPENDENCIES = $(POST_PROCESS)
+
 manyprocesses_SOURCES = manyprocesses.c
 manyprocesses_LDADD = libmanyprocesses.la
 manyprocesses_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
@@ -485,6 +497,7 @@ TESTS = \
   process_revert.py \
   livepatchable.py \
   revert_with_invalid.py \
+  process_access.py \
   manyprocesses.py \
   tempfiles.py
 
@@ -547,3 +560,5 @@ libbuildid_livepatch1.ulp: libbuildid_livepatch1.dsc $(check_LTLIBRARIES)
 	echo Maintained for legacy reasons > $@
 
 libprocess_livepatch1.ulp: process libprocess_livepatch1.dsc
+
+libprocess_access_livepatch1.ulp: process_access libprocess_access_livepatch1.dsc

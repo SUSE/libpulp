@@ -308,16 +308,15 @@ dl_find_base_addr(struct dl_phdr_info *info, size_t size, void *data)
     return 0;
 
   /* Check if the current info is the library we want to find the symbols.  */
-  if (*info->dlpi_name != '\0' && strstr(info->dlpi_name, args->library)) {
-    /* Found.  Set symbol_addr as the base address of library.  */
-    args->bias_addr = info->dlpi_addr;
-    args->tls_index = info->dlpi_tls_modid;
+  if (args->library && !strstr(info->dlpi_name, args->library))
+    return 0;
 
-    /* Alert dl_iterate that we are finished.  */
-    return 1;
-  }
+  /* Found.  Set symbol_addr as the base address of library.  */
+  args->bias_addr = info->dlpi_addr;
+  args->tls_index = info->dlpi_tls_modid;
 
-  return 0;
+  /* Alert dl_iterate that we are finished.  */
+  return 1;
 }
 
 void *
