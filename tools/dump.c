@@ -34,6 +34,7 @@ dump_metadata(struct ulp_metadata *ulp, int buildid_only)
 {
   struct ulp_object *obj;
   struct ulp_unit *unit;
+  struct ulp_reference *ref;
   const char *buildid_string = buildid_to_string(ulp->patch_id);
 
   if (ulp) {
@@ -65,6 +66,15 @@ dump_metadata(struct ulp_metadata *ulp, int buildid_only)
         fprintf(stdout, "** new_fname: %s\n", unit->new_fname);
         fprintf(stdout, "** old_faddr: %p\n", unit->old_faddr);
         unit = unit->next;
+      }
+
+      /* Show static references:  */
+      fprintf(stdout, "\nstatic references: %d\n", ulp->nrefs);
+      for (ref = ulp->refs; ref != NULL; ref = ref->next) {
+        fprintf(stdout, "*** ref_name: %s\n", ref->reference_name);
+        fprintf(stdout, "*** target_offset: %lx\n", ref->target_offset);
+        fprintf(stdout, "*** patch_offset: %lx\n", ref->target_offset);
+        fprintf(stdout, "*** tls variable: %s\n\n", ref->tls ? "yes" : "no");
       }
     }
   }
