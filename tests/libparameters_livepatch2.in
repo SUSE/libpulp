@@ -1,3 +1,2 @@
 __ABS_BUILDDIR__/.libs/libparameters_livepatch2.so
 @__ABS_BUILDDIR__/.libs/libparameters.so.0
-int_params:new_int_params

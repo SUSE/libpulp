@@ -51,8 +51,6 @@ int create_patch_metadata_file(struct ulp_metadata *ulp, const char *filename);
 int add_dependency(struct ulp_metadata *ulp, struct ulp_dependency *dep,
                    const char *filename);
 
-int parse_description(const char *filename, struct ulp_metadata *ulp);
-
 int get_build_id(Elf_Scn *s, struct ulp_object *obj);
 
 void *get_symbol_addr(Elf *elf, Elf_Scn *s, const char *search);
