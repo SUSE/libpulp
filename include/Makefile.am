@@ -23,4 +23,5 @@ noinst_HEADERS = \
 	interpose.h \
 	msg_queue.h \
 	error.h \
-	error_common.h
+	error_common.h \
+	terminal_colors.h

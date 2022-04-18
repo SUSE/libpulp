@@ -25,6 +25,8 @@
 #include <gelf.h>
 #include <libgen.h>
 #include <limits.h>
+#include <signal.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,6 +38,7 @@
 #include "introspection.h"
 #include "md4.h"
 #include "packer.h"
+#include "terminal_colors.h"
 #include "ulp_common.h"
 
 static int get_elf_tgt_ref_addrs(Elf *, struct ulp_reference *, Elf_Scn *,
@@ -360,26 +363,206 @@ add_dependency(struct ulp_metadata *ulp, struct ulp_dependency *dep,
   return 1;
 }
 
-int
-parse_description(const char *filename, struct ulp_metadata *ulp)
+/** Struct to denote a location in the file.  Used for better error messages.
+ */
+typedef struct
+{
+  unsigned line;
+  unsigned col;
+} location_t;
+
+static const char *parse_filename;
+static location_t loc;
+
+/** @brief Print a beautiful error message to the user
+ *
+ * This function tries to print error messages in the .dsc file as beautiful as
+ * GCC 5.0+ does.
+ *
+ * @param loc      Location of the problem.
+ * @param fmt      Reason of error.
+ **/
+
+static void
+parse_error(location_t loc, const char *fmt, ...)
+{
+  va_list arglist;
+  unsigned i, j;
+  FILE *parse_file;
+
+  char *line = NULL;
+  size_t line_size;
+  size_t len;
+
+  printf(WHITE("%s:%d:%d: ") RED("error: "), parse_filename, loc.line,
+         loc.col);
+  va_start(arglist, fmt);
+  vprintf(fmt, arglist);
+  va_end(arglist);
+  putchar('\n');
+  parse_file = fopen(parse_filename, "r");
+  if (!parse_file) {
+    printf("ERROR WHILE PRINTING ERROR MESSAGE: %s\n", strerror(errno));
+    return;
+  }
+
+  assert(loc.line > 0 && loc.col > 0);
+
+  for (i = 0; i < loc.line; i++) {
+    len = getline(&line, &line_size, parse_file);
+  }
+
+  if (i > 0) {
+    for (j = 0; j < (loc.col - 1) && j < len; j++) {
+      putchar(line[j]);
+    }
+
+    unsigned redchars = 0;
+    printf(TERM_COLOR_RED);
+    for (; j < len; j++) {
+      if (line[j] == ':') {
+        if (line[loc.col - 1] == ':') {
+          putchar(line[j]);
+          redchars++;
+          j++;
+        }
+        break;
+      }
+      else if (line[j] != '\n') {
+        putchar(line[j]);
+        redchars++;
+      }
+    }
+    printf(TERM_COLOR_RESET);
+
+    for (; j < len; j++) {
+      if (line[j] != '\n')
+        putchar(line[j]);
+    }
+
+    putchar('\n');
+
+    for (j = 0; j < (loc.col - 1) && j < len; j++) {
+      putchar(' ');
+    }
+
+    printf(TERM_COLOR_RED);
+    putchar('^');
+    for (j = 1; j < redchars; j++) {
+      putchar('~');
+    }
+    printf(TERM_COLOR_RESET);
+  }
+
+  free(line);
+  putchar('\n');
+  fclose(parse_file);
+}
+
+static void
+segfault_handler(int signum)
+{
+  if (signum != SIGSEGV) {
+    return;
+  }
+
+  parse_error(loc, "internal error parsing %s: received SIGSEGV",
+              parse_filename);
+  exit(1);
+}
+
+/** Struct containing informations about a shared-link library (.so). */
+struct shared_object
+{
+  /** The path to the .so.  */
+  const char *path;
+
+  /** Elf object in memory.  */
+  Elf *elf;
+
+  /** Opened file descriptor.  */
+  int fd;
+
+  /** Dynsym object.  */
+  Elf_Scn *dynsym;
+
+  /** Symtab object.  */
+  Elf_Scn *symtab;
+};
+
+/** @brief Checks if symbol `sym` exists in shared object `so`
+ *
+ * @param so   The shared object.
+ * @param sym  Symbol to query
+ *
+ * @return true if exists, false if not.
+ **/
+static bool
+symbol_exists(struct shared_object *so, const char *sym)
+{
+  if (!get_symbol_addr(so->elf, so->dynsym, sym)) {
+    if (so->symtab) {
+      if (!get_symbol_addr(so->elf, so->symtab, sym)) {
+        return 0;
+      }
+    }
+    else {
+      return 0;
+    }
+  }
+
+  return true;
+}
+
+/** @brief Parse description .dsc file.
+ *
+ * This function parses the livepatch description files in dsc format, as
+ * specified by the programmer, and construct the ulp object.
+ *
+ * @param filename           Path to .dsc file.
+ * @param ulp                Pointer to ulp object
+ * @param container_override Use the following container file instead of the
+ * one provided in the .dsc file
+ * @param target_override    Use the following target file instead of the one
+ *                           provided in .dsc file.
+ *
+ */
+
+static int
+parse_description(const char *filename, struct ulp_metadata *ulp,
+                  const char *container_override, const char *target_override)
 {
   struct ulp_unit *unit, *last_unit;
   struct ulp_dependency *dep;
   struct ulp_reference *ref;
-  FILE *file;
-  char *first;
-  char *second;
-  char *third;
+  char *first = NULL;
+  char *second = NULL;
+  char *third = NULL;
+  FILE *parse_file;
   size_t len = 0;
-  int n;
+  int n, ret;
+
+  struct shared_object container, target;
+
+  memset(&container, 0, sizeof(container));
+  memset(&target, 0, sizeof(target));
+
+  loc.line = 0;
+  loc.col = 0;
+  parse_filename = filename;
+
+  /* Install a SIGSEGV handler in case this parser crashes, so the user at
+     least get some kind of error message.  */
+  signal(SIGSEGV, segfault_handler);
 
   /* zero the entire structure before filling */
   memset(ulp, 0, sizeof(struct ulp_metadata));
 
-  file = fopen(filename, "r");
-  if (!file) {
+  parse_file = fopen(filename, "r");
+  if (!parse_file) {
     WARN("Unable to open description file.");
-    return 0;
+    ret = 0;
+    goto dsc_clean;
   }
 
   first = NULL;
@@ -387,72 +570,117 @@ parse_description(const char *filename, struct ulp_metadata *ulp)
   last_unit = NULL;
   len = 0;
 
-  n = getline(&first, &len, file);
+  n = getline(&first, &len, parse_file);
+  loc.line++;
+  loc.col = 1;
   if (n <= 0) {
-    WARN("Unable to parse description.");
-    return 0;
+    WARN("Unable to parse description file: is empty");
+    ret = 0;
+    goto dsc_clean;
   }
 
-  ulp->so_filename = calloc(n + 1, sizeof(char));
-  if (!ulp->so_filename) {
-    WARN("Unable to allocate memory for patch so filename.");
-    return 0;
+  if (container_override) {
+    ulp->so_filename = strdup(container_override);
   }
-  strcpy(ulp->so_filename, first);
+  else {
+    ulp->so_filename = calloc(n + 1, sizeof(char));
+    if (!ulp->so_filename) {
+      parse_error(loc, "unable to allocate memory for patch so filename");
+      ret = 0;
+      goto dsc_clean;
+    }
+    strcpy(ulp->so_filename, first);
 
-  if (!ulp->so_filename) {
-    WARN("Unable to retrieve so filename from description.");
-    return 0;
+    if (!ulp->so_filename) {
+      parse_error(loc, "unable to retrieve so filename from description");
+      ret = 0;
+      goto dsc_clean;
+    }
+    if (ulp->so_filename[n - 1] == '\n')
+      ulp->so_filename[n - 1] = '\0';
   }
-  if (ulp->so_filename[n - 1] == '\n')
-    ulp->so_filename[n - 1] = '\0';
+
+  FILE *file_check = fopen(ulp->so_filename, "r");
+  if (!file_check) {
+    parse_error(loc, "livepatch container file not found");
+    ret = 0;
+    goto dsc_clean;
+  }
+  fclose(file_check);
+
   free(first);
   first = NULL;
   len = 0;
 
-  n = getline(&first, &len, file);
+  container.path = ulp->so_filename;
+  container.elf = load_elf(container.path, &container.fd);
+  container.dynsym = get_dynsym(container.elf);
+  container.symtab = get_symtab(container.elf);
+
+  n = getline(&first, &len, parse_file);
+  loc.line++;
+  loc.col = 1;
   while (n > 0 && first[0] == '*') {
     dep = calloc(1, sizeof(struct ulp_dependency));
     if (!dep) {
-      WARN("Unable to allocate memory for dependency.");
-      return 0;
+      parse_error(loc, "unable to allocate memory for dependency.");
+      ret = 0;
+      goto dsc_clean;
     }
     if (first[n - 1] == '\n')
       first[n - 1] = '\0';
     if (!add_dependency(ulp, dep, &first[1])) {
-      WARN("Unable to add dependency to livepatch metadata.");
-      return 0;
+      parse_error(loc, "unable to add dependency to livepatch metadata.");
+      ret = 0;
+      goto dsc_clean;
     }
 
     free(first);
     first = NULL;
     len = 0;
-    n = getline(&first, &len, file);
+    n = getline(&first, &len, parse_file);
+    loc.line++;
+    loc.col = 1;
   }
 
   while (n > 0) {
     /* if this is another object */
     if (first[0] == '@') {
       if (ulp->objs) {
-        WARN("libpulp patches 1 shared object per patch\n");
-        return 0;
+        parse_error(loc, "duplicated target object. Libpulp patches 1 shared "
+                         "object per patch\n");
+        ret = 0;
+        goto dsc_clean;
       }
 
       ulp->objs = calloc(1, sizeof(struct ulp_object));
       if (!ulp->objs) {
-        WARN("Unable to allocate memory for parsing ulp object.");
-        return 0;
+        parse_error(loc, "unable to allocate memory for parsing ulp object.");
+        ret = 0;
+        goto dsc_clean;
       }
       if (first[n - 1] == '\n')
         first[n - 1] = '\0';
-      ulp->objs->name = strdup(&first[1]);
+
+      if (target_override)
+        ulp->objs->name = strdup(target_override);
+      else
+        ulp->objs->name = strdup(&first[1]);
       ulp->objs->nunits = 0;
       last_unit = NULL;
+
+      target.path = ulp->objs->name;
+      target.elf = load_elf(target.path, &target.fd);
+      target.dynsym = get_dynsym(target.elf);
+      target.symtab = get_symtab(target.elf);
     }
     else {
       if (!ulp->objs) {
-        WARN("Patch description does not define shared object for patching.");
-        return 0;
+        parse_error(
+            loc,
+            "patch description does not define shared object for patching.");
+        ret = 0;
+        goto dsc_clean;
       }
 
       /* else, this is new function to-be-patched in last found object */
@@ -461,15 +689,17 @@ parse_description(const char *filename, struct ulp_metadata *ulp)
 
       /* Lines starting with # are static data references */
       if (first[0] == '#') {
-
+        loc.col = 2;
         ref = calloc(1, sizeof(struct ulp_reference));
         if (!ref) {
-          WARN("Unable to allocate memory");
-          return 0;
+          parse_error(loc, "unable to allocate memory");
+          ret = 0;
+          goto dsc_clean;
         }
 
         if (first[1] == '%') {
           ref->tls = true;
+          loc.col++;
         }
         else {
           ref->tls = false;
@@ -484,8 +714,25 @@ parse_description(const char *filename, struct ulp_metadata *ulp)
         second = strchr(third, ':');
 
         /* Check if the user manually specified the offsets.  */
-        if (second == NULL)
+        if (second == NULL) {
           ref->reference_name = strdup(third);
+
+          if (!symbol_exists(&target, ref->target_name)) {
+            parse_error(loc, "symbol %s is not present in %s",
+                        ref->target_name, target.path);
+            ret = 0;
+            goto dsc_clean;
+          }
+
+          loc.col += strlen(ref->target_name) + 1;
+
+          if (!symbol_exists(&container, ref->reference_name)) {
+            parse_error(loc, "symbol %s is not present in %s",
+                        ref->reference_name, container.path);
+            ret = 0;
+            goto dsc_clean;
+          }
+        }
         else {
           *second = '\0';
           ref->reference_name = strdup(third);
@@ -511,32 +758,64 @@ parse_description(const char *filename, struct ulp_metadata *ulp)
        */
       else {
 
+        if (first[strlen(first) - 1] == ':') {
+          loc.col = strlen(first);
+          parse_error(loc, "expected target variable or offset");
+          ret = 0;
+          goto dsc_clean;
+        }
+
         /* find old/new function name separator */
         first = strtok(first, ":");
         second = strtok(NULL, ":");
 
+        if (!symbol_exists(&target, first)) {
+          parse_error(loc, "symbol %s is not present in %s", first,
+                      target.path);
+          ret = 0;
+          goto dsc_clean;
+        }
+
         if (!second) {
-          WARN("Invalid input description.");
-          return 0;
+          parse_error(loc, "expected ':' token and target variable or offset");
+          ret = 0;
+          goto dsc_clean;
+        }
+
+        loc.col = (ssize_t)(second - first) + 1;
+        if (*second == '\0') {
+          parse_error(loc, "expected target variable or offset");
+          ret = 0;
+          goto dsc_clean;
+        }
+
+        if (!symbol_exists(&container, second)) {
+          parse_error(loc, "symbol %s is not present in %s", second,
+                      container.path);
+          ret = 0;
+          goto dsc_clean;
         }
 
         /* allocate and fill patch unit */
         unit = calloc(1, sizeof(struct ulp_unit));
         if (!unit) {
-          WARN("Unable to allocate memory for parsing ulp units.");
-          return 0;
+          parse_error(loc, "unable to allocate memory for parsing ulp units.");
+          ret = 0;
+          goto dsc_clean;
         }
 
         unit->old_fname = strdup(first);
         if (!unit->old_fname) {
-          WARN("Unable to allocate memory for parsing ulp units.");
-          return 0;
+          parse_error(loc, "unable to allocate memory for parsing ulp units.");
+          ret = 0;
+          goto dsc_clean;
         }
 
         unit->new_fname = strdup(second);
         if (!unit->old_fname) {
-          WARN("Unable to allocate memory for parsing ulp units.");
-          return 0;
+          parse_error(loc, "unable to allocate memory for parsing ulp units.");
+          ret = 0;
+          goto dsc_clean;
         }
 
         if (!last_unit) {
@@ -555,10 +834,22 @@ parse_description(const char *filename, struct ulp_metadata *ulp)
     first = NULL;
     second = NULL;
     len = 0;
-    n = getline(&first, &len, file);
+    n = getline(&first, &len, parse_file);
+    loc.line++;
+    loc.col = 1;
   }
-  free(first);
-  return 1;
+  ret = 1;
+dsc_clean:
+  fclose(parse_file);
+  parse_file = NULL;
+  if (first)
+    free(first);
+  signal(SIGSEGV, SIG_DFL);
+  if (container.elf)
+    unload_elf(&container.elf, &container.fd);
+  if (target.elf)
+    unload_elf(&target.elf, &target.fd);
+  return ret;
 }
 
 int
@@ -846,8 +1137,8 @@ run_packer(struct arguments *arguments)
   elf_version(EV_CURRENT);
 
   DEBUG("parsing the description file (%s).", description);
-  if (!parse_description(description, &ulp)) {
-    WARN("unable to parse description file (%s).", description);
+  if (!parse_description(description, &ulp, arguments->livepatch,
+                         arguments->library)) {
     ret = 1;
     goto main_error;
   }
