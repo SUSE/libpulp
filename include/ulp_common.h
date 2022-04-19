@@ -145,6 +145,8 @@ const char *create_path_to_tmp_file(void);
 void ulp_warn(const char *, ...);
 void ulp_debug(const char *, ...);
 
+void free_metadata(struct ulp_metadata *);
+
 #define FATAL(format, ...) \
   do { \
     fprintf(stderr, "ulp: " format "\n", ##__VA_ARGS__); \

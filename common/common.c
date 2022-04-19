@@ -121,6 +121,8 @@ get_target_binary_name(int pid)
 
   snprintf(fname, sizeof(fname), "/proc/%d/comm", pid);
   FILE *fp = fopen(fname, "r");
+  if (!fp)
+    return NULL;
   if (fgets(cmdline, sizeof(cmdline), fp) != NULL) {
     strncpy(binary_name, get_basename(cmdline), PATH_MAX - 1);
 
@@ -497,4 +499,46 @@ parse_metadata_from_mem(struct ulp_metadata *ulp, void *src, size_t size)
   }
 
   return 0;
+}
+
+void
+free_metadata(struct ulp_metadata *ulp)
+{
+  struct ulp_object *obj;
+  struct ulp_unit *unit, *next_unit;
+  struct ulp_reference *ref, *next_ref;
+  if (!ulp)
+    return;
+
+  if (ulp->so_filename)
+    free(ulp->so_filename);
+
+  for (ref = ulp->refs; ref != NULL; ref = next_ref) {
+    if (ref->target_name)
+      free(ref->target_name);
+    if (ref->reference_name)
+      free(ref->reference_name);
+    next_ref = ref->next;
+    free(ref);
+  }
+  ulp->refs = NULL;
+
+  obj = ulp->objs;
+  if (obj) {
+    unit = obj->units;
+    while (unit) {
+      next_unit = unit->next;
+      if (unit->old_fname)
+        free(unit->old_fname);
+      if (unit->new_fname)
+        free(unit->new_fname);
+      free(unit);
+      unit = next_unit;
+    }
+    if (obj->name)
+      free(obj->name);
+    if (obj->build_id)
+      free(obj->build_id);
+    free(obj);
+  }
 }

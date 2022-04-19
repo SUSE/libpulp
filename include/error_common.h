@@ -56,6 +56,7 @@ typedef int ulp_error_t;
 #define EDEPEND       273 /** Dependency failure.  */
 #define ENOADDRESS    274 /** Address Error.  */
 #define EAPPLIED      275 /** Patch applied.  */
+#define ENOTARGETLIB  276 /** Target library not loaded.  */
 
 /** Table used to map error code to message.  Define it here so that it is
  *  easier for it being maintained.
@@ -81,7 +82,8 @@ typedef int ulp_error_t;
     "Patch not applied", \
     "Dependency failure", \
     "Address read error", \
-    "Patch applied", \
+    "Patch already applied", \
+    "Target library not loaded", \
   }
 /* clang-format on */
 

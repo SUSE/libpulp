@@ -30,8 +30,6 @@
 
 struct arguments;
 
-void free_metadata(struct ulp_metadata *ulp);
-
 void unload_elf(Elf **elf, int *fd);
 
 Elf *load_elf(const char *obj, int *fd);

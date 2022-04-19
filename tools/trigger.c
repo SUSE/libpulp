@@ -39,19 +39,9 @@
 #include "error_common.h"
 #include "introspection.h"
 #include "patches.h"
+#include "terminal_colors.h"
 #include "trigger.h"
 #include "ulp_common.h"
-
-/** Holds global variables used in this file. */
-static struct
-{
-  int trigger_successes;
-  int trigger_processes;
-} globals;
-
-#define TRIGGER_ERR_NONE 0
-#define TRIGGER_ERR_UNKNOWN 1
-#define TRIGGER_ERR_WRONG_PROCESS 2
 
 /** @brief Apply a single live patch to one process.
  *
@@ -60,7 +50,7 @@ static struct
  *  the target process, and if so, proceeds hijacking all threads there
  *  to revert/apply patches.
  *
- *  @param pid       The pid of the process.
+ *  @param target    ulp_process object of target process.
  *  @param retries   The number of retries to livepatch before giving up.
  *  @param livepatch The path to the metadata file (.ulp). Not necessary on
  *                   --revert-all unless atomic reverse & patch is desired.
@@ -70,16 +60,16 @@ static struct
  *  @return 0 on success, anything else on error.
  */
 static int
-trigger_one_process(int pid, int retries, const char *container_path,
-                    const char *revert_library, bool check_stack, bool revert)
+trigger_one_process(struct ulp_process *target, int retries,
+                    const char *container_path, const char *revert_library,
+                    bool check_stack, bool revert)
 {
   char *livepatch = NULL;
   size_t livepatch_size = 0;
-  struct ulp_process *target = calloc(1, sizeof(struct ulp_process));
   int result;
   int ret;
 
-  target->pid = pid;
+  struct trigger_results *entry = NULL;
 
   /* Extract the livepatch metadata from .so file.  */
   if (container_path) {
@@ -91,24 +81,21 @@ trigger_one_process(int pid, int retries, const char *container_path,
     }
   }
 
-  if (livepatch && load_patch_info_from_mem(livepatch, livepatch_size)) {
-    WARN("error parsing the metadata file (%s).", livepatch);
-    ret = TRIGGER_ERR_UNKNOWN;
-    goto metadata_clean;
+  if (livepatch) {
+    ret = load_patch_info_from_mem(livepatch, livepatch_size);
+    if (ret) {
+      WARN("error parsing the metadata file (%s).", livepatch);
+      goto metadata_clean;
+    }
   }
 
-  ret = initialize_data_structures(target);
-  if (ret) {
-    WARN("error gathering target process information.");
-    ret = TRIGGER_ERR_UNKNOWN;
-    goto target_clean;
-  }
-
-  if (livepatch && check_patch_sanity(target)) {
-    /* Sanity may fail because the patch should not be applied to this
-       process.  */
-    ret = TRIGGER_ERR_WRONG_PROCESS;
-    goto target_clean;
+  if (livepatch) {
+    ret = check_patch_sanity(target);
+    if (ret) {
+      /* Sanity may fail because the patch should not be applied to this
+         process.  */
+      goto metadata_clean;
+    }
   }
 
   /*
@@ -126,13 +113,11 @@ trigger_one_process(int pid, int retries, const char *container_path,
     ret = hijack_threads(target);
     if (ret == ETHRDDETTACH) {
       FATAL("fatal error during live patch application (hijacking).");
-      ret = TRIGGER_ERR_UNKNOWN;
-      goto target_clean;
+      goto metadata_clean;
     }
     if (ret > 0) {
       WARN("unable to hijack process.");
-      ret = TRIGGER_ERR_UNKNOWN;
-      goto target_clean;
+      goto metadata_clean;
     }
 
     if (check_stack) {
@@ -184,17 +169,29 @@ trigger_one_process(int pid, int retries, const char *container_path,
   }
 
   if (result) {
-    WARN("live patching failed.");
-    ret = TRIGGER_ERR_UNKNOWN;
-    goto target_clean;
+    DEBUG("live patching failed.");
+    ret = result;
+    goto metadata_clean;
   }
 
-  WARN("live patching succeeded.");
-  ret = TRIGGER_ERR_NONE;
+  DEBUG("live patching succeeded.");
+  ret = 0;
 
-target_clean:
-  release_ulp_process(target);
 metadata_clean:
+  /* Annotate error code and patch name.  */
+  entry = calloc(1, sizeof(struct trigger_results));
+  entry->next = target->results;
+  if (container_path) {
+    entry->patch_name = strdup(container_path);
+  }
+  else {
+    char buf[128];
+    snprintf(buf, 128, "reverted all patches from %s", revert_library);
+    entry->patch_name = strdup(buf);
+  }
+  entry->err = ret;
+  target->results = entry;
+
   release_ulp_global_metadata();
   /* Remove temporary file.  */
   if (livepatch) {
@@ -208,7 +205,7 @@ metadata_clean:
  *  This function reads all metadata files in `ulp_folder_path` and applies
  *  them to a process with pid = `pid`.
  *
- *  @param pid             The pid of the process.
+ *  @param p               ulp_process object reference.
  *  @param retries         The number of retries to livepatch before giving up.
  *  @param ulp_folder_path The path to the folder containing all metadata
  * files.
@@ -218,8 +215,9 @@ metadata_clean:
  *  @return 0 on success, anything else on error.
  */
 static int
-trigger_many_ulps(int pid, int retries, const char *wildcard_path,
-                  const char *library, bool check_stack, bool revert)
+trigger_many_ulps(struct ulp_process *p, int retries,
+                  const char *wildcard_path, const char *library,
+                  bool check_stack, bool revert)
 {
   const char *wildcard = get_basename(wildcard_path);
   char *wildcard_path_dup = strdup(wildcard_path);
@@ -228,7 +226,7 @@ trigger_many_ulps(int pid, int retries, const char *wildcard_path,
   struct dirent *entry;
   char buffer[ULP_PATH_LEN];
 
-  int ret = 0;
+  int ret = 0, r;
 
   if (!directory) {
     FATAL("Unable to open directory: %s", ulp_folder_path);
@@ -275,18 +273,48 @@ trigger_many_ulps(int pid, int retries, const char *wildcard_path,
       continue;
     }
 
-    if (trigger_one_process(pid, retries, buffer, library, check_stack,
-                            revert) == 0)
-      globals.trigger_successes++;
-    globals.trigger_processes++;
+    r = trigger_one_process(p, retries, buffer, library, check_stack, revert);
+    if (!(ret == EBUILDID || ret == ENOTARGETLIB))
+      ret |= r;
   }
 
   closedir(directory);
-  ret = 0;
 
 wildcard_clean:
   free(wildcard_path_dup);
   return ret;
+}
+
+static void
+print_patched_unpatched_processes(struct ulp_process *list)
+{
+  struct ulp_process *curr_item;
+  int count = 0;
+  fprintf(stdout, "Summary:\n");
+  for (curr_item = list; curr_item != NULL; curr_item = curr_item->next) {
+    pid_t pid = curr_item->pid;
+    struct trigger_results *results;
+    fprintf(stdout, "  %s (pid: %5d):\n", get_target_binary_name(pid), pid);
+    for (results = curr_item->results; results; results = results->next) {
+      ulp_error_t err = results->err;
+      if (err == EBUILDID || err == ENOTARGETLIB) {
+        fprintf(stdout, YELLOW("    SKIPPED") " %s: %s\n", results->patch_name,
+                libpulp_strerror(results->err));
+      }
+      else if (err) {
+        fprintf(stdout, RED("    FAILED") " %s: %s\n", results->patch_name,
+                libpulp_strerror(results->err));
+      }
+      else {
+        fprintf(stdout, GREEN("    SUCCESS") " %s\n", results->patch_name);
+      }
+      count++;
+    }
+  }
+
+  if (count == 0) {
+    fprintf(stdout, "    (empty)\n");
+  }
 }
 
 /** @brief Apply multiple live patches to all processes with libpulp loaded.
@@ -311,9 +339,6 @@ trigger_many_processes(const char *process_wildcard, int retries,
   struct ulp_process *curr_item;
   int ret = 0;
 
-  globals.trigger_successes = 0;
-  globals.trigger_processes = 0;
-
   /* Iterate over the process list that have libpulp preloaded.  */
   for (curr_item = list; curr_item != NULL; curr_item = curr_item->next) {
     int r;
@@ -321,30 +346,76 @@ trigger_many_processes(const char *process_wildcard, int retries,
     if (ulp_folder_path) {
       /* If a path to ulp files were provided, trigger all files that match the
          wildcard.  */
-      r = trigger_many_ulps(curr_item->pid, retries, ulp_folder_path, library,
+      r = trigger_many_ulps(curr_item, retries, ulp_folder_path, library,
                             check_stack, revert);
     }
     else {
       /* No path or wildcard provided.  The user may have requested to
          revert-all.  */
-      r = trigger_one_process(curr_item->pid, retries, NULL, library,
-                              check_stack, revert);
-      if (r == 0)
-        globals.trigger_successes++;
-      globals.trigger_processes++;
+      r = trigger_one_process(curr_item, retries, NULL, library, check_stack,
+                              revert);
     }
 
     /* If the livepatch failed because the patch wasn't targeted to the
        proccess, we ignore because we are batch processing.  */
-    if (r != TRIGGER_ERR_WRONG_PROCESS)
+    if (!(r == EBUILDID || r == ENOTARGETLIB))
       ret |= r;
   }
 
   if (!ulp_quiet)
-    WARN("Succesfully applied %d patches\n", globals.trigger_successes);
+    print_patched_unpatched_processes(list);
 
   release_ulp_process(list);
   return ret;
+}
+
+static void
+diagnose_patch_apply(ulp_error_t ret, bool revert, const char *livepatch,
+                     const char *library, int pid)
+{
+  const char *apply_rev = (revert) ? "revert" : "apply";
+  const char *applied_rev = (revert) ? "reverted" : "applied";
+
+  if (ret) {
+    if (livepatch) {
+      fprintf(stdout, RED("error:") " could not %s %s to %s (pid %d): %s\n",
+              apply_rev, livepatch, get_target_binary_name(pid), pid,
+              libpulp_strerror(ret));
+      if (ret == EBUILDID && !ulp_quiet) {
+        fprintf(stdout, CYAN("note:") " run `ulp patches -b` to retrieve all "
+                                      "build ids from patchable processes.\n");
+      }
+    }
+    else if (library) {
+      fprintf(stdout,
+              RED("error:") " could not revert all patches to library %s in "
+                            "process %s (pid %d): %s\n",
+              library, get_target_binary_name(pid), pid,
+              libpulp_strerror(ret));
+      fprintf(stdout, CYAN("note:") " run `ulp patches` to retrieve all "
+                                    "libraries in process.\n");
+    }
+    else {
+      fprintf(stdout, RED("error:") " no input");
+    }
+  }
+  else {
+    if (!ulp_quiet) {
+      if (livepatch) {
+        fprintf(stdout, GREEN("success:") " patch %s %s to %d\n", livepatch,
+                applied_rev, pid);
+      }
+      else if (library) {
+        fprintf(stdout,
+                GREEN("success:") " reverted all patches to library %s in "
+                                  "process %s (pid %d)\n",
+                library, get_target_binary_name(pid), pid);
+      }
+      else {
+        fprintf(stdout, RED("error:") " no input");
+      }
+    }
+  }
 }
 
 /** @brief Trigger command entry point.
@@ -373,9 +444,21 @@ run_trigger(struct arguments *arguments)
   check_stack = arguments->check_stack;
 #endif
 
-  if (pid > 0)
-    ret = trigger_one_process(pid, retry, livepatch, library, check_stack,
+  if (pid > 0) {
+    struct ulp_process *target = calloc(1, sizeof(struct ulp_process));
+    target->pid = pid;
+    ret = initialize_data_structures(target);
+    if (ret) {
+      WARN("error gathering target process information.");
+      return 1;
+    }
+
+    ret = trigger_one_process(target, retry, livepatch, library, check_stack,
                               revert);
+
+    diagnose_patch_apply(ret, revert, livepatch, library, pid);
+    release_ulp_process(target);
+  }
   else {
     ret = trigger_many_processes(process_wildcard, retry, ulp_folder_path,
                                  library, check_stack, revert);

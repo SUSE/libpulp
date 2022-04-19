@@ -182,6 +182,17 @@ release_ulp_dynobj(struct ulp_dynobj *obj)
   }
 }
 
+void
+release_trigger_results(struct trigger_results *list)
+{
+  if (list == NULL)
+    return;
+
+  release_trigger_results(list->next);
+  free((void *)list->patch_name);
+  free(list);
+}
+
 /** @brief Release memory of an ulp_process `p`
  *
  *  Release memory of an ulp_process allocated with malloc as well as
@@ -202,6 +213,7 @@ release_ulp_process(struct ulp_process *p)
     release_ulp_dynobj(p->dynobj_targets);
     /* p->dynobj_libpulp don't require free as it is in targets chain.  */
     release_ulp_dynobj(p->dynobj_patches);
+    release_trigger_results(p->results);
     free(p);
   }
 }
@@ -1944,28 +1956,31 @@ check_patch_sanity(struct ulp_process *process)
   }
 
   if (!d) {
+    int ret;
     if (buildid) {
       /* strdup because buildid_to_string returns a pointer to a static
          variable.  */
       char *buildid_str = strdup(buildid_to_string(buildid));
       char *lp_buildid = strdup(buildid_to_string((void *)ulp.objs->build_id));
 
-      WARN("pid = %d, name = %s: livepatch buildid mismatch for %s (%s)\n"
-           "    expected buildid: %s\n",
-           process->pid, get_target_binary_name(process->pid), target,
-           buildid_str, lp_buildid);
+      DEBUG("pid = %d, name = %s: livepatch buildid mismatch for %s (%s)\n"
+            "    expected buildid: %s\n",
+            process->pid, get_target_binary_name(process->pid), target,
+            buildid_str, lp_buildid);
 
       free(buildid_str);
       free(lp_buildid);
+      ret = EBUILDID;
     }
     else {
-      WARN("pid = %d, name = %s: target library (%s) not loaded.",
-           process->pid, get_target_binary_name(process->pid), target);
+      DEBUG("pid = %d, name = %s: target library (%s) not loaded.",
+            process->pid, get_target_binary_name(process->pid), target);
+      ret = ENOTARGETLIB;
     }
     DEBUG("available target libraries:");
     for (d = dynobj_first(process); d != NULL; d = dynobj_next(process, d))
       DEBUG("  %s (%s)", d->filename, buildid_to_string(d->build_id));
-    return EBUILDID;
+    return ret;
   }
 
   return 0;

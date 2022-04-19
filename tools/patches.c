@@ -157,7 +157,8 @@ build_process_list(const char *wildcard)
 
     const char *process_name = get_target_binary_name(pid);
     /* Skip processes that does not match the wildcard. */
-    if (wildcard != NULL && fnmatch(wildcard, process_name, 0) != 0)
+    if (wildcard != NULL && process_name != NULL &&
+        fnmatch(wildcard, process_name, 0) != 0)
       continue;
 
     /* If process is the ULP tool itself, skip it.  We cannot livepatch the
