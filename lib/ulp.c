@@ -205,32 +205,6 @@ __ulp_get_global_universe_value()
   return __ulp_global_universe;
 }
 
-/* libpulp functions */
-void
-free_metadata(struct ulp_metadata *ulp)
-{
-  struct ulp_unit *unit, *next_unit;
-  struct ulp_object *obj;
-
-  if (ulp) {
-    obj = ulp->objs;
-    if (obj) {
-      unit = ulp->objs->units;
-      while (unit) {
-        next_unit = unit->next;
-        free(unit->old_fname);
-        free(unit->new_fname);
-        free(unit);
-        unit = next_unit;
-      }
-      free(obj->build_id);
-      free(obj->name);
-      free(obj);
-    }
-  }
-  free(ulp);
-}
-
 /* TODO: unloading needs further testing */
 int
 unload_handlers(struct ulp_metadata *ulp)
@@ -300,7 +274,8 @@ load_metadata(int *err)
   __ulp_metadata_ref = ulp;
   *err = parse_metadata(ulp);
   if (*err) {
-    WARN("Error parsing metadata.\n");
+    unload_metadata(ulp);
+    WARN("Error in metadata load: %s.", libpulp_strerror(*err));
     return NULL;
   };
 
@@ -843,7 +818,6 @@ check_patch_sanity(struct ulp_metadata *ulp)
   if (ret)
     return ret;
   if (ulp_get_applied_patch(ulp->patch_id)) {
-    WARN("Patch was already applied\n");
     return EAPPLIED;
   }
 

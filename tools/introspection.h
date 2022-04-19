@@ -31,6 +31,13 @@
 extern int ulp_verbose;
 extern int ulp_quiet;
 
+struct trigger_results
+{
+  const char *patch_name;
+  int err;
+  struct trigger_results *next;
+};
+
 struct ulp_process
 {
   int pid;
@@ -48,6 +55,9 @@ struct ulp_process
   struct ulp_dynobj *dynobj_patches;
 
   unsigned long global_universe;
+
+  /** Holds on a trigger many ulps, which patches were applied on the run.  */
+  struct trigger_results *results;
 
   struct ulp_process *next;
 };

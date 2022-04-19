@@ -44,41 +44,6 @@
 static int get_elf_tgt_ref_addrs(Elf *, struct ulp_reference *, Elf_Scn *,
                                  Elf_Scn *);
 
-void
-free_metadata(struct ulp_metadata *ulp)
-{
-  struct ulp_object *obj;
-  struct ulp_unit *unit, *next_unit;
-  struct ulp_reference *ref, *next_ref;
-  if (!ulp)
-    return;
-
-  free(ulp->so_filename);
-
-  for (ref = ulp->refs; ref != NULL; ref = next_ref) {
-    free(ref->target_name);
-    free(ref->reference_name);
-    next_ref = ref->next;
-    free(ref);
-  }
-  ulp->refs = NULL;
-
-  obj = ulp->objs;
-  if (obj) {
-    unit = obj->units;
-    while (unit) {
-      next_unit = unit->next;
-      free(unit->old_fname);
-      free(unit->new_fname);
-      free(unit);
-      unit = next_unit;
-    }
-    free(obj->name);
-    free(obj->build_id);
-    free(obj);
-  }
-}
-
 Elf_Scn *
 get_dynsym(Elf *elf)
 {
