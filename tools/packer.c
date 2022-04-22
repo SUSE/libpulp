@@ -359,8 +359,12 @@ parse_error(location_t loc, const char *fmt, ...)
   size_t line_size;
   size_t len;
 
-  printf(WHITE("%s:%d:%d: ") RED("error: "), parse_filename, loc.line,
-         loc.col);
+  change_color(TERM_COLOR_BOLD);
+  printf("%s:%d:%d: ", parse_filename, loc.line, loc.col);
+  change_color(TERM_COLOR_RED);
+  printf("error: ");
+  change_color(TERM_COLOR_RESET);
+
   va_start(arglist, fmt);
   vprintf(fmt, arglist);
   va_end(arglist);
@@ -383,7 +387,7 @@ parse_error(location_t loc, const char *fmt, ...)
     }
 
     unsigned redchars = 0;
-    printf(TERM_COLOR_RED);
+    change_color(TERM_COLOR_RED);
     for (; j < len; j++) {
       if (line[j] == ':') {
         if (line[loc.col - 1] == ':') {
@@ -398,7 +402,7 @@ parse_error(location_t loc, const char *fmt, ...)
         redchars++;
       }
     }
-    printf(TERM_COLOR_RESET);
+    change_color(TERM_COLOR_RESET);
 
     for (; j < len; j++) {
       if (line[j] != '\n')
@@ -411,12 +415,12 @@ parse_error(location_t loc, const char *fmt, ...)
       putchar(' ');
     }
 
-    printf(TERM_COLOR_RED);
+    change_color(TERM_COLOR_RED);
     putchar('^');
     for (j = 1; j < redchars; j++) {
       putchar('~');
     }
-    printf(TERM_COLOR_RESET);
+    change_color(TERM_COLOR_RESET);
   }
 
   free(line);

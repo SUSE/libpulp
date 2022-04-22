@@ -30,6 +30,7 @@
 
 extern int ulp_verbose;
 extern int ulp_quiet;
+extern bool no_color;
 
 struct trigger_results
 {

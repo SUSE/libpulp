@@ -76,6 +76,9 @@ struct ulp_metadata ulp;
 int ulp_verbose;
 int ulp_quiet;
 
+/** If this flag is enabled, ulp should not print colored messages.  */
+bool no_color;
+
 void
 ulp_warn(const char *format, ...)
 {
@@ -613,7 +616,7 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
     ret = read_memory((char *)&num_symbols, sizeof(int), pid,
                       hash_addr + sizeof(int));
     if (ret != 0) {
-      DEBUG("Unable to read hash table");
+      DEBUG("Unable to read hash table at %lx", (hash_addr + sizeof(int)));
       return ETARGETHOOK;
     }
   }
@@ -1444,8 +1447,14 @@ revert_patches_from_lib(struct ulp_process *process, const char *lib_name)
   if (ret)
     return ret;
 
-  if (context.rax == EAGAIN)
-    DEBUG("libc/libdl locks were busy: patches not reversed.");
+  if (context.rax != 0) {
+    if (context.rax == EAGAIN)
+      WARN("patches reverse-all failed in libpulp.so: libc/libdl locks were "
+           "busy");
+    else
+      WARN("patches reverse-all failed in libpulp.so: %s",
+           libpulp_strerror(context.rax));
+  }
 
   return context.rax;
 }
