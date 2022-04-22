@@ -32,6 +32,7 @@
 
 #include "arguments.h"
 #include "config.h"
+#include "error_common.h"
 #include "introspection.h"
 #include "patches.h"
 
@@ -69,15 +70,19 @@ libpulp_loaded(FILE *map)
 int
 get_process_universes(struct ulp_process *process)
 {
-  if (initialize_data_structures(process))
-    return 1;
+  int ret;
+  ret = initialize_data_structures(process);
+  if (ret)
+    return ret;
 
-  if (hijack_threads(process))
+  ret = hijack_threads(process);
+  if (ret)
     return -1;
 
   read_global_universe(process);
 
-  if (restore_threads(process))
+  ret = restore_threads(process);
+  if (ret)
     return -1;
 
   return 0;
@@ -91,6 +96,7 @@ insert_target_process(int pid, struct ulp_process **list)
 {
   char mapname[PATH_MAX];
   FILE *map;
+  int ret;
 
   struct ulp_process *new = NULL;
 
@@ -109,15 +115,13 @@ insert_target_process(int pid, struct ulp_process **list)
     memset(new, 0, sizeof(struct ulp_process));
 
     new->pid = pid;
-    if (get_process_universes(new)) {
-      printf("Failed to parsed data for live-patchable process %d... "
-             "Skipping.\n",
-             pid);
+    ret = get_process_universes(new);
+    if (ret) {
+      WARN("Failed to parse data for live-patchable process %d: %s", pid,
+           libpulp_strerror(ret));
     }
-    else {
-      new->next = *list;
-      *list = new;
-    }
+    new->next = *list;
+    *list = new;
   }
 
   fclose(map);

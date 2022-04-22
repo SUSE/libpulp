@@ -129,20 +129,24 @@ trigger_one_process(struct ulp_process *target, int retries,
       }
 #endif
     }
+    bool skip_patch_apply = false;
     if (revert_library) {
       result = revert_patches_from_lib(target, revert_library);
       if (result == -1) {
         FATAL("fatal error reverting livepatches (hijacked execution).");
         retry = 0;
       }
-      if (result)
+      if (result) {
         DEBUG("live patching revert %d failed (attempt #%d).", target->pid,
               (retries - retry));
-      else
+        skip_patch_apply = true;
+      }
+      else {
         retry = 0;
+      }
     }
 
-    if (livepatch) {
+    if (livepatch && !skip_patch_apply) {
       result = apply_patch(target, livepatch, livepatch_size);
       if (result == -1) {
         FATAL(
@@ -290,30 +294,39 @@ print_patched_unpatched_processes(struct ulp_process *list)
 {
   struct ulp_process *curr_item;
   int count = 0;
-  fprintf(stdout, "Summary:\n");
+  printf("Summary:\n");
   for (curr_item = list; curr_item != NULL; curr_item = curr_item->next) {
     pid_t pid = curr_item->pid;
     struct trigger_results *results;
-    fprintf(stdout, "  %s (pid: %5d):\n", get_target_binary_name(pid), pid);
+    printf("  %s (pid: %5d):\n", get_target_binary_name(pid), pid);
     for (results = curr_item->results; results; results = results->next) {
       ulp_error_t err = results->err;
       if (err == EBUILDID || err == ENOTARGETLIB) {
-        fprintf(stdout, YELLOW("    SKIPPED") " %s: %s\n", results->patch_name,
-                libpulp_strerror(results->err));
+        change_color(TERM_COLOR_YELLOW);
+        printf("    SKIPPED");
+        change_color(TERM_COLOR_RESET);
+        printf(" %s: %s\n", results->patch_name,
+               libpulp_strerror(results->err));
       }
       else if (err) {
-        fprintf(stdout, RED("    FAILED") " %s: %s\n", results->patch_name,
-                libpulp_strerror(results->err));
+        change_color(TERM_COLOR_RED);
+        printf("    FAILED");
+        change_color(TERM_COLOR_RESET);
+        printf(" %s: %s\n", results->patch_name,
+               libpulp_strerror(results->err));
       }
       else {
-        fprintf(stdout, GREEN("    SUCCESS") " %s\n", results->patch_name);
+        change_color(TERM_COLOR_GREEN);
+        printf("    SUCCESS");
+        change_color(TERM_COLOR_RESET);
+        printf(" %s\n", results->patch_name);
       }
       count++;
     }
   }
 
   if (count == 0) {
-    fprintf(stdout, "    (empty)\n");
+    printf("    (empty)\n");
   }
 }
 
@@ -378,41 +391,60 @@ diagnose_patch_apply(ulp_error_t ret, bool revert, const char *livepatch,
 
   if (ret) {
     if (livepatch) {
-      fprintf(stdout, RED("error:") " could not %s %s to %s (pid %d): %s\n",
-              apply_rev, livepatch, get_target_binary_name(pid), pid,
-              libpulp_strerror(ret));
+      change_color(TERM_COLOR_RED);
+      printf("error:");
+      change_color(TERM_COLOR_RESET);
+      printf(" could not %s %s to %s (pid %d): %s\n", apply_rev, livepatch,
+             get_target_binary_name(pid), pid, libpulp_strerror(ret));
       if (ret == EBUILDID && !ulp_quiet) {
-        fprintf(stdout, CYAN("note:") " run `ulp patches -b` to retrieve all "
-                                      "build ids from patchable processes.\n");
+        change_color(TERM_COLOR_CYAN);
+        printf("note:");
+        change_color(TERM_COLOR_RESET);
+        printf(" run `ulp patches -b` to retrieve all "
+               "build ids from patchable processes.\n");
       }
     }
     else if (library) {
-      fprintf(stdout,
-              RED("error:") " could not revert all patches to library %s in "
-                            "process %s (pid %d): %s\n",
-              library, get_target_binary_name(pid), pid,
-              libpulp_strerror(ret));
-      fprintf(stdout, CYAN("note:") " run `ulp patches` to retrieve all "
-                                    "libraries in process.\n");
+      change_color(TERM_COLOR_RED);
+      printf("error:");
+      change_color(TERM_COLOR_RESET);
+      printf(" could not revert all patches to library %s in "
+             "process %s (pid %d): %s\n",
+             library, get_target_binary_name(pid), pid, libpulp_strerror(ret));
+      change_color(TERM_COLOR_CYAN);
+      printf("note:");
+      change_color(TERM_COLOR_RESET);
+      printf(" run `ulp patches` to retrieve all "
+             "libraries in process.\n");
     }
     else {
-      fprintf(stdout, RED("error:") " no input");
+      change_color(TERM_COLOR_RED);
+      printf("error:");
+      change_color(TERM_COLOR_RESET);
+      printf(" no input\n");
     }
   }
   else {
     if (!ulp_quiet) {
       if (livepatch) {
-        fprintf(stdout, GREEN("success:") " patch %s %s to %d\n", livepatch,
-                applied_rev, pid);
+        change_color(TERM_COLOR_GREEN);
+        printf("success:");
+        change_color(TERM_COLOR_RESET);
+        printf(" patch %s %s to %d\n", livepatch, applied_rev, pid);
       }
       else if (library) {
-        fprintf(stdout,
-                GREEN("success:") " reverted all patches to library %s in "
-                                  "process %s (pid %d)\n",
-                library, get_target_binary_name(pid), pid);
+        change_color(TERM_COLOR_GREEN);
+        printf("success:");
+        change_color(TERM_COLOR_RESET);
+        printf(" reverted all patches to library %s in "
+               "process %s (pid %d)\n",
+               library, get_target_binary_name(pid), pid);
       }
       else {
-        fprintf(stdout, RED("error:") " no input");
+        change_color(TERM_COLOR_RED);
+        printf("error:");
+        change_color(TERM_COLOR_RESET);
+        printf(" no input\n");
       }
     }
   }

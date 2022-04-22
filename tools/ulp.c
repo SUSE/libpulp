@@ -40,6 +40,7 @@
 #include "trigger.h"
 
 static error_t parser(int, char *, struct argp_state *);
+static bool check_color_available(void);
 
 /* These variables are used by ARGP.  */
 
@@ -72,6 +73,7 @@ static const char doc[] =
 /* switches that don't have a shorthand.  */
 #define ULP_OP_REVERT_ALL 256
 #define ULP_OP_REVERT 257
+#define ULP_OP_COLOR 258
 
 static struct argp_option options[] = {
   { 0, 0, 0, 0, "Options:", 0 },
@@ -98,6 +100,8 @@ static struct argp_option options[] = {
     "Use this livepatch file\nDefaults to the one described in ARG1", 0 },
   { "target", 't', "LIBRARY", 0,
     "Use this target library\nDefaults to the one described in ARG1", 0 },
+  { "color", ULP_OP_COLOR, "yes/no/auto", 0, "Enable/disable colored messages",
+    0 },
   { 0 }
 };
 
@@ -285,6 +289,18 @@ parser(int key, char *arg, struct argp_state *state)
       handle_end_of_arguments(state);
       break;
 
+    case ULP_OP_COLOR:
+      if (strcmp(arg, "no") == 0 || strcmp(arg, "n") == 0) {
+        no_color = true;
+      }
+      else if (strcmp(arg, "auto") == 0) {
+        no_color = !check_color_available();
+      }
+      else {
+        no_color = false;
+      }
+      break;
+
     default:
       return ARGP_ERR_UNKNOWN;
   }
@@ -292,11 +308,42 @@ parser(int key, char *arg, struct argp_state *state)
   return 0;
 }
 
+static bool
+check_color_available(void)
+{
+  /* Check if NO_COLOR env variable is set.  */
+  if (getenv("NO_COLOR"))
+    return false;
+
+  /* Check if terminal supports ANSI escapes.  */
+  if (isatty(STDOUT_FILENO)) {
+    const char *term = getenv("TERM");
+    if (term && strcmp(term, "dumb")) {
+      return true;
+    }
+  }
+
+  /* ANSI escapes not available.  */
+  return false;
+}
+
+void
+change_color(const char *ansi_escape)
+{
+  /* If no_color is set, doens't push colors.  */
+  if (!no_color) {
+    fputs(ansi_escape, stdout);
+  }
+}
+
 int
 main(int argc, char **argv)
 {
   struct arguments arguments = { 0 };
   int ret = 0;
+
+  /* Set no_color here, as user may not have passed --color.  */
+  no_color = !check_color_available();
 
   /* Initialize retries correctly.  */
   arguments.retries = 1;
