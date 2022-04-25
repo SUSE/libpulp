@@ -57,6 +57,7 @@ typedef int ulp_error_t;
 #define ENOADDRESS    274 /** Address Error.  */
 #define EAPPLIED      275 /** Patch applied.  */
 #define ENOTARGETLIB  276 /** Target library not loaded.  */
+#define EHOOKNOTRUN   277 /** libpulp.so hook routine not run.  */
 
 /** Table used to map error code to message.  Define it here so that it is
  *  easier for it being maintained.
@@ -84,6 +85,7 @@ typedef int ulp_error_t;
     "Address read error", \
     "Patch already applied", \
     "Target library not loaded", \
+    "libpulp.so hook routine not run", \
   }
 /* clang-format on */
 

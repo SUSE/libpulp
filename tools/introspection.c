@@ -1371,6 +1371,7 @@ apply_patch(struct ulp_process *process, void *metadata, size_t metadata_size)
   ElfW(Addr) routine;
 
   struct ulp_dynobj *dynobj_libpulp = process->dynobj_libpulp;
+  uintptr_t rax;
 
   DEBUG("beginning live patch application.");
 
@@ -1388,6 +1389,8 @@ apply_patch(struct ulp_process *process, void *metadata, size_t metadata_size)
   context = thread->context;
   routine = dynobj_libpulp->trigger;
 
+  rax = context.rax;
+
   DEBUG(">>> running libpulp functions within target process...");
   ret = run_and_redirect(thread->tid, &context, routine);
   if (ret == -1) {
@@ -1403,9 +1406,17 @@ apply_patch(struct ulp_process *process, void *metadata, size_t metadata_size)
 
   if (context.rax != 0) {
     if (context.rax == EAGAIN)
-      WARN("patching failed in libpulp.so: libc/libdl locks were busy");
+      DEBUG("patching failed in libpulp.so: libc/libdl locks were busy");
+    else if (context.rax == rax) {
+      /* If rax register is not changed in this process, it is evidence that
+         the routine in libpulp.so wasn't executed by some reason.  */
+      DEBUG("patching failed in libpulp.so: %s",
+            libpulp_strerror(EHOOKNOTRUN));
+      return EHOOKNOTRUN;
+    }
     else
-      WARN("patching failed in libpulp.so: %s", libpulp_strerror(context.rax));
+      DEBUG("patching failed in libpulp.so: %s",
+            libpulp_strerror(context.rax));
   }
 
   return context.rax;

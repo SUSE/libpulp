@@ -197,7 +197,6 @@ metadata_clean:
   target->results = entry;
 
   release_ulp_global_metadata();
-  /* Remove temporary file.  */
   if (livepatch) {
     free(livepatch);
   }
@@ -290,38 +289,111 @@ wildcard_clean:
 }
 
 static void
-print_patched_unpatched_processes(struct ulp_process *list)
+print_patched_unpatched_processes(struct ulp_process *list, bool summarize)
 {
   struct ulp_process *curr_item;
   int count = 0;
-  printf("Summary:\n");
   for (curr_item = list; curr_item != NULL; curr_item = curr_item->next) {
     pid_t pid = curr_item->pid;
-    struct trigger_results *results;
-    printf("  %s (pid: %5d):\n", get_target_binary_name(pid), pid);
+    struct trigger_results *results, *summarized_result = NULL;
+    printf("  %s (pid: %d):", get_target_binary_name(pid), pid);
+
+    /* Try to summarize the patches result.  */
+    ulp_error_t err = EUNKNOWN;
+    bool summarized = true;
+    bool hide_skipped = false;
+
+    if (curr_item->results)
+      err = curr_item->results->err;
+
     for (results = curr_item->results; results; results = results->next) {
-      ulp_error_t err = results->err;
+      if (results->err == 0 ||
+          (results->err != EBUILDID && results->err != ENOTARGETLIB)) {
+        /* Patch applied or critical error found.  Hide minor 'skipped' errors
+           and try to summarize this error.  */
+        err = results->err;
+        hide_skipped = true;
+      }
+    }
+
+    for (results = curr_item->results; results; results = results->next) {
+      /* if marked to hide sipped patches, then proceed to next one.  */
+      if (hide_skipped &&
+          (results->err == EBUILDID || results->err == ENOTARGETLIB))
+        continue;
+
+      if (results->err != err) {
+        /* There are multiple events  and we are unable to summarize.  */
+        summarized = false;
+      }
+      else if (results->err != EBUILDID && results->err != ENOTARGETLIB) {
+        if (!summarized_result) {
+          /* So far, only one important event was catch.  */
+          summarized_result = results;
+        }
+        else {
+          /* Multiple important events happened.  Unable to summarize.  */
+          summarized = false;
+        }
+      }
+    }
+
+    if (!summarize) {
+      summarized = false;
+      hide_skipped = false;
+    }
+
+    if (summarized) {
       if (err == EBUILDID || err == ENOTARGETLIB) {
         change_color(TERM_COLOR_YELLOW);
-        printf("    SKIPPED");
+        printf(" SKIPPED");
         change_color(TERM_COLOR_RESET);
-        printf(" %s: %s\n", results->patch_name,
-               libpulp_strerror(results->err));
+        printf(" %s\n", libpulp_strerror(err));
+        count++;
       }
       else if (err) {
         change_color(TERM_COLOR_RED);
-        printf("    FAILED");
+        printf(" FAILED");
         change_color(TERM_COLOR_RESET);
-        printf(" %s: %s\n", results->patch_name,
-               libpulp_strerror(results->err));
+        printf(" %s: %s\n", summarized_result->patch_name,
+               libpulp_strerror(err));
+        count++;
       }
       else {
         change_color(TERM_COLOR_GREEN);
-        printf("    SUCCESS");
+        printf(" SUCCESS");
         change_color(TERM_COLOR_RESET);
-        printf(" %s\n", results->patch_name);
+        printf(" %s\n", summarized_result->patch_name);
+        count++;
       }
-      count++;
+    }
+    else {
+      putchar('\n');
+      for (results = curr_item->results; results; results = results->next) {
+        if (results->err == EBUILDID || results->err == ENOTARGETLIB) {
+          if (!hide_skipped) {
+            change_color(TERM_COLOR_YELLOW);
+            printf("    SKIPPED");
+            change_color(TERM_COLOR_RESET);
+            printf(" %s: %s\n", results->patch_name,
+                   libpulp_strerror(results->err));
+          }
+        }
+        else if (results->err) {
+          change_color(TERM_COLOR_RED);
+          printf("    FAILED");
+          change_color(TERM_COLOR_RESET);
+          printf(" %s: %s\n", results->patch_name,
+                 libpulp_strerror(results->err));
+        }
+        else {
+          change_color(TERM_COLOR_GREEN);
+          printf("    SUCCESS");
+          change_color(TERM_COLOR_RESET);
+          printf(" %s\n", results->patch_name);
+        }
+        count++;
+      }
     }
   }
 
@@ -376,7 +448,7 @@ trigger_many_processes(const char *process_wildcard, int retries,
   }
 
   if (!ulp_quiet)
-    print_patched_unpatched_processes(list);
+    print_patched_unpatched_processes(list, !ulp_verbose);
 
   release_ulp_process(list);
   return ret;
