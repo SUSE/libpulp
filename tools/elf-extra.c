@@ -153,6 +153,10 @@ embed_patch_metadata_into_elf(Elf *elfinput, const char *elf_path,
   int fd;
   /* Load ELF with libelf to check if we already have an .ulp section.  */
   Elf *elf = load_elf(elf_path, &fd);
+  if (!elf) {
+    return EINVAL;
+  }
+
   bool ulp_section_exists = (get_elfscn_by_name(elf, section_name) != NULL);
   unload_elf(&elf, &fd);
 

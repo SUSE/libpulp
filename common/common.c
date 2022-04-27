@@ -25,6 +25,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/random.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include "error_common.h"
@@ -541,4 +543,14 @@ free_metadata(struct ulp_metadata *ulp)
       free(obj->build_id);
     free(obj);
   }
+}
+
+bool
+is_directory(const char *path)
+{
+  struct stat s;
+  if (stat(path, &s))
+    return false;
+  else
+    return S_ISDIR(s.st_mode);
 }

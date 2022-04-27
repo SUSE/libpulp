@@ -576,6 +576,11 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
     goto dsc_clean;
   }
   fclose(file_check);
+  if (is_directory(ulp->so_filename)) {
+    parse_error(loc, "livepatch container path is not a file");
+    ret = 0;
+    goto dsc_clean;
+  }
 
   free(first);
   first = NULL;
@@ -621,7 +626,7 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
         ret = 0;
         goto dsc_clean;
       }
-
+      loc.col++;
       ulp->objs = calloc(1, sizeof(struct ulp_object));
       if (!ulp->objs) {
         parse_error(loc, "unable to allocate memory for parsing ulp object.");
@@ -637,6 +642,20 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
         ulp->objs->name = strdup(&first[1]);
       ulp->objs->nunits = 0;
       last_unit = NULL;
+
+      FILE *file_check = fopen(ulp->objs->name, "r");
+      if (file_check == NULL) {
+        parse_error(loc, "unable to open target file");
+        ret = 0;
+        goto dsc_clean;
+      }
+      fclose(file_check);
+
+      if (is_directory(ulp->objs->name)) {
+        parse_error(loc, "target path is not a file");
+        ret = 0;
+        goto dsc_clean;
+      }
 
       target.path = ulp->objs->name;
       target.elf = load_elf(target.path, &target.fd);
