@@ -164,6 +164,14 @@ libbuildid_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
 POST_PROCESS += .libs/libbuildid.post
 
+check_LTLIBRARIES += libendbr64.la
+
+libendbr64_la_SOURCES = libendbr64.c
+libendbr64_la_CFLAGS = $(TARGET_CFLAGS) -fcf-protection=full
+libendbr64_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
+
+POST_PROCESS += .libs/libendbr64.post
+
 # Target libraries to test static data access
 check_LTLIBRARIES += libmanyprocesses.la
 
@@ -195,6 +203,7 @@ check_LTLIBRARIES += libdozens_livepatch1.la \
                      libtls_livepatch1.la \
                      libbuildid_livepatch1.la \
                      libprocess_access_livepatch1.la \
+                     libendbr64_livepatch1.la \
                      libmanyprocesses_livepatch1.la
 
 libdozens_livepatch1_la_SOURCES = libdozens_livepatch1.c
@@ -257,6 +266,9 @@ libtls_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 libbuildid_livepatch1_la_SOURCES = libbuildid_livepatch1.c
 libbuildid_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
+libendbr64_livepatch1_la_SOURCES = libhundreds_livepatch1.c
+libendbr64_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
+
 libprocess_access_livepatch1_la_SOURCES = process_access_livepatch1.c
 libprocess_access_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
@@ -304,6 +316,8 @@ METADATA = \
   libbuildid_livepatch1.ulp \
   libmanyprocesses_livepatch1.dsc \
   libmanyprocesses_livepatch1.ulp \
+  libendbr64_livepatch1.dsc \
+  libendbr64_livepatch1.ulp \
   libprocess_livepatch1.dsc \
   libprocess_livepatch1.ulp \
   libprocess_access_livepatch1.dsc \
@@ -329,6 +343,7 @@ EXTRA_DIST = \
   libaccess_livepatch2.in \
   libtls_livepatch1.in \
   libbuildid_livepatch1.in \
+  libendbr64_livepatch1.in \
   libmanyprocesses_livepatch1.in \
   libprocess_livepatch1.in \
   libprocess_access_livepatch1.in
@@ -360,6 +375,7 @@ check_PROGRAMS = \
   tls \
   buildid \
   process_access \
+  endbr64 \
   manyprocesses
 
 numserv_SOURCES = numserv.c
@@ -369,6 +385,10 @@ numserv_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 numserv_bsymbolic_SOURCES = numserv.c
 numserv_bsymbolic_LDADD = libdozens_bsymbolic.la libhundreds_bsymbolic.la
 numserv_bsymbolic_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
+
+endbr64_SOURCES = endbr64.c
+endbr64_LDADD = libdozens.la libendbr64.la
+endbr64_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
 parameters_SOURCES = parameters.c
 parameters_LDADD = libparameters.la
@@ -499,6 +519,7 @@ TESTS = \
   revert_with_invalid.py \
   process_access.py \
   manyprocesses.py \
+  endbr64.py \
   tempfiles.py
 
 XFAIL_TESTS = \

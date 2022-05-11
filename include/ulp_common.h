@@ -39,6 +39,9 @@
 /** Length of build id, in bytes.  */
 #define BUILDID_LEN 20
 
+/** Intel endbr64 instruction optcode.  */
+#define INSN_ENDBR64 0xf3, 0x0f, 0x1e, 0xfa
+
 extern __thread int __ulp_pending;
 
 /** Used on __tls_get_addr(tls_index *).  */
