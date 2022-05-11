@@ -47,6 +47,10 @@ struct ulp_metadata *__ulp_metadata_ref = NULL;
 struct ulp_detour_root *__ulp_root = NULL;
 
 /* clang-format off */
+
+/** Intel endbr64 instruction optcode.  */
+static const uint8_t insn_endbr64[] = {INSN_ENDBR64};
+
 /** Offset of the data entry in the ulp_prologue.  */
 #define ULP_DATA_OFFSET 6           // ------------------------------+
                                     //                               |
@@ -56,6 +60,17 @@ char ulp_prologue[ULP_NOPS_LEN] = { //                               |
   0, 0, 0, 0, 0, 0, 0, 0,           // <data>  &__ulp_prolog     | <-+
   // Function entry is here                                      |
   0xeb, -(PRE_NOPS_LEN + 2)         // jmp ----------------------+
+  // (+2 because the previous jump consumes 2 bytes.
+};
+
+/** Offset of the data entry in the ulp_prologue.  */
+char ulp_prologue_endbr64[ULP_NOPS_LEN_ENDBR64] = {
+  // Preceding nops
+  0xff, 0x25, 0, 0, 0, 0,           // jmp     0x0(%rip) <-------+
+  0, 0, 0, 0, 0, 0, 0, 0,           // <data>  &__ulp_prolog     |
+  // Function entry is here                                      |
+  INSN_ENDBR64,                     // endbr64                   |
+  0xeb, -(PRE_NOPS_LEN + 2 + 4)     // jmp ----------------------+
   // (+2 because the previous jump consumes 2 bytes.
 };
 /* clang-format on */
@@ -936,10 +951,10 @@ check_build_id(struct ulp_metadata *ulp)
   return 1;
 }
 
-void
-ulp_patch_prologue_layout(void *old_fentry)
+static void
+ulp_patch_prologue_layout(void *old_fentry, const char *prologue, int len)
 {
-  memcpy(old_fentry, ulp_prologue, sizeof(ulp_prologue));
+  memcpy(old_fentry, prologue, len);
 }
 
 /*
@@ -956,9 +971,13 @@ ulp_patch_prologue_layout(void *old_fentry)
 void
 ulp_skip_prologue(void *fentry)
 {
+  static const char insn_nop2[] = { 0x66, 0x90 };
+  int bias = 0;
+  if (memcmp(fentry, insn_endbr64, sizeof(insn_endbr64)) == 0)
+    bias += sizeof(insn_endbr64);
+
   /* Do not jump backwards on function entry (0x6690 is a nop on x86). */
-  memset(fentry + 0, 0x66, 1);
-  memset(fentry + 1, 0x90, 1);
+  memcpy(fentry + bias, insn_nop2, sizeof(insn_nop2));
 }
 
 void
@@ -1051,6 +1070,20 @@ ulp_patch_addr(void *old_faddr, void *new_faddr, int enable)
   int prot1;
   int prot2;
 
+  int ulp_nops_len;
+  const char *prologue;
+
+  /* Check if the first instruction of old_function is endbr64.  In this
+     case, we have to handle things differently.  */
+  if (memcmp(old_faddr, insn_endbr64, 4) == 0) {
+    ulp_nops_len = ULP_NOPS_LEN_ENDBR64;
+    prologue = ulp_prologue_endbr64;
+  }
+  else {
+    ulp_nops_len = ULP_NOPS_LEN;
+    prologue = ulp_prologue;
+  }
+
   /*
    * The size of the nop padding area is supposed to be a lot smaller
    * than the typical size of a memory page. Even so, when the entry
@@ -1060,15 +1093,16 @@ ulp_patch_addr(void *old_faddr, void *new_faddr, int enable)
    */
   page_size = getpagesize();
   page_mask = ~(page_size - 1);
-  if (ULP_NOPS_LEN > page_size) {
+  if ((unsigned long)ulp_nops_len > page_size) {
     WARN("Nop padding area unexpectedly large.");
     return 0;
   }
 
   /* Find the starting address of the pages containing the nops. */
   addr = old_faddr - PRE_NOPS_LEN;
+
   page1 = (uintptr_t)addr;
-  page2 = (uintptr_t)(addr + ULP_NOPS_LEN - 1);
+  page2 = (uintptr_t)(addr + ulp_nops_len - 1);
   page1 = page1 & page_mask;
   page2 = page2 & page_mask;
 
@@ -1092,7 +1126,7 @@ ulp_patch_addr(void *old_faddr, void *new_faddr, int enable)
 
   /* Actually patch the prologue. */
   if (enable) {
-    ulp_patch_prologue_layout(addr);
+    ulp_patch_prologue_layout(addr, prologue, ulp_nops_len);
     ulp_patch_addr_absolute(addr, new_faddr);
   }
   else {
@@ -1214,10 +1248,12 @@ ulp_revert_all_units(unsigned char *patch_id)
         }
 
         /* Update the function prologue. */
-        if (dactive == NULL)
+        if (dactive == NULL) {
           ulp_patch_addr(r->patched_addr, NULL, false);
-        else
+        }
+        else {
           ulp_patch_addr(r->patched_addr, dactive->target_addr, true);
+        }
       }
 
   return 1;

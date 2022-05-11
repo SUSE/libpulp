@@ -178,10 +178,16 @@ AC_SUBST([PAGE_SIZE], [$($GETCONF PAGE_SIZE)]))
 # instructions that redirect execution to the universe handling routines.
 AC_SUBST([ULP_NOPS_LEN], [16])
 AC_SUBST([PRE_NOPS_LEN], [14])
+
+AC_SUBST([ULP_NOPS_LEN_ENDBR64], [$(expr $ULP_NOPS_LEN + 4)])
+AC_SUBST([PRE_NOPS_LEN_ENDBR64], [$(expr $PRE_NOPS_LEN + 4)])
+
 AC_DEFINE_UNQUOTED([ULP_NOPS_LEN], [$ULP_NOPS_LEN],
 [Total number of padding nops])
 AC_DEFINE_UNQUOTED([PRE_NOPS_LEN], [$PRE_NOPS_LEN],
 [Padding nops before the entry point of functions])
+AC_DEFINE_UNQUOTED([ULP_NOPS_LEN_ENDBR64], [$ULP_NOPS_LEN_ENDBR64],
+[Total number of padding nops when endbr64 is issued])
 
 AC_CONFIG_FILES([Makefile
 		 include/Makefile
