@@ -19,10 +19,10 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <librecursion.h>
+int (*lucas_ptr)(int) = (void *)0L;
 
 long long int
 new_recursion(long long int n)
 {
-  return lucas(n);
+  return lucas_ptr(n);
 }
