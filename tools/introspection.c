@@ -1648,8 +1648,8 @@ extract_ulp_from_so_to_disk(const char *livepatch, bool revert)
   char *tmp_path = strdup(create_path_to_tmp_file());
   file = fopen(tmp_path, "wb");
   if (!file) {
-    free(tmp_path);
     WARN("Unable to open temporary file %s: %s", tmp_path, strerror(errno));
+    free(tmp_path);
     return NULL;
   }
 
@@ -1657,8 +1657,8 @@ extract_ulp_from_so_to_disk(const char *livepatch, bool revert)
     remove(tmp_path);
     fclose(file);
     free(buf);
-    free(tmp_path);
     WARN("Error writing to %s: %s", tmp_path, strerror(errno));
+    free(tmp_path);
     return NULL;
   }
 
