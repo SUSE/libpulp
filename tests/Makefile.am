@@ -167,7 +167,7 @@ POST_PROCESS += .libs/libbuildid.post
 check_LTLIBRARIES += libendbr64.la
 
 libendbr64_la_SOURCES = libendbr64.c
-libendbr64_la_CFLAGS = $(TARGET_CFLAGS) -fcf-protection=full
+libendbr64_la_CFLAGS = $(TARGET_CFLAGS) $(FCF_PROTECTION)
 libendbr64_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
 POST_PROCESS += .libs/libendbr64.post
