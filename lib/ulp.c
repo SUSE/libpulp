@@ -606,9 +606,9 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
       return EUNKNOWN;
     }
 
-    if (!(ulp_patch_addr(old_fun, new_fun, true))) {
+    if ((retcode = ulp_patch_addr(old_fun, new_fun, true)) > 0) {
       WARN("error patching address %p", old_fun);
-      return EUNKNOWN;
+      return retcode;
     }
 
     unit = unit->next;
@@ -1073,15 +1073,29 @@ ulp_patch_addr(void *old_faddr, void *new_faddr, int enable)
   int ulp_nops_len;
   const char *prologue;
 
+  const unsigned char *as_bytes = old_faddr;
+
   /* Check if the first instruction of old_function is endbr64.  In this
      case, we have to handle things differently.  */
-  if (memcmp(old_faddr, insn_endbr64, 4) == 0) {
+  if (memcmp(old_faddr, insn_endbr64, sizeof(insn_endbr64)) == 0) {
     ulp_nops_len = ULP_NOPS_LEN_ENDBR64;
     prologue = ulp_prologue_endbr64;
+    as_bytes += sizeof(insn_endbr64);
   }
   else {
     ulp_nops_len = ULP_NOPS_LEN;
     prologue = ulp_prologue;
+  }
+
+  /* Check if we have the two NOP sequence or a JMP ref8 insn.  Else we might
+     be attempting to patch a non-livepatchable function.  */
+
+  if (!(as_bytes[0] == 0xEB ||
+        (as_bytes[1] == 0x90 &&
+         (as_bytes[0] == 0x90 || as_bytes[0] == 0x66)))) {
+    WARN("Function at addr %lx is not livepatchable",
+         (unsigned long)old_faddr);
+    return ENOPATCHABLE;
   }
 
   /*
@@ -1111,17 +1125,17 @@ ulp_patch_addr(void *old_faddr, void *new_faddr, int enable)
   prot2 = memory_protection_get(page2);
   if (prot1 == -1 || prot2 == -1) {
     WARN("Memory protection read error");
-    return 0;
+    return ENOADDRESS;
   }
 
   /* Set the writable bit on affected pages. */
   if (mprotect((void *)page1, page_size, prot1 | PROT_WRITE)) {
     WARN("Memory protection set error (1st page)");
-    return 0;
+    return errno;
   }
   if (mprotect((void *)page2, page_size, prot2 | PROT_WRITE)) {
     WARN("Memory protection set error (2nd page)");
-    return 0;
+    return errno;
   }
 
   /* Actually patch the prologue. */
@@ -1136,14 +1150,14 @@ ulp_patch_addr(void *old_faddr, void *new_faddr, int enable)
   /* Restore the previous access protection. */
   if (mprotect((void *)page1, page_size, prot1)) {
     WARN("Memory protection restore error (1st page)");
-    return 0;
+    return errno;
   }
   if (mprotect((void *)page2, page_size, prot2)) {
     WARN("Memory protection restore error (2nd page)");
-    return 0;
+    return errno;
   }
 
-  return 1;
+  return 0;
 }
 
 struct ulp_applied_patch *

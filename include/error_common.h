@@ -58,6 +58,7 @@ typedef int ulp_error_t;
 #define EAPPLIED      275 /** Patch applied.  */
 #define ENOTARGETLIB  276 /** Target library not loaded.  */
 #define EHOOKNOTRUN   277 /** libpulp.so hook routine not run.  */
+#define ENOPATCHABLE  278 /** Function is not livepatchable.  */
 
 /** Table used to map error code to message.  Define it here so that it is
  *  easier for it being maintained.
@@ -86,6 +87,7 @@ typedef int ulp_error_t;
     "Patch already applied", \
     "Target library not loaded", \
     "libpulp.so hook routine not run", \
+    "Function is not livepatchable", \
   }
 /* clang-format on */
 
