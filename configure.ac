@@ -99,6 +99,14 @@ AC_MSG_ERROR(
 AX_CHECK_COMPILE_FLAG([-fpatchable-function-entry=1],, AC_MSG_ERROR([\
 Required compiler option missing: -fpatchable-function-entry]))
 
+# Check if the compiler provides the -fcf-protection=full option,
+# needed to test functions with endbr64 prologue.
+AX_CHECK_COMPILE_FLAG([-fcf-protection=full], [fcf_protection="yes"], [fcf_protection="no"])
+AC_SUBST([FCF_PROTECTION], [""])
+AS_IF([test "x$fcf_protection" == "xyes"],
+  [AC_SUBST([FCF_PROTECTION], ["-fcf-protection=full"])],
+  [AC_MSG_WARN([-fcf-protection=full not supported. Full testsuite coverage not possible])])
+
 # The following headers are required to build libpulp's tools.
 AC_CHECK_HEADER([gelf.h],,
 AC_MSG_ERROR([Libelf development files are missing.]))
