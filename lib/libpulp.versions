@@ -13,8 +13,6 @@
     posix_memalign;
     dlopen;
     dlmopen;
-    dlsym;
-    dlvsym;
     dlclose;
     dladdr;
     dladdr1;
