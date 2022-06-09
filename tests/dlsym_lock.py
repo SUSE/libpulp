@@ -1,6 +1,8 @@
+#!/usr/bin/env python3
+
 #   libpulp - User-space Livepatching Library
 #
-#   Copyright (C) 2020-2021 SUSE Software Solutions GmbH
+#   Copyright (C) 2022 SUSE Software Solutions GmbH
 #
 #   This file is part of libpulp.
 #
@@ -17,25 +19,13 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-lib_LTLIBRARIES = libpulp.la
+import testsuite
 
-libpulp_la_SOURCES = \
-  ulp.c \
-  interpose.c \
-  msg_queue.c \
-  error.c \
-  ulp_prologue.S \
-  ulp_interface.S
-libpulp_la_DEPENDENCIES= libpulp.versions
-libpulp_la_LDFLAGS = \
-  -ldl \
-  -l:ld-linux-x86-64.so.2 \
-  -Wl,--version-script=$(srcdir)/libpulp.versions \
-  -Wl,--hash-style=sysv \ # Ubuntu seems to default to gnu, so be clear we ...
-  $(AM_LDFLAGS) # ... want old style hash sections, else DT_HASH is empty.
+child = testsuite.spawn("dlsym", timeout=10)
 
-libpulp_la_LIBADD = $(top_builddir)/common/libcommon.la
+child.expect('dl lock was acquired: 1',
+             reject=["dl lock is nonsensical:",
+             "symbol _rtld_global not found in ld-linux-x86_64.so"])
 
-AM_CFLAGS += -I$(top_srcdir)/include
-
-EXTRA_DIST = libpulp.versions
+child.close(force=True)
+exit(0)

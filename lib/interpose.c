@@ -24,14 +24,17 @@
 #include <elf.h>
 #include <err.h>
 #include <fcntl.h>
+#include <gnu/libc-version.h>
 #include <limits.h>
 #include <link.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
+#include "ld_rtld.h"
 #include "msg_queue.h"
 #include "ulp_common.h"
 
@@ -55,12 +58,14 @@ static int (*real_posix_memalign)(void **, size_t, size_t) = NULL;
 /* Dynamic loader functions. */
 static void *(*real_dlopen)(const char *, int) = NULL;
 static void *(*real_dlmopen)(Lmid_t, const char *, int) = NULL;
-static void *(*real_dlsym)(void *, const char *) = NULL;
-static void *(*real_dlvsym)(void *, const char *, const char *) = NULL;
 static int (*real_dlclose)(void *) = NULL;
 static int (*real_dladdr)(const void *, Dl_info *) = NULL;
 static int (*real_dladdr1)(const void *, Dl_info *, void **, int) = NULL;
 static int (*real_dlinfo)(void *, int, void *) = NULL;
+
+/* Linker structures.  */
+static pthread_mutex_t *dl_load_lock = NULL;
+static pthread_mutex_t *dl_load_write_lock = NULL;
 
 /** @brief Get symbol by its name
  *
@@ -350,34 +355,71 @@ get_loaded_library_tls_index(const char *library)
   return arg.tls_index;
 }
 
+/** @brief Find address of dl functions lock.
+ *
+ * This function finds the locks which are held when dlsym and dlmsym functions
+ * are called. This is necessary because of:
+ *   * dlsym behaviour changes depending of where it is being called.
+ * Proof of this can be found in glibc's dlfcn/dlsym.c. Notice that
+ * RETURN_ADDRESS(0) is passed to internal functions, which gets the previous
+ * frame address. The practical behaviour is that if we interpose dlsym, then
+ * software that interposes functions from glibc will find libpulp functions
+ * instead, and libpulp will find the software interposed functions, creating
+ * an infinite recursion.
+ *
+ * Therefore, we can not interpose dlsym and use a custom lock, as we do for
+ * the other functions, and we instead check if the dlsym lock is held.
+ */
+static void
+get_ld_global_locks()
+{
+  char libc_ver[32];
+  const char *tok;
+  int major, minor;
+
+  void *rtld_global =
+      get_loaded_symbol_addr("ld-linux-x86-64.so.2", "_rtld_global", NULL);
+  if (!rtld_global) {
+    libpulp_crash("symbol _rtld_global not found in ld-linux-x86_64.so\n");
+  }
+
+  strcpy(libc_ver, gnu_get_libc_version());
+
+  tok = strtok(libc_ver, ".");
+  major = atoi(tok);
+  tok = strtok(NULL, ".");
+  minor = atoi(tok);
+
+  if (major == 2) {
+    if (31 <= minor && minor < 35) {
+      struct rtld_global__2_31 *rtld = rtld_global;
+      dl_load_lock = &rtld->_dl_load_lock.mutex;
+      dl_load_write_lock = &rtld->_dl_load_write_lock.mutex;
+    }
+    else if (35 <= minor) {
+      struct rtld_global__2_35 *rtld = rtld_global;
+      dl_load_lock = &rtld->_dl_load_lock.mutex;
+      dl_load_write_lock = &rtld->_dl_load_write_lock.mutex;
+    }
+    else {
+      libpulp_crash("glibc version %d.%d is unsupported\n", major, minor);
+    }
+  }
+}
+
 __attribute__((constructor)) void
 __ulp_asunsafe_begin(void)
 {
   /*
-   * If the address of dlsym is know (real_dlsym not NULL) this function
+   * If the address of dlsym is know (real_malloc not NULL) this function
    * has already been executed successfully and learned the real
    * addresses of all interposed function, so do not run it again.
    */
-  if (real_dlsym)
+  if (real_malloc)
     return;
-
-  /*
-   * Calling dlsym to interpose dlsym itself is not possible, so look
-   * at the loaded dynamic symbols from "libdl.so" for the "dlsym" function.
-   */
-  real_dlsym =
-      (typeof(real_dlsym))get_loaded_symbol_addr("libdl.so", "dlsym", NULL);
-  if (!real_dlsym) {
-    /* Check if that is present in libc.  */
-    real_dlsym =
-        (typeof(real_dlsym))get_loaded_symbol_addr("libc.so", "dlsym", NULL);
-  }
-
-  libpulp_crash_assert(real_dlsym);
 
   real_dlopen = dlsym(RTLD_NEXT, "dlopen");
   real_dlmopen = dlsym(RTLD_NEXT, "dlmopen");
-  real_dlvsym = dlsym(RTLD_NEXT, "dlvsym");
   real_dlclose = dlsym(RTLD_NEXT, "dlclose");
   real_dladdr = dlsym(RTLD_NEXT, "dladdr");
   real_dladdr1 = dlsym(RTLD_NEXT, "dladdr1");
@@ -385,7 +427,6 @@ __ulp_asunsafe_begin(void)
 
   libpulp_crash_assert(real_dlopen);
   libpulp_crash_assert(real_dlmopen);
-  libpulp_crash_assert(real_dlvsym);
   libpulp_crash_assert(real_dlclose);
   libpulp_crash_assert(real_dladdr);
   libpulp_crash_assert(real_dladdr1);
@@ -413,12 +454,22 @@ __ulp_asunsafe_begin(void)
   libpulp_crash_assert(real_aligned_alloc);
   libpulp_crash_assert(real_posix_memalign);
   libpulp_crash_assert(real_posix_memalign);
+
+  get_ld_global_locks();
+}
+
+static bool
+dl_locks_held(void)
+{
+  return (dl_load_lock->__data.__lock || dl_load_write_lock->__data.__lock);
 }
 
 int
 __ulp_asunsafe_trylock(void)
 {
   int local;
+  if (dl_locks_held())
+    return 1;
 
   local = __sync_val_compare_and_swap(&flag, 0, 1);
   if (local)
@@ -612,36 +663,6 @@ dlmopen(Lmid_t nsid, const char *file, int mode)
 
   __sync_fetch_and_add(&flag, 1);
   result = real_dlmopen(nsid, file, mode);
-  __sync_fetch_and_sub(&flag, 1);
-
-  return result;
-}
-
-void *
-dlsym(void *handle, const char *name)
-{
-  void *result;
-
-  if (real_dlsym == NULL)
-    __ulp_asunsafe_begin();
-
-  __sync_fetch_and_add(&flag, 1);
-  result = real_dlsym(handle, name);
-  __sync_fetch_and_sub(&flag, 1);
-
-  return result;
-}
-
-void *
-dlvsym(void *handle, const char *name, const char *version)
-{
-  void *result;
-
-  if (real_dlvsym == NULL)
-    __ulp_asunsafe_begin();
-
-  __sync_fetch_and_add(&flag, 1);
-  result = real_dlvsym(handle, name, version);
   __sync_fetch_and_sub(&flag, 1);
 
   return result;

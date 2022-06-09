@@ -376,7 +376,8 @@ check_PROGRAMS = \
   buildid \
   process_access \
   endbr64 \
-  manyprocesses
+  manyprocesses \
+  dlsym
 
 numserv_SOURCES = numserv.c
 numserv_LDADD = libdozens.la libhundreds.la
@@ -485,6 +486,10 @@ manyprocesses_SOURCES = manyprocesses.c
 manyprocesses_LDADD = libmanyprocesses.la
 manyprocesses_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
+dlsym_SOURCES = dlsym.c
+dlsym_LDADD = -lpthread -ldl -lrt -l:ld-linux-x86-64.so.2
+dlsym_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
+
 TESTS = \
   numserv.py \
   numserv_bsymbolic.py \
@@ -520,6 +525,7 @@ TESTS = \
   process_access.py \
   manyprocesses.py \
   endbr64.py \
+  dlsym_lock.py \
   tempfiles.py
 
 XFAIL_TESTS = \
