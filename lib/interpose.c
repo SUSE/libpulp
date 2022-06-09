@@ -41,6 +41,12 @@
 /* This header should be included last, as it poisons some symbols.  */
 #include "error.h"
 
+/* Declare internal glibc functions which are exposed. We have to use them
+   while __ulp_asunsafe_begin have not run yet.  */
+extern void *__libc_malloc(size_t);
+extern void *__libc_calloc(size_t, size_t);
+extern void __libc_free(void *);
+
 static int flag = 0;
 
 /* Memory allocation functions. */
@@ -488,7 +494,7 @@ void
 free(void *ptr)
 {
   if (real_free == NULL) {
-    munmap(ptr, 1);
+    __libc_free(ptr);
     return;
   }
 
@@ -503,8 +509,7 @@ malloc(size_t size)
   void *result;
 
   if (real_malloc == NULL) {
-    result = mmap(NULL, size, PROT_READ | PROT_WRITE,
-                  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    result = __libc_malloc(size);
     return result;
   }
 
@@ -521,8 +526,7 @@ calloc(size_t nmemb, size_t size)
   void *result;
 
   if (real_calloc == NULL) {
-    result = mmap(NULL, nmemb * size, PROT_READ | PROT_WRITE,
-                  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    result = __libc_calloc(nmemb, size);
     return result;
   }
 
