@@ -415,7 +415,7 @@ parse_metadata(struct ulp_metadata *ulp)
     goto metadata_clean;
 
   if (!load_so_handlers(ulp)) {
-    ret = EUNKNOWN;
+    ret = errno;
     goto metadata_clean;
   }
 
