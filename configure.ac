@@ -17,7 +17,7 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-AC_INIT([libpulp], [0.2.4], [noreply@suse.com])
+AC_INIT([libpulp],[0.2.4],[noreply@suse.com])
 
 # Keep most generated files under the config directory.
 AC_CONFIG_AUX_DIR([config])
@@ -122,8 +122,7 @@ AC_SUBST([AM_CCASFLAGS], ["-Wa,--fatal-warnings"])
 
 # Use the glibc versions installed on path
 AC_ARG_WITH([glibc],
-AC_HELP_STRING([--with-glibc=GLIBC_PATH],
-[Use the glibc installed on GLIBC_PATH, where the .so file is present]),
+AS_HELP_STRING([--with-glibc=GLIBC_PATH],[Use the glibc installed on GLIBC_PATH, where the .so file is present]),
 [AC_SUBST([AM_LDFLAGS], ["-Wl,--dynamic-linker=$with_glibc/ld-linux-x86-64.so.2 -Wl,--rpath=$with_glibc/"])],
 [])
 
@@ -168,6 +167,25 @@ AS_IF([test "$enable_docs_generation" = "yes"],
 # inside the above if.
 AM_CONDITIONAL([HAVE_DOXYGEN], [test "$HAVE_DOXYGEN" == "yes"])
 AM_CONDITIONAL([HAVE_PDFLATEX], [test "$HAVE_PDFLATEX_YESNO" == "YES"])
+
+
+AC_CHECK_PROGS([AFL_GCC], [afl-gcc])
+AC_CHECK_PROGS([AFL_FUZZ], [afl-fuzz])
+AC_ARG_ENABLE(afl-testing,
+AS_HELP_STRING([--enable-afl-testing],
+[enable testing the ulp tool using the american fuzzer lop [default=no]]),
+[enable_afl=yes],
+[enable_afl=no; break])
+
+AS_IF([test "$enable_afl" == "yes"],
+      [AS_IF([test "x$AFL_GCC" != "x"],
+             [CC="afl-gcc"],
+             [AC_MSG_ERROR([afl not found in your system])])],
+      [])
+AM_CONDITIONAL([ENABLE_AFL], [test "x$enable_afl" == "xyes"])
+if test "$enable_afl" == "yes"; then
+  AC_DEFINE([ENABLE_AFL], [1], [afl support is enabled.])
+fi
 
 # The test suite covers patching of functions near page boundaries, so
 # try to detect the size of a page in the system, using getconf. If
