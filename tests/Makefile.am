@@ -569,6 +569,12 @@ if ENABLE_VALGRIND
 check: export TESTS_THROUGH_VALGRIND=1
 endif
 
+if ENABLE_AFL
+check-afl: $(METADATA) $(check_LTLIBRARIES)
+	ULP_IN_AFL_TEST=1 \
+	$(AFL_FUZZ) -i $(srcdir)/fuz/ -o $(top_builddir)/afl_findings -- $(ULP)
+endif
+
 # Custom rule for libbuild_livepatch1.ulp. This tests if the build id
 # is correct before applying the patch. A trivial way of testing it
 # would be editing the build id from the metadata file, however, that

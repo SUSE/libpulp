@@ -39,6 +39,50 @@
 #include "post.h"
 #include "trigger.h"
 
+#include <unistd.h>
+
+#ifdef ENABLE_AFL
+#define AFL_INIT_SET0(_p) do { \
+    argv = afl_init_argv(&argc); \
+    argv[0] = (_p); \
+    if (!argc) argc = 1; \
+  } while (0)
+
+#define MAX_CMDLINE_LEN 100000
+#define MAX_CMDLINE_PAR 1000
+
+__attribute__((unused)) static char** afl_init_argv(int* argc) {
+
+  static char  in_buf[MAX_CMDLINE_LEN];
+  static char* ret[MAX_CMDLINE_PAR];
+
+  char* ptr = in_buf;
+  int   rc  = 0;
+
+  if (read(0, in_buf, MAX_CMDLINE_LEN - 2) < 0){}
+
+  while (*ptr) {
+
+    ret[rc] = ptr;
+    if (ret[rc][0] == 0x02 && !ret[rc][1])
+      ret[rc]++;
+    rc++;
+
+    while (*ptr) ptr++;
+    ptr++;
+
+  }
+
+  *argc = rc;
+
+  return ret;
+
+}
+
+#undef MAX_CMDLINE_LEN
+#undef MAX_CMDLINE_PAR
+#endif /* ENABLE_AFL  */
+
 static error_t parser(int, char *, struct argp_state *);
 static bool check_color_available(void);
 
@@ -337,8 +381,20 @@ change_color(const char *ansi_escape)
 }
 
 int
-main(int argc, char **argv)
+main(int argc, char **argv, char *envp[] __attribute__((unused)))
 {
+#ifdef ENABLE_AFL
+  while (*envp) {
+    const char *key = strtok(*envp, "=");
+    const char *val = strtok(NULL, "=");
+    if (!strcmp(key, "ULP_IN_AFL_TEST") && val && *val == '1') {
+      argv = afl_init_argv(&argc);
+      break;
+    }
+    envp++;
+  }
+#endif /* ENABLE_AFL  */
+
   struct arguments arguments = { 0 };
   int ret = 0;
 
