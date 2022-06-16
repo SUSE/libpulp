@@ -357,7 +357,7 @@ parse_error(location_t loc, const char *fmt, ...)
 
   char *line = NULL;
   size_t line_size;
-  size_t len;
+  ssize_t len;
 
   change_color(TERM_COLOR_BOLD);
   printf("%s:%d:%d: ", parse_filename, loc.line, loc.col);
@@ -371,7 +371,7 @@ parse_error(location_t loc, const char *fmt, ...)
   putchar('\n');
   parse_file = fopen(parse_filename, "r");
   if (!parse_file) {
-    printf("ERROR WHILE PRINTING ERROR MESSAGE: %s\n", strerror(errno));
+    printf("Error opening %s: %s\n", parse_filename, strerror(errno));
     return;
   }
 
@@ -379,6 +379,10 @@ parse_error(location_t loc, const char *fmt, ...)
 
   for (i = 0; i < loc.line; i++) {
     len = getline(&line, &line_size, parse_file);
+    if (len <= 0) {
+      printf("File is empty or is a directory\n");
+      return;
+    }
   }
 
   if (i > 0) {
@@ -529,7 +533,7 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
 
   parse_file = fopen(filename, "r");
   if (!parse_file) {
-    WARN("Unable to open description file.");
+    parse_error(loc, "Unable to open description file");
     ret = 0;
     goto dsc_clean;
   }
@@ -543,7 +547,7 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
   loc.line++;
   loc.col = 1;
   if (n <= 0) {
-    WARN("Unable to parse description file: is empty");
+    parse_error(loc, "Unable to parse description file: is empty");
     ret = 0;
     goto dsc_clean;
   }
@@ -828,7 +832,8 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
   }
   ret = 1;
 dsc_clean:
-  fclose(parse_file);
+  if (parse_file)
+    fclose(parse_file);
   parse_file = NULL;
   if (first)
     free(first);

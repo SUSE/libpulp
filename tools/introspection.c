@@ -849,6 +849,12 @@ parse_main_dynobj(struct ulp_process *process)
 
   DEBUG("getting in-memory information about the main executable.");
 
+  const char *target_binary_name = get_target_binary_name(process->pid);
+  if (target_binary_name == NULL) {
+    DEBUG("unable to find name of process with pid %d.", process->pid);
+    return EINVAL;
+  }
+
   /* calloc initializes all to zero */
   obj = calloc(sizeof(struct ulp_dynobj), 1);
   if (!obj) {
@@ -857,7 +863,7 @@ parse_main_dynobj(struct ulp_process *process)
   }
 
   obj->filename = malloc(PATH_MAX);
-  strcpy(obj->filename, get_target_binary_name(process->pid));
+  strcpy(obj->filename, target_binary_name);
 
   DEBUG("process name = %s, process pid = %d", obj->filename, process->pid);
 
