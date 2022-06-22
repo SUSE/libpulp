@@ -181,6 +181,15 @@ libmanyprocesses_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
 POST_PROCESS += .libs/libmanyprocesses.post
 
+# Target libraries to test static data access
+check_LTLIBRARIES += libstress.la
+
+libstress_la_SOURCES = libstress.c
+libstress_la_CFLAGS = $(TARGET_CFLAGS)
+libstress_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
+
+POST_PROCESS += .libs/libstress.post
+
 # Live patches
 check_LTLIBRARIES += libdozens_livepatch1.la \
                      libdozens_livepatch99.la \
@@ -204,7 +213,8 @@ check_LTLIBRARIES += libdozens_livepatch1.la \
                      libbuildid_livepatch1.la \
                      libprocess_access_livepatch1.la \
                      libendbr64_livepatch1.la \
-                     libmanyprocesses_livepatch1.la
+                     libmanyprocesses_livepatch1.la \
+                     libstress_livepatch1.la
 
 libdozens_livepatch1_la_SOURCES = libdozens_livepatch1.c
 libdozens_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
@@ -275,6 +285,9 @@ libprocess_access_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 libmanyprocesses_livepatch1_la_SOURCES = libmanyprocesses_livepatch1.c
 libmanyprocesses_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
+libstress_livepatch1_la_SOURCES = libstress_livepatch1.c
+libstress_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
+
 METADATA = \
   libdozens_livepatch1.dsc \
   libdozens_livepatch1.ulp \
@@ -321,7 +334,9 @@ METADATA = \
   libprocess_livepatch1.dsc \
   libprocess_livepatch1.ulp \
   libprocess_access_livepatch1.dsc \
-  libprocess_access_livepatch1.ulp
+  libprocess_access_livepatch1.ulp \
+  libstress_livepatch1.dsc \
+  libstress_livepatch1.ulp
 
 EXTRA_DIST = \
   libdozens_livepatch1.in \
@@ -346,7 +361,8 @@ EXTRA_DIST = \
   libendbr64_livepatch1.in \
   libmanyprocesses_livepatch1.in \
   libprocess_livepatch1.in \
-  libprocess_access_livepatch1.in
+  libprocess_access_livepatch1.in \
+  libstress_livepatch1.in
 
 clean-local:
 	rm -f $(METADATA)
@@ -377,7 +393,8 @@ check_PROGRAMS = \
   process_access \
   endbr64 \
   manyprocesses \
-  dlsym
+  dlsym \
+  stress
 
 numserv_SOURCES = numserv.c
 numserv_LDADD = libdozens.la libhundreds.la
@@ -490,6 +507,10 @@ dlsym_SOURCES = dlsym.c
 dlsym_LDADD = -lpthread -ldl -lrt -l:ld-linux-x86-64.so.2
 dlsym_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
+stress_SOURCES = stress.c
+stress_LDADD = libstress.la
+stress_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
+
 TESTS = \
   numserv.py \
   numserv_bsymbolic.py \
@@ -526,6 +547,7 @@ TESTS = \
   manyprocesses.py \
   endbr64.py \
   dlsym_lock.py \
+  stress.py \
   tempfiles.py
 
 XFAIL_TESTS = \
@@ -540,20 +562,26 @@ XFAIL_TESTS = \
 # looking for libraries to patch, and for that it locks the ptrace
 # lock.
 #
+# stress must run serially for the same reason as manyprocesses.
+#
 # tempfiles must run serially AFTER all tests because it checks if
 # garbage were not left in filesystem after the testsuite was run.
 
 SERIAL_TESTS = \
   manyprocesses.log \
+  stress.log \
   tempfiles.log
 
 # Remove the test itself from the dependency list.
 MANYPROCESSES_DEPS = $(filter-out $(SERIAL_TESTS),$(TEST_LOGS))
-TEMPFILES_DEPS = $(MANYPROCESSES_DEPS) manyprocesses.log
+STRESS_DEPS = $(MANYPROCESSES_DEPS) manyprocesses.log
+TEMPFILES_DEPS = $(STRESS_DEPS) manyprocesses.log stress.log
 
 manyprocesses.log: $(MANYPROCESSES_DEPS)
 
 tempfiles.log: $(TEMPFILES_DEPS)
+
+stress.log: $(STRESS_DEPS)
 
 TEST_EXTENSIONS = .py
 PY_LOG_COMPILER = $(PYTHON) -B
