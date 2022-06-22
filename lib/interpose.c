@@ -46,6 +46,7 @@
 extern void *__libc_malloc(size_t);
 extern void *__libc_calloc(size_t, size_t);
 extern void __libc_free(void *);
+extern const char *__progname;
 
 static int flag = 0;
 
@@ -282,7 +283,7 @@ get_loaded_symbol_addr(const char *library, const char *symbol,
 {
   /* Check if the current info is the program's binary itself.  In that case
    * we must handle things somewhat differently.  */
-  if (library == NULL || !strcmp(library, get_current_binary_name())) {
+  if (library == NULL || !strcmp(library, __progname)) {
     library = "";
   }
 
@@ -336,7 +337,7 @@ get_loaded_library_base_addr(const char *library)
 
   /* Check if the current info is the program's binary itself.  In that case
    * we must handle things somewhat differently.  */
-  if (library == NULL || !strcmp(library, get_current_binary_name())) {
+  if (library == NULL || !strcmp(library, __progname)) {
     library = "";
   }
 
@@ -351,7 +352,7 @@ get_loaded_library_tls_index(const char *library)
 {
   /* Check if the current info is the program's binary itself.  In that case
    * we must handle things somewhat differently.  */
-  if (library == NULL || !strcmp(library, get_current_binary_name())) {
+  if (library == NULL || !strcmp(library, __progname)) {
     library = "";
   }
 

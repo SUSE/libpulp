@@ -191,4 +191,10 @@ void release_ulp_applied_patch(struct ulp_applied_patch *);
 int coarse_library_range_check(struct ulp_process *process, char *library);
 #endif
 
+static inline const char *
+get_process_name(struct ulp_process *process)
+{
+  return get_basename(process->dynobj_main->filename);
+}
+
 #endif

@@ -337,7 +337,7 @@ print_process_list(struct ulp_process *process_list, int print_buildid)
   while (process_item) {
     pid_t pid = process_item->pid;
     struct ulp_applied_patch *patch = ulp_read_state(process_item);
-    printf("PID: %d, name: %s\n", pid, get_target_binary_name(pid));
+    printf("PID: %d, name: %s\n", pid, get_process_name(process_item));
 
     printf("  Livepatchable libraries:\n");
     object_item = dynobj_first(process_item);

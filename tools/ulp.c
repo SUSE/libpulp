@@ -42,24 +42,30 @@
 #include <unistd.h>
 
 #ifdef ENABLE_AFL
-#define AFL_INIT_SET0(_p) do { \
+#define AFL_INIT_SET0(_p) \
+  do { \
     argv = afl_init_argv(&argc); \
     argv[0] = (_p); \
-    if (!argc) argc = 1; \
-  } while (0)
+    if (!argc) \
+      argc = 1; \
+  } \
+  while (0)
 
 #define MAX_CMDLINE_LEN 100000
 #define MAX_CMDLINE_PAR 1000
 
-__attribute__((unused)) static char** afl_init_argv(int* argc) {
+__attribute__((unused)) static char **
+afl_init_argv(int *argc)
+{
 
-  static char  in_buf[MAX_CMDLINE_LEN];
-  static char* ret[MAX_CMDLINE_PAR];
+  static char in_buf[MAX_CMDLINE_LEN];
+  static char *ret[MAX_CMDLINE_PAR];
 
-  char* ptr = in_buf;
-  int   rc  = 0;
+  char *ptr = in_buf;
+  int rc = 0;
 
-  if (read(0, in_buf, MAX_CMDLINE_LEN - 2) < 0){}
+  if (read(0, in_buf, MAX_CMDLINE_LEN - 2) < 0) {
+  }
 
   while (*ptr) {
 
@@ -68,15 +74,14 @@ __attribute__((unused)) static char** afl_init_argv(int* argc) {
       ret[rc]++;
     rc++;
 
-    while (*ptr) ptr++;
+    while (*ptr)
+      ptr++;
     ptr++;
-
   }
 
   *argc = rc;
 
   return ret;
-
 }
 
 #undef MAX_CMDLINE_LEN
