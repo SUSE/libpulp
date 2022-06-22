@@ -296,7 +296,7 @@ print_patched_unpatched_processes(struct ulp_process *list, bool summarize)
   for (curr_item = list; curr_item != NULL; curr_item = curr_item->next) {
     pid_t pid = curr_item->pid;
     struct trigger_results *results, *summarized_result = NULL;
-    printf("  %s (pid: %d):", get_target_binary_name(pid), pid);
+    printf("  %s (pid: %d):", get_process_name(curr_item), pid);
 
     /* Try to summarize the patches result.  */
     ulp_error_t err = EUNKNOWN;
@@ -456,10 +456,11 @@ trigger_many_processes(const char *process_wildcard, int retries,
 
 static void
 diagnose_patch_apply(ulp_error_t ret, bool revert, const char *livepatch,
-                     const char *library, int pid)
+                     const char *library, struct ulp_process *p)
 {
   const char *apply_rev = (revert) ? "revert" : "apply";
   const char *applied_rev = (revert) ? "reverted" : "applied";
+  pid_t pid = p->pid;
 
   if (ret) {
     if (livepatch) {
@@ -467,7 +468,7 @@ diagnose_patch_apply(ulp_error_t ret, bool revert, const char *livepatch,
       printf("error:");
       change_color(TERM_COLOR_RESET);
       printf(" could not %s %s to %s (pid %d): %s\n", apply_rev, livepatch,
-             get_target_binary_name(pid), pid, libpulp_strerror(ret));
+             get_process_name(p), pid, libpulp_strerror(ret));
       if (ret == EBUILDID && !ulp_quiet) {
         change_color(TERM_COLOR_CYAN);
         printf("note:");
@@ -482,7 +483,7 @@ diagnose_patch_apply(ulp_error_t ret, bool revert, const char *livepatch,
       change_color(TERM_COLOR_RESET);
       printf(" could not revert all patches to library %s in "
              "process %s (pid %d): %s\n",
-             library, get_target_binary_name(pid), pid, libpulp_strerror(ret));
+             library, get_process_name(p), pid, libpulp_strerror(ret));
       change_color(TERM_COLOR_CYAN);
       printf("note:");
       change_color(TERM_COLOR_RESET);
@@ -510,7 +511,7 @@ diagnose_patch_apply(ulp_error_t ret, bool revert, const char *livepatch,
         change_color(TERM_COLOR_RESET);
         printf(" reverted all patches to library %s in "
                "process %s (pid %d)\n",
-               library, get_target_binary_name(pid), pid);
+               library, get_process_name(p), pid);
       }
       else {
         change_color(TERM_COLOR_RED);
@@ -560,7 +561,7 @@ run_trigger(struct arguments *arguments)
     ret = trigger_one_process(target, retry, livepatch, library, check_stack,
                               revert);
 
-    diagnose_patch_apply(ret, revert, livepatch, library, pid);
+    diagnose_patch_apply(ret, revert, livepatch, library, target);
     release_ulp_process(target);
   }
   else {

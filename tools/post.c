@@ -122,7 +122,7 @@ merge_nops_at_addr(Elf64_Addr addr, size_t amount)
       /* Merge two nops into a two-bytes, single one. */
       offset = addr - shdr->sh_addr;
       uint8_t *func_addr = data->d_buf + offset;
-      static const char insn_endbr64[] = {INSN_ENDBR64};
+      static const char insn_endbr64[] = { INSN_ENDBR64 };
 
       /* Check if instruction is actually an endbr64.  In that case we must
          take that into account.  */
@@ -130,7 +130,8 @@ merge_nops_at_addr(Elf64_Addr addr, size_t amount)
         func_addr += sizeof(insn_endbr64);
 
       /* Assert that the insn is actually a NOP.  */
-      assert(func_addr[1] == 0x90 && (func_addr[0] == 0x90 || func_addr[0] == 0x66));
+      assert(func_addr[1] == 0x90 &&
+             (func_addr[0] == 0x90 || func_addr[0] == 0x66));
 
       /* Merge two NOPs.  */
       *func_addr = 0x66;

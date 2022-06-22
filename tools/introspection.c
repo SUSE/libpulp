@@ -1930,7 +1930,7 @@ check_livepatch_functions_matches_metadata(void)
 int
 check_patch_sanity(struct ulp_process *process)
 {
-  char *target;
+  const char *target;
   struct ulp_dynobj *d;
 
   DEBUG("checking that the live patch is suitable for the target process.");
@@ -1945,29 +1945,14 @@ check_patch_sanity(struct ulp_process *process)
     return EUNKNOWN;
   }
 
-  target = strrchr(ulp.objs->name, '/');
-  if (target) {
-    /* strrchr returns pointer to the last occurence of '/'.  Therefore, the
-       library base name should be one character ahead.  */
-    target++;
-  }
-  else {
-    /* name is already the library's basename.  */
-    target = ulp.objs->name;
-  }
-
+  target = get_basename(ulp.objs->name);
   const unsigned char *buildid = NULL;
 
   /* check if the affected library is present in the process. */
   for (d = dynobj_first(process); d != NULL; d = dynobj_next(process, d)) {
     bool buildid_match = false;
     bool name_match = false;
-    const char *basename = strrchr(d->filename, '/');
-
-    if (basename)
-      basename++;
-    else
-      basename = d->filename;
+    const char *basename = get_basename(d->filename);
 
     if (strcmp(basename, target) == 0) {
       buildid = d->build_id;
@@ -1991,8 +1976,8 @@ check_patch_sanity(struct ulp_process *process)
 
       DEBUG("pid = %d, name = %s: livepatch buildid mismatch for %s (%s)\n"
             "    expected buildid: %s\n",
-            process->pid, get_target_binary_name(process->pid), target,
-            buildid_str, lp_buildid);
+            process->pid, get_process_name(process), target, buildid_str,
+            lp_buildid);
 
       free(buildid_str);
       free(lp_buildid);
@@ -2000,7 +1985,7 @@ check_patch_sanity(struct ulp_process *process)
     }
     else {
       DEBUG("pid = %d, name = %s: target library (%s) not loaded.",
-            process->pid, get_target_binary_name(process->pid), target);
+            process->pid, get_process_name(process), target);
       ret = ENOTARGETLIB;
     }
     DEBUG("available target libraries:");
@@ -2262,7 +2247,7 @@ ulp_read_state(struct ulp_process *process)
   struct ulp_patching_state state;
   pid_t pid = process->pid;
 
-  if (!process->dynobj_libpulp->state) {
+  if (!process->dynobj_libpulp || !process->dynobj_libpulp->state) {
     WARN("patching state address is NULL.");
     return NULL;
   }
