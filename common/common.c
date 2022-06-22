@@ -123,8 +123,11 @@ get_target_binary_name(int pid)
 
   snprintf(fname, sizeof(fname), "/proc/%d/comm", pid);
   FILE *fp = fopen(fname, "r");
-  if (!fp)
-    return NULL;
+  if (!fp) {
+    DEBUG("Unable to find name of process %d: %s", pid,
+          libpulp_strerror(errno));
+    return "(null)";
+  }
   if (fgets(cmdline, sizeof(cmdline), fp) != NULL) {
     strncpy(binary_name, get_basename(cmdline), PATH_MAX - 1);
 

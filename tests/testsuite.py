@@ -344,3 +344,37 @@ class spawn(pexpect.spawn):
 
     msgs = tool.stdout.decode()
     return str(msgs)
+
+
+def childless_livepatch(wildcard, timeout=10, retries=1,
+            verbose=False, quiet=False, revert_lib=None):
+
+    # Build command-line from arguments
+    command = [ulptool, "trigger"]
+    if revert_lib is not None:
+      command.append("--revert-all")
+      command.append(revert_lib)
+    if wildcard is not None:
+      command.append(wildcard)
+      print('')
+    if verbose:
+      command.append('-v')
+    if quiet:
+      command.append('-q')
+    if retries > 1:
+      command.append('-r')
+      command.append(str(retries))
+
+    # Apply the live patch and check for common errors
+    try:
+      print('Applying/reverting live patch.')
+      tool = subprocess.run(command, timeout=timeout)
+    except subprocess.TimeoutExpired:
+      print('Live patching timed out.')
+      raise
+
+    # The trigger tool returns 0 on success, so use check_returncode(),
+    # which asserts that, and raises CalledProcessError otherwise.
+    tool.check_returncode()
+
+    print('Live patch applied/reverted successfully.')

@@ -1,0 +1,3 @@
+__ABS_BUILDDIR__/.libs/libstress_livepatch1.so
+@__ABS_BUILDDIR__/.libs/libstress.so.0
+value:new_value
