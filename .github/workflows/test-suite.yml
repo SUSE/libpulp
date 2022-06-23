@@ -21,10 +21,10 @@ jobs:
             compiler: gcc
             build-type: sanitizers
             extra-configure: --enable-sanitizers
-          - opensuse: tumbleweed
-            compiler: gcc
-            build-type: valgrind
-            extra-configure: --enable-valgrind
+#         - opensuse: tumbleweed
+#           compiler: gcc
+#           build-type: valgrind
+#           extra-configure: --enable-valgrind
 
     container:
       image: opensuse/${{ matrix.opensuse }}
