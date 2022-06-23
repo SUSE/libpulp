@@ -54,5 +54,7 @@ int get_regs(int pid, struct user_regs_struct *regs);
 
 int set_regs(int pid, struct user_regs_struct *regs);
 
+void set_run_and_redirect_timeout(long t);
+
 int run_and_redirect(int pid, struct user_regs_struct *regs,
                      ElfW(Addr) routine);
