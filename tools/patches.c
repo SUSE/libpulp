@@ -103,8 +103,9 @@ insert_target_process(int pid, struct ulp_process **list)
   snprintf(mapname, PATH_MAX, "/proc/%d/maps", pid);
   if ((map = fopen(mapname, "r")) == NULL) {
     /* EACESS error happens when the tool is executed by a regular user.
-       This is not a hard error. */
-    if (errno != EACCES)
+       This is not a hard error.
+       ENOENT happens when the process finished in between this process.  */
+    if (errno != EACCES && errno != ENOENT)
       perror("Unable to open memory map for process");
     return;
   }
@@ -366,6 +367,8 @@ run_patches(struct arguments *arguments)
 {
   struct ulp_process *process_list;
   int print_buildid = arguments->buildid;
+  ulp_quiet = arguments->quiet;
+  ulp_verbose = arguments->verbose;
 
   /*
    * If the PID argument has not been provided, check all live patchable
