@@ -1343,11 +1343,8 @@ patch_applied(struct ulp_process *process, unsigned char *id, int *result)
 
   DEBUG(">>> running libpulp functions within target process...");
   ret = run_and_redirect(thread->tid, &context, routine);
-  if (ret == -1) {
-    WARN("fatal error during live patch status check.");
-  };
-  if (ret) {
-    WARN("error during live patch status check.");
+  if (ret != 0) {
+    WARN("error during live patch status check: %s", libpulp_strerror(ret));
   }
   DEBUG(">>> done.");
   if (ret)
@@ -1399,9 +1396,6 @@ apply_patch(struct ulp_process *process, void *metadata, size_t metadata_size)
 
   DEBUG(">>> running libpulp functions within target process...");
   ret = run_and_redirect(thread->tid, &context, routine);
-  if (ret == -1) {
-    WARN("fatal error during live patch application.");
-  }
   if (ret) {
     WARN("error during live patch application: %s",
          libpulp_strerror(context.rax));
@@ -1454,11 +1448,8 @@ revert_patches_from_lib(struct ulp_process *process, const char *lib_name)
 
   DEBUG(">>> running libpulp functions within target process...");
   ret = run_and_redirect(thread->tid, &context, routine);
-  if (ret == -1) {
-    WARN("fatal error during live patch revert.");
-  };
   if (ret) {
-    WARN("error during live patch revert.");
+    WARN("error during live patch revert: %s", libpulp_strerror(ret));
   }
   DEBUG(">>> done.");
   if (ret)

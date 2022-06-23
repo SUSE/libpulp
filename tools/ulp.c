@@ -123,6 +123,7 @@ static const char doc[] =
 #define ULP_OP_REVERT_ALL 256
 #define ULP_OP_REVERT 257
 #define ULP_OP_COLOR 258
+#define ULP_OP_TIMEOUT 259
 
 static struct argp_option options[] = {
   { 0, 0, 0, 0, "Options:", 0 },
@@ -136,6 +137,7 @@ static struct argp_option options[] = {
   { "retries", 'r', "N", 0, "Retry N times if process busy", 0 },
   { "revert-all", ULP_OP_REVERT_ALL, "LIB", 0, "Revert all patches from LIB",
     0 },
+  { "timeout", ULP_OP_TIMEOUT, "t", 0, "Set trigger timeout to t seconds", 0 },
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
   { "check-stack", 'c', 0, 0, "Check the call stack before live patching", 0 },
 #endif
@@ -347,6 +349,18 @@ parser(int key, char *arg, struct argp_state *state)
       }
       else {
         no_color = false;
+      }
+      break;
+
+    case ULP_OP_TIMEOUT:
+      if (isnumber(arg)) {
+        long num = atol(arg);
+        if (num < 0)
+          argp_error(state, "--timeout value must be a non-negative integer");
+        set_run_and_redirect_timeout(num);
+      }
+      else {
+        argp_error(state, "--timeout value must be a non-negative integer");
       }
       break;
 

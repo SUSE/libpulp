@@ -26,6 +26,7 @@
 #include <sys/ptrace.h>
 #include <sys/user.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "error_common.h"
@@ -296,10 +297,32 @@ set_regs(int pid, struct user_regs_struct *regs)
   return 0;
 }
 
+/** Timeout for run_and_redirect function.  Set default to 10s.  */
+static long rr_timeout = 10;
+
+/** @brief Set timeout timer on run_and_redirect function
+ *
+ * If for some reason libpulp.so deadlocks when livepatching, the only
+ * way we can 'detect' it is by using a timer. This function let the
+ * user control this timer
+ * timer
+ *
+ * @param t   New timeout value.
+ *
+ **/
+void
+set_run_and_redirect_timeout(long t)
+{
+  rr_timeout = t;
+}
+
 int
 run_and_redirect(int pid, struct user_regs_struct *regs, ElfW(Addr) routine)
 {
   int status;
+  time_t t0, t1;
+  bool success = false;
+  long timeout = rr_timeout;
 
   /*
    * After an ongoing syscall gets interrupted (for instance by
@@ -363,20 +386,48 @@ run_and_redirect(int pid, struct user_regs_struct *regs, ElfW(Addr) routine)
     return ETARGETHOOK;
   }
 
-  usleep(1000);
-  if (waitpid(-1, &status, __WALL) == -1) {
-    WARN("waitpid error (pid %d).\n", pid);
-    return -1;
-  }
+  t0 = time(NULL);
+  do {
+    pid_t ret;
 
-  if (WIFEXITED(status) || WCOREDUMP(status)) {
-    WARN("%d failed %s.\n", pid, strsignal(WEXITSTATUS(status)));
-    return -1;
-  }
+    usleep(1000);
+    /* Query on pid to check if the process has stopped.  */
+    ret = waitpid(pid, &status, WNOHANG | WSTOPPED);
 
-  if (!WIFSTOPPED(status)) {
-    WARN("Target %d did not stop.\n", pid);
-    return -1;
+    if (ret == -1) {
+      /* waitpid returned an error state.  */
+      WARN("waitpid error (pid %d).\n", pid);
+      return EUNKNOWN;
+    }
+    else if (ret == pid) {
+      /* Expected correct value: the process state changed in process with
+       * pid=pid*/
+
+      if (WIFEXITED(status) || WCOREDUMP(status)) {
+        /* If the process exited for some reason, we can not continue.  */
+        WARN("%d failed %s.\n", pid, strsignal(WEXITSTATUS(status)));
+        return EUNKNOWN;
+      }
+
+      /* Check if the process indeed stopped. Else we have to continue trying.
+       */
+      if (WIFSTOPPED(status)) {
+        success = true;
+        break;
+      }
+    }
+    else if (ret > 0) {
+      /* Unexpected process stopped?  */
+      DEBUG(
+          "waitpid: state changed on unexpected process: expected %d, got %d",
+          pid, ret);
+    }
+    t1 = time(NULL);
+  }
+  while (t1 - t0 < timeout);
+
+  if (!success) {
+    return ETIME;
   }
 
   /* Read the full context to learn about return values. */
