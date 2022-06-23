@@ -34,6 +34,11 @@
 #include "ptrace.h"
 #include "ulp_common.h"
 
+/** Set an amout of time to retry to read/write target process memory before
+    giving up. The process could be being patched or analyzed by another ulp
+    instance.  */
+#define PTRACE_TIMEOUT 5
+
 /*
  * Number of bytes that the kernel subtracts from the program counter,
  * when an ongoing syscall gets interrupted and must be restarted.
@@ -45,6 +50,51 @@
  * number of bytes.  */
 static ElfW(Addr) tlb = 0;
 
+/** @brief ulp ptrace wrapper
+ *
+ * The `ulp` tool uses ptrace to both update a process AND query for libraries
+ * and patches installed in the process, and both things could be happening at
+ * once. If this is the case, ptrace may sometimes fail with permissions or
+ * busy errors. In this case, this wrapper tries ot ptrace a process multiple
+ * times before concluding that it can't.
+ *
+ **/
+static long
+ulp_ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data)
+{
+  time_t t0, t1;
+  long ret;
+
+  t0 = time(NULL);
+  do {
+    errno = 0;
+
+    ret = ptrace(request, pid, addr, data);
+
+    switch (errno) {
+      case EBUSY:
+      case EPERM:
+        usleep(10000);
+        break;
+
+      case EIO:
+      case EFAULT:
+      case EINVAL:
+      case ESRCH:
+      case 0:
+        return ret;
+        break;
+    }
+    t1 = time(NULL);
+  }
+  while (t1 - t0 < PTRACE_TIMEOUT);
+
+  return ret;
+}
+
+/** This file should not call ptrace directly anymore.  */
+#pragma GCC poison ptrace
+
 /* Memory read/write helper functions */
 int
 write_byte(char byte, int pid, Elf64_Addr addr)
@@ -55,13 +105,13 @@ write_byte(char byte, int pid, Elf64_Addr addr)
   tlb = 0;
 
   errno = 0;
-  value = ptrace(PTRACE_PEEKDATA, pid, addr, 0);
+  value = ulp_ptrace(PTRACE_PEEKDATA, pid, (void *)addr, 0);
   if (errno) {
     DEBUG("unable to read byte before writing: %s\n", strerror(errno));
     return 1;
   }
   memset(&value, byte, 1);
-  ptrace(PTRACE_POKEDATA, pid, addr, value);
+  ulp_ptrace(PTRACE_POKEDATA, pid, (void *)addr, (void *)value);
   if (errno) {
     DEBUG("Unable to write byte: %s\n", strerror(errno));
     return 1;
@@ -101,7 +151,7 @@ static int
 ptrace_peekdata(long *value, int pid, Elf64_Addr addr)
 {
   errno = 0;
-  *value = ptrace(PTRACE_PEEKDATA, pid, addr, 0);
+  *value = ulp_ptrace(PTRACE_PEEKDATA, pid, (void *)addr, 0);
   if (errno) {
     DEBUG("unable to read byte: %s\n", strerror(errno));
     return 1;
@@ -234,7 +284,7 @@ attach(int pid)
 {
   int status;
 
-  if (ptrace(PTRACE_ATTACH, pid, NULL, NULL)) {
+  if (ulp_ptrace(PTRACE_ATTACH, pid, NULL, NULL)) {
     DEBUG("PTRACE_ATTACH error: %s.\n", strerror(errno));
     return 1;
   }
@@ -267,7 +317,7 @@ attach(int pid)
 int
 detach(int pid)
 {
-  if (ptrace(PTRACE_DETACH, pid, NULL, NULL)) {
+  if (ulp_ptrace(PTRACE_DETACH, pid, NULL, NULL)) {
     DEBUG("PTRACE_DETACH error: %s.\n", strerror(errno));
     return 1;
   }
@@ -280,7 +330,7 @@ detach(int pid)
 int
 get_regs(int pid, struct user_regs_struct *regs)
 {
-  if (ptrace(PTRACE_GETREGS, pid, NULL, regs)) {
+  if (ulp_ptrace(PTRACE_GETREGS, pid, NULL, regs)) {
     DEBUG("PTRACE_GETREGS error: %s.\n", strerror(errno));
     return 1;
   }
@@ -290,7 +340,7 @@ get_regs(int pid, struct user_regs_struct *regs)
 int
 set_regs(int pid, struct user_regs_struct *regs)
 {
-  if (ptrace(PTRACE_SETREGS, pid, NULL, regs)) {
+  if (ulp_ptrace(PTRACE_SETREGS, pid, NULL, regs)) {
     DEBUG("PTRACE_SETREGS error: %s.\n", strerror(errno));
     return 1;
   }
@@ -376,12 +426,12 @@ run_and_redirect(int pid, struct user_regs_struct *regs, ElfW(Addr) routine)
    */
   regs->rsp &= 0xFFFFFFFFFFFFFFC0;
 
-  if (ptrace(PTRACE_SETREGS, pid, NULL, regs)) {
+  if (ulp_ptrace(PTRACE_SETREGS, pid, NULL, regs)) {
     WARN("PTRACE_SETREGS error (pid %d).\n", pid);
     return ETARGETHOOK;
   }
 
-  if (ptrace(PTRACE_CONT, pid, NULL, NULL)) {
+  if (ulp_ptrace(PTRACE_CONT, pid, NULL, NULL)) {
     WARN("PTRACE_CONT error (pid %d).\n", pid);
     return ETARGETHOOK;
   }
@@ -431,7 +481,7 @@ run_and_redirect(int pid, struct user_regs_struct *regs, ElfW(Addr) routine)
   }
 
   /* Read the full context to learn about return values. */
-  if (ptrace(PTRACE_GETREGS, pid, NULL, regs)) {
+  if (ulp_ptrace(PTRACE_GETREGS, pid, NULL, regs)) {
     WARN("PTRACE_GETREGS error (pid %d).\n", pid);
     return -1;
   }
