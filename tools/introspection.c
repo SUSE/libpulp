@@ -783,6 +783,7 @@ dig_load_bias(struct ulp_process *process)
   do {
     if (read(auxv, &at, sizeof(Elf64_auxv_t)) != sizeof(Elf64_auxv_t)) {
       DEBUG("error: unable to read auxv.");
+      close(auxv);
       return errno;
     }
     if (at.a_type == AT_ENTRY) {
@@ -801,19 +802,23 @@ dig_load_bias(struct ulp_process *process)
   while (at.a_type != AT_NULL);
   if (addrof_entry == 0) {
     DEBUG("error: unable to find entry address for the executable");
+    close(auxv);
     return ENOPENTRY;
   }
   if (at_phdr == 0) {
     DEBUG("error: unable to find program header of target process");
+    close(auxv);
     return ENOPHDR;
   }
   if (phent != sizeof(phdr)) {
     DEBUG("error: invalid PHDR size for target process (32 bit process?)");
+    close(auxv);
     return ENOPHDR;
   }
   for (i = 0; i < phnum; i++) {
     if (read_memory((char *)&phdr, phent, process->pid, at_phdr + i * phent)) {
       DEBUG("error: unable to read PHDR entry");
+      close(auxv);
       return ETARGETHOOK;
     }
     switch (phdr.p_type) {
@@ -834,6 +839,7 @@ dig_load_bias(struct ulp_process *process)
   process->dyn_addr = adyn;
 
   free(filename);
+  close(auxv);
   return 0;
 }
 
