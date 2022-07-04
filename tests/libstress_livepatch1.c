@@ -1,4 +1,5 @@
-int new_value(void)
+int
+new_value(void)
 {
-return 2;
+  return 0;
 }

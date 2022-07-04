@@ -17,20 +17,14 @@
 
 # This test stress out the ulp tool when multiple processes are running.
 
+import sys
 import testsuite
 import subprocess
 
-childs = []
-
-for i in range(1000):
-    print("launching " + str(i))
-    child = testsuite.spawn('stress')
-    childs.append(child)
-
-for child in childs:
-    child.expect('Ready')
+child = testsuite.spawn('stress')
+child.expect("Processes launched")
 
 testsuite.childless_livepatch(wildcard='.libs/libstress_livepatch1.so', verbose=False, timeout=60)
 
-for child in childs:
-    child.close(force=True)
+child.expect("Processes finished", reject=['returned non-zero'])
+child.close(force=True)
