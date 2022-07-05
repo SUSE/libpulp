@@ -61,33 +61,6 @@ libpulp_loaded(FILE *map)
   return retcode;
 }
 
-/* Attaches to PROCESS multiple times and collect information about its
- * applied live patches and loaded libraries. Returns 0 on
- * success; 1 if process information was not properly parsed; and -1 if
- * process hijacking went wrong, which also means that PROCESS was
- * probably put into an inconsistent state and should be killed.
- */
-int
-get_process_universes(struct ulp_process *process)
-{
-  int ret;
-  ret = initialize_data_structures(process);
-  if (ret)
-    return ret;
-
-  ret = hijack_threads(process);
-  if (ret)
-    return -1;
-
-  read_global_universe(process);
-
-  ret = restore_threads(process);
-  if (ret)
-    return -1;
-
-  return 0;
-}
-
 /* Inserts a new process structure into LIST if the process identified
  * by PID is live-patchable.
  */
@@ -116,7 +89,7 @@ insert_target_process(int pid, struct ulp_process **list)
     memset(new, 0, sizeof(struct ulp_process));
 
     new->pid = pid;
-    ret = get_process_universes(new);
+    ret = initialize_data_structures(new);
     if (ret) {
       WARN("Failed to parse data for live-patchable process %d: %s", pid,
            libpulp_strerror(ret));
@@ -160,11 +133,15 @@ build_process_list(const char *wildcard)
     if ((pid = strtol(subdir->d_name, NULL, 10)) == 0)
       continue;
 
-    const char *process_name = get_target_binary_name(pid);
-    /* Skip processes that does not match the wildcard. */
-    if (wildcard != NULL && process_name != NULL &&
-        fnmatch(wildcard, process_name, 0) != 0)
-      continue;
+    /* Optimization: If no wildcard is provided, do not bother geting target
+       name because it doesn't matter.  */
+    if (wildcard) {
+      const char *process_name = get_target_binary_name(pid);
+      /* Skip processes that does not match the wildcard. */
+      if (wildcard != NULL && process_name != NULL &&
+          fnmatch(wildcard, process_name, 0) != 0)
+        continue;
+    }
 
     /* If process is the ULP tool itself, skip it.  We cannot livepatch the
        tool itself.  Gödel and Cantor would not be proud...  */

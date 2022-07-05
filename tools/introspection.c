@@ -1087,7 +1087,6 @@ set_id_buffer(struct ulp_process *process, unsigned char *patch_id)
 {
   struct ulp_thread *thread;
   Elf64_Addr path_addr;
-  int i;
 
   DEBUG("advertising live patch ID to libpulp.");
 
@@ -1099,11 +1098,9 @@ set_id_buffer(struct ulp_process *process, unsigned char *patch_id)
   thread = process->main_thread;
   path_addr = process->dynobj_libpulp->metadata_buffer;
 
-  for (i = 0; i < 32; i++) {
-    if (write_byte(patch_id[i], thread->tid, path_addr + i)) {
-      WARN("Unable to write id byte %d.", i);
-      return ETARGETHOOK;
-    }
+  if (write_bytes(patch_id, 32, thread->tid, path_addr)) {
+    WARN("Unable to write buildid at address %lx.", path_addr);
+    return ETARGETHOOK;
   }
 
   return 0;
@@ -1143,7 +1140,6 @@ set_string_buffer(struct ulp_process *process, const char *string)
 static int
 set_metadata_buffer(struct ulp_process *process, void *metadata, size_t size)
 {
-  size_t i;
   char *cmetadata = metadata;
 
   struct ulp_thread *thread;
@@ -1157,10 +1153,8 @@ set_metadata_buffer(struct ulp_process *process, void *metadata, size_t size)
   thread = process->main_thread;
   metadata_addr = process->dynobj_libpulp->metadata_buffer;
 
-  for (i = 0; i < size; i++) {
-    if (write_byte(cmetadata[i], thread->tid, metadata_addr + i)) {
-      return EUNKNOWN;
-    }
+  if (write_bytes(cmetadata, size, thread->tid, metadata_addr)) {
+    return EUNKNOWN;
   }
 
   return ENONE;

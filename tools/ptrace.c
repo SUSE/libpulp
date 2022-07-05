@@ -95,28 +95,40 @@ ulp_ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data)
 /** This file should not call ptrace directly anymore.  */
 #pragma GCC poison ptrace
 
-/* Memory read/write helper functions */
 int
-write_byte(char byte, int pid, Elf64_Addr addr)
+write_bytes(const void *buf, size_t n, int pid, Elf64_Addr addr)
 {
-  Elf64_Addr value;
-
   /* Invalidate tlb because we are commiting changes to memory.  */
   tlb = 0;
+  unsigned long *lbuf = (unsigned long *)buf;
+  size_t num_longs = n / sizeof(long);
+  size_t num_remainders = n % sizeof(long);
 
-  errno = 0;
-  value = ulp_ptrace(PTRACE_PEEKDATA, pid, (void *)addr, 0);
-  if (errno) {
-    DEBUG("unable to read byte before writing: %s\n", strerror(errno));
-    return 1;
-  }
-  memset(&value, byte, 1);
-  ulp_ptrace(PTRACE_POKEDATA, pid, (void *)addr, (void *)value);
-  if (errno) {
-    DEBUG("Unable to write byte: %s\n", strerror(errno));
-    return 1;
+  while (num_longs-- > 0) {
+    ulp_ptrace(PTRACE_POKEDATA, pid, (void *)addr, (void *)*lbuf++);
+    if (errno) {
+      DEBUG("Unable to write long at address %lx: %s\n", addr,
+            strerror(errno));
+      return 1;
+    }
+    addr += sizeof(long);
   }
 
+  if (num_remainders > 0) {
+    unsigned long remainder;
+    remainder = ulp_ptrace(PTRACE_PEEKDATA, pid, (void *)addr, 0);
+    if (errno) {
+      DEBUG("unable to read byte before writing: %s\n", strerror(errno));
+      return 1;
+    }
+    memcpy(&remainder, lbuf, num_remainders);
+    ulp_ptrace(PTRACE_POKEDATA, pid, (void *)addr, (void *)remainder);
+    if (errno) {
+      DEBUG("Unable to write long at address %lx: %s\n", addr,
+            strerror(errno));
+      return 1;
+    }
+  }
   return 0;
 }
 
@@ -130,21 +142,16 @@ write_byte(char byte, int pid, Elf64_Addr addr)
 int
 write_string(const char *buffer, int pid, Elf64_Addr addr, int size)
 {
-  int i;
+  size_t len = strlen(buffer);
+
+  if (len > (unsigned)size) {
+    len = size;
+  }
 
   /* Invalidate tlb because we are commiting changes to memory.  */
   tlb = 0;
 
-  for (i = 0; i < size && buffer[i] != '\0'; i++) {
-    if (write_byte(buffer[i], pid, addr + i))
-      return 1;
-  }
-
-  if (i < size)
-    if (write_byte('\0', pid, addr + i))
-      return 1;
-
-  return 0;
+  return write_bytes(buffer, len, pid, addr);
 }
 
 static int
