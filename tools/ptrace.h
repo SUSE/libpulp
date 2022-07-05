@@ -30,7 +30,8 @@
 #include "ulp_common.h"
 
 /* Memory read/write helper functions */
-int write_byte(char byte, int pid, Elf64_Addr addr);
+
+int write_bytes(const void *buf, size_t n, int pid, Elf64_Addr addr);
 
 int write_string(const char *buffer, int pid, Elf64_Addr addr, int length);
 

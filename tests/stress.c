@@ -4,7 +4,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define NUM_PROCESSES 1000
+#define NUM_PROCESSES 4000
 
 int value(void);
 
