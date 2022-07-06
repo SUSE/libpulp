@@ -61,101 +61,6 @@ libpulp_loaded(FILE *map)
   return retcode;
 }
 
-/* Inserts a new process structure into LIST if the process identified
- * by PID is live-patchable.
- */
-void
-insert_target_process(int pid, struct ulp_process **list)
-{
-  char mapname[PATH_MAX];
-  FILE *map;
-  int ret;
-
-  struct ulp_process *new = NULL;
-
-  snprintf(mapname, PATH_MAX, "/proc/%d/maps", pid);
-  if ((map = fopen(mapname, "r")) == NULL) {
-    /* EACESS error happens when the tool is executed by a regular user.
-       This is not a hard error.
-       ENOENT happens when the process finished in between this process.  */
-    if (errno != EACCES && errno != ENOENT)
-      perror("Unable to open memory map for process");
-    return;
-  }
-
-  /* If the process identified by PID is live patchable, add to LIST. */
-  if (libpulp_loaded(map)) {
-    new = malloc(sizeof(struct ulp_process));
-    memset(new, 0, sizeof(struct ulp_process));
-
-    new->pid = pid;
-    ret = initialize_data_structures(new);
-    if (ret) {
-      WARN("Failed to parse data for live-patchable process %d: %s", pid,
-           libpulp_strerror(ret));
-    }
-    new->next = *list;
-    *list = new;
-  }
-
-  fclose(map);
-}
-
-/* Iterates over /proc and builds a list of live-patchable processes.
- * Returns said list.
- */
-struct ulp_process *
-build_process_list(const char *wildcard)
-{
-  long int pid;
-
-  DIR *slashproc;
-  struct dirent *subdir;
-
-  struct ulp_process *list = NULL;
-
-  if (isnumber(wildcard)) {
-    /* If wildcard is actually a number, then treat it as a PID.  */
-    pid = atoi(wildcard);
-    insert_target_process(pid, &list);
-    return list;
-  }
-
-  /* Build a list of all processes that have libpulp.so loaded. */
-  slashproc = opendir("/proc");
-  if (slashproc == NULL) {
-    perror("Is /proc mounted?");
-    return NULL;
-  }
-
-  while ((subdir = readdir(slashproc))) {
-    /* Skip non-numeric directories in /proc. */
-    if ((pid = strtol(subdir->d_name, NULL, 10)) == 0)
-      continue;
-
-    /* Optimization: If no wildcard is provided, do not bother geting target
-       name because it doesn't matter.  */
-    if (wildcard) {
-      const char *process_name = get_target_binary_name(pid);
-      /* Skip processes that does not match the wildcard. */
-      if (wildcard != NULL && process_name != NULL &&
-          fnmatch(wildcard, process_name, 0) != 0)
-        continue;
-    }
-
-    /* If process is the ULP tool itself, skip it.  We cannot livepatch the
-       tool itself.  Gödel and Cantor would not be proud...  */
-    if (pid == getpid())
-      continue;
-
-    /* Add live patchable process. */
-    insert_target_process(pid, &list);
-  }
-  closedir(slashproc);
-
-  return list;
-}
-
 /** @brief Print all livepatches applied to library.
  *
  * @param patch   Patch object.
@@ -173,35 +78,6 @@ print_lib_patches(struct ulp_applied_patch *patch, const char *libname)
     }
     patch = patch->next;
   }
-}
-/** @brief Check if `libname` has a livepatch loaded.
- *
- * Check if the library with name `libname` has a livepatch loaded in the
- * `patch` chain.
- *
- * @param patch   List of loaded patches in the target process.
- * @param libname Name of the library in target process.
- *
- * @return true if libname has a livepatch loaded. False elsewhere.
- *
- */
-static bool
-has_livepatch_loaded(struct ulp_applied_patch *patch, const char *libname)
-{
-  if (libname == NULL)
-    return false;
-
-  /* Ensure that the basename was passed.  */
-  libname = get_basename(libname);
-
-  while (patch) {
-    if (!strcmp(libname, patch->lib_name)) {
-      return true;
-    }
-    patch = patch->next;
-  }
-
-  return false;
 }
 
 /** @brief Check if function at `sym_address` has the NOP preamble.
@@ -235,6 +111,36 @@ check_preamble(ElfW(Addr) sym_address, pid_t pid)
 
   if (i == num_bytes)
     return true;
+  return false;
+}
+
+/** @brief Check if `libname` has a livepatch loaded.
+ *
+ * Check if the library with name `libname` has a livepatch loaded in the
+ * `patch` chain.
+ *
+ * @param patch   List of loaded patches in the target process.
+ * @param libname Name of the library in target process.
+ *
+ * @return true if libname has a livepatch loaded. False elsewhere.
+ *
+ */
+static bool
+has_livepatch_loaded(struct ulp_applied_patch *patch, const char *libname)
+{
+  if (libname == NULL)
+    return false;
+
+  /* Ensure that the basename was passed.  */
+  libname = get_basename(libname);
+
+  while (patch) {
+    if (!strcmp(libname, patch->lib_name)) {
+      return true;
+    }
+    patch = patch->next;
+  }
+
   return false;
 }
 
@@ -300,6 +206,138 @@ is_library_livepatchable(struct ulp_applied_patch *patch,
   return false;
 }
 
+void
+print_process(struct ulp_process *process, int print_buildid)
+{
+  struct ulp_dynobj *object_item;
+  pid_t pid = process->pid;
+  struct ulp_applied_patch *patch = ulp_read_state(process);
+  printf("PID: %d, name: %s\n", pid, get_process_name(process));
+
+  printf("  Livepatchable libraries:\n");
+  object_item = dynobj_first(process);
+  if (!object_item)
+    printf("    (none)\n");
+  while (object_item) {
+    if (is_library_livepatchable(patch, object_item, pid)) {
+      printf("    in %s", object_item->filename);
+      if (print_buildid)
+        printf(" (%s)", buildid_to_string(object_item->build_id));
+      printf(":\n");
+
+      print_lib_patches(patch, object_item->filename);
+    }
+
+    object_item = dynobj_next(process, object_item);
+  }
+  release_ulp_applied_patch(patch);
+  printf("\n");
+}
+
+/** Do not create list and print process.  */
+static bool print_process_instead = false;
+static bool print_build_id = false;
+
+/* Inserts a new process structure into LIST if the process identified
+ * by PID is live-patchable.
+ */
+void
+insert_target_process(int pid, struct ulp_process **list)
+{
+  char mapname[PATH_MAX];
+  FILE *map;
+  int ret;
+
+  struct ulp_process *new = NULL;
+
+  snprintf(mapname, PATH_MAX, "/proc/%d/maps", pid);
+  if ((map = fopen(mapname, "r")) == NULL) {
+    /* EACESS error happens when the tool is executed by a regular user.
+       This is not a hard error.
+       ENOENT happens when the process finished in between this process.  */
+    if (errno != EACCES && errno != ENOENT)
+      perror("Unable to open memory map for process");
+    return;
+  }
+
+  /* If the process identified by PID is live patchable, add to LIST. */
+  if (libpulp_loaded(map)) {
+    new = malloc(sizeof(struct ulp_process));
+    memset(new, 0, sizeof(struct ulp_process));
+
+    new->pid = pid;
+    ret = initialize_data_structures(new);
+    if (ret) {
+      WARN("Failed to parse data for live-patchable process %d: %s", pid,
+           libpulp_strerror(ret));
+    }
+    if (print_process_instead) {
+      print_process(new, print_build_id);
+      release_ulp_process(new);
+    } else {
+      new->next = *list;
+      *list = new;
+    }
+  }
+
+  fclose(map);
+}
+
+/* Iterates over /proc and builds a list of live-patchable processes.
+ * Returns said list.
+ */
+struct ulp_process *
+build_process_list(const char *wildcard)
+{
+  long int pid;
+
+  DIR *slashproc;
+  struct dirent *subdir;
+
+  struct ulp_process *list = NULL;
+
+  if (isnumber(wildcard)) {
+    /* If wildcard is actually a number, then treat it as a PID.  */
+    pid = atoi(wildcard);
+    insert_target_process(pid, &list);
+    return list;
+  }
+
+  /* Build a list of all processes that have libpulp.so loaded. */
+  slashproc = opendir("/proc");
+  if (slashproc == NULL) {
+    perror("Is /proc mounted?");
+    return NULL;
+  }
+
+  while ((subdir = readdir(slashproc))) {
+    /* Skip non-numeric directories in /proc. */
+    if ((pid = strtol(subdir->d_name, NULL, 10)) == 0)
+      continue;
+
+    /* Optimization: If no wildcard is provided, do not bother geting target
+       name because it doesn't matter.  */
+    if (wildcard) {
+      const char *process_name = get_target_binary_name(pid);
+      /* Skip processes that does not match the wildcard. */
+      if (wildcard != NULL && process_name != NULL &&
+          fnmatch(wildcard, process_name, 0) != 0)
+        continue;
+    }
+
+    /* If process is the ULP tool itself, skip it.  We cannot livepatch the
+       tool itself.  Gödel and Cantor would not be proud...  */
+    if (pid == getpid())
+      continue;
+
+    /* Add live patchable process. */
+    insert_target_process(pid, &list);
+  }
+  closedir(slashproc);
+
+  return list;
+}
+
 /** @brief Prints all the info collected about the processes in `process_list`.
  *
  * @param process_list List of processes.
@@ -309,52 +347,27 @@ void
 print_process_list(struct ulp_process *process_list, int print_buildid)
 {
   struct ulp_process *process_item;
-  struct ulp_dynobj *object_item;
 
   process_item = process_list;
   while (process_item) {
-    pid_t pid = process_item->pid;
-    struct ulp_applied_patch *patch = ulp_read_state(process_item);
-    printf("PID: %d, name: %s\n", pid, get_process_name(process_item));
-
-    printf("  Livepatchable libraries:\n");
-    object_item = dynobj_first(process_item);
-    if (!object_item)
-      printf("    (none)\n");
-    while (object_item) {
-      if (is_library_livepatchable(patch, object_item, pid)) {
-        printf("    in %s", object_item->filename);
-        if (print_buildid)
-          printf(" (%s)", buildid_to_string(object_item->build_id));
-        printf(":\n");
-
-        print_lib_patches(patch, object_item->filename);
-      }
-
-      object_item = dynobj_next(process_item, object_item);
-    }
-    release_ulp_applied_patch(patch);
+    print_process(process_item, print_buildid);
     process_item = process_item->next;
-    printf("\n");
   }
 }
 
 int
 run_patches(struct arguments *arguments)
 {
-  struct ulp_process *process_list;
-  int print_buildid = arguments->buildid;
+  print_build_id = arguments->buildid;
   ulp_quiet = arguments->quiet;
   ulp_verbose = arguments->verbose;
+  print_process_instead = true;
 
   /*
    * If the PID argument has not been provided, check all live patchable
    * processes; otherwise, just the request process.
    */
-  process_list = build_process_list(arguments->process_wildcard);
-
-  print_process_list(process_list, print_buildid);
-  release_ulp_process(process_list);
+  build_process_list(arguments->process_wildcard);
 
   return 0;
 }
