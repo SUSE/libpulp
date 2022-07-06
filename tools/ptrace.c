@@ -50,6 +50,9 @@
  * number of bytes.  */
 static ElfW(Addr) tlb = 0;
 
+/** Timeout for run_and_redirect function.  Set default to 10s.  */
+static long rr_timeout = 10;
+
 /** @brief ulp ptrace wrapper
  *
  * The `ulp` tool uses ptrace to both update a process AND query for libraries
@@ -296,26 +299,36 @@ attach(int pid)
     return 1;
   }
 
-  while (1) {
-    if (waitpid(pid, &status, __WALL) == -1) {
+  while (true) {
+    pid_t ret = waitpid(pid, &status, WSTOPPED);
+
+    if (ret == -1) {
       DEBUG("waitpid error (pid %d): %s.\n", pid, strerror(errno));
       return 1;
     }
+    else if (ret == pid) {
 
-    if (WIFSTOPPED(status)) {
-      /* Everything went as expected.  */
-      return 0;
+      if (WIFSTOPPED(status)) {
+        /* Everything went as expected.  */
+        return 0;
+      }
+
+      if (WIFEXITED(status) || WCOREDUMP(status)) {
+        WARN("Process %d exited while waiting for stop signal.", pid);
+        return 1;
+      }
+
+      if (WIFSIGNALED(status)) {
+        WARN(
+            "Process %d terminated by a signal while waiting for stop signal.",
+            pid);
+        return 1;
+      }
     }
-
-    if (WIFEXITED(status)) {
-      WARN("Process %d exited while waiting for stop signal.", pid);
-      return 1;
-    }
-
-    if (WIFSIGNALED(status)) {
-      WARN("Process %d terminated by a signal while waiting for stop signal.",
-           pid);
-      return 1;
+    else if (ret > 0) {
+      /* Unexpected process stopped?  */
+      WARN("waitpid: state changed on unexpected process: expected %d, got %d",
+           pid, ret);
     }
   }
   __builtin_unreachable();
@@ -353,9 +366,6 @@ set_regs(int pid, struct user_regs_struct *regs)
   }
   return 0;
 }
-
-/** Timeout for run_and_redirect function.  Set default to 10s.  */
-static long rr_timeout = 10;
 
 /** @brief Set timeout timer on run_and_redirect function
  *
@@ -447,7 +457,6 @@ run_and_redirect(int pid, struct user_regs_struct *regs, ElfW(Addr) routine)
   do {
     pid_t ret;
 
-    usleep(1000);
     /* Query on pid to check if the process has stopped.  */
     ret = waitpid(pid, &status, WNOHANG | WSTOPPED);
 
@@ -479,6 +488,7 @@ run_and_redirect(int pid, struct user_regs_struct *regs, ElfW(Addr) routine)
           "waitpid: state changed on unexpected process: expected %d, got %d",
           pid, ret);
     }
+    usleep(100);
     t1 = time(NULL);
   }
   while (t1 - t0 < timeout);

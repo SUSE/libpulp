@@ -668,6 +668,82 @@ get_loaded_symbol_addr(struct ulp_dynobj *obj, int pid, const char *sym_name)
   return sym_addr ? (ehdr_addr + sym_addr) : 0;
 }
 
+static int
+get_libpulp_extern_symbols(struct ulp_dynobj *obj, int pid)
+{
+  /* l_addr holds the pointer to the ELF header.  */
+  ElfW(Addr) ehdr_addr = obj->link_map.l_addr;
+
+  ElfW(Addr) dynsym_addr = obj->dynsym_addr;
+  ElfW(Addr) dynstr_addr = obj->dynstr_addr;
+  int num_symbols = obj->num_symbols;
+
+  int bitfield = 0;
+
+  /* If, for some reason, parse_dynobj_elf_headers failed to locate
+    `num_symbols`, `dynsym`, or `dynstr`, we can't continue.  */
+  if (!dynsym_addr || !dynstr_addr || num_symbols <= 0)
+    return 0;
+
+  int i, ret;
+  for (i = 0; i < num_symbols; i++) {
+    ElfW(Sym) sym;
+    char *remote_name;
+
+    ret = read_memory((char *)&sym, sizeof(sym), pid, dynsym_addr);
+    if (ret) {
+      WARN("Unable to read dynamic symbol");
+      return 1;
+    }
+
+    /* WARNING: remote name has to be released.  */
+    ret = read_string(&remote_name, pid, dynstr_addr + sym.st_name);
+    if (ret) {
+      WARN("Unable to read dynamic symbol name");
+      return 1;
+    }
+
+    if (!strncmp(remote_name, "__ulp", 5)) {
+      if (!strcmp(remote_name, "__ulp_trigger")) {
+        obj->trigger = ehdr_addr + sym.st_value;
+        bitfield |= (1 << 0);
+      }
+      else if (!strcmp(remote_name, "__ulp_check_patched")) {
+        obj->check = ehdr_addr + sym.st_value;
+        bitfield |= (1 << 1);
+      }
+      else if (!strcmp(remote_name, "__ulp_state")) {
+        obj->state = ehdr_addr + sym.st_value;
+        bitfield |= (1 << 2);
+      }
+      else if (!strcmp(remote_name, "__ulp_get_global_universe")) {
+        obj->global = ehdr_addr + sym.st_value;
+        bitfield |= (1 << 3);
+      }
+      else if (!strcmp(remote_name, "__ulp_msg_queue")) {
+        obj->msg_queue = ehdr_addr + sym.st_value;
+        bitfield |= (1 << 4);
+      }
+      else if (!strcmp(remote_name, "__ulp_revert_all")) {
+        obj->revert_all = ehdr_addr + sym.st_value;
+        bitfield |= (1 << 5);
+      }
+      else if (!strcmp(remote_name, "__ulp_metadata_buffer")) {
+        obj->metadata_buffer = ehdr_addr + sym.st_value;
+        bitfield |= (1 << 6);
+      }
+    }
+
+    free(remote_name); /* (*).  */
+    dynsym_addr += sizeof(sym);
+
+    if (bitfield == 0x7f)
+      break;
+  }
+
+  return 0;
+}
+
 /* Same as get_loaded_symbol_addr, but use the file in disk instead of parsing
  * the in-memory content of the remote process. This have the advantage of
  * finding non-exported symbols whose names aren't loaded in the process, but
@@ -987,15 +1063,7 @@ parse_lib_dynobj(struct ulp_process *process, struct link_map *link_map_addr)
 
   /* Only libpulp.so should have those symbols exported.  */
   if (strstr(libname, "libpulp.so")) {
-    obj->trigger = get_loaded_symbol_addr(obj, pid, "__ulp_trigger");
-    obj->check = get_loaded_symbol_addr(obj, pid, "__ulp_check_patched");
-    obj->state = get_loaded_symbol_addr(obj, pid, "__ulp_state");
-    obj->global =
-        get_loaded_symbol_addr(obj, pid, "__ulp_get_global_universe");
-    obj->msg_queue = get_loaded_symbol_addr(obj, pid, "__ulp_msg_queue");
-    obj->revert_all = get_loaded_symbol_addr(obj, pid, "__ulp_revert_all");
-    obj->metadata_buffer =
-        get_loaded_symbol_addr(obj, pid, "__ulp_metadata_buffer");
+    get_libpulp_extern_symbols(obj, pid);
 
     /* libpulp must expose all these symbols. */
     if (obj->trigger && obj->check && obj->state && obj->global &&
