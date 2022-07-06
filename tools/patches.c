@@ -93,23 +93,15 @@ print_lib_patches(struct ulp_applied_patch *patch, const char *libname)
 static bool
 check_preamble(ElfW(Addr) sym_address, pid_t pid)
 {
-  int i;
-  const int num_bytes = ULP_NOPS_LEN - PRE_NOPS_LEN;
-  unsigned char bytes[num_bytes];
+  unsigned char bytes[2];
 
-  if (read_memory((char *)bytes, num_bytes, pid, sym_address)) {
+  if (read_memory((char *)bytes, 2, pid, sym_address)) {
     WARN("Unable to read symbol preable.");
     return false;
   }
 
-  for (i = 0; i < num_bytes; i++) {
-    if (bytes[i] == 0x90)
-      continue;
-    else
-      break;
-  }
-
-  if (i == num_bytes)
+  /* Check for NOP NOP or XGCH AX, AX.  */
+  if ((bytes[0] == 0x90 || bytes[0] == 0x66) && bytes[1] == 0x90)
     return true;
   return false;
 }
@@ -172,13 +164,13 @@ is_library_livepatchable(struct ulp_applied_patch *patch,
   ElfW(Addr) ehdr_addr = obj->link_map.l_addr;
 
   ElfW(Addr) dynsym_addr = obj->dynsym_addr;
-  ElfW(Addr) dynstr_addr = obj->dynstr_addr;
-  int len = obj->num_symbols;
+
+  /* Only look the first 64 symbols, else we may take too much time.  */
+  int len = MIN(obj->num_symbols, 64);
 
   int i, ret;
   for (i = 0; i < len; i++) {
     ElfW(Sym) sym;
-    char *remote_name;
 
     ret = read_memory((char *)&sym, sizeof(sym), pid, dynsym_addr);
     if (ret) {
@@ -186,21 +178,13 @@ is_library_livepatchable(struct ulp_applied_patch *patch,
       return false;
     }
 
-    ret = read_string(&remote_name, pid, dynstr_addr + sym.st_name);
-    if (ret) {
-      WARN("Unable to read dynamic symbol name");
-      return false;
-    }
-
     ElfW(Addr) sym_addr = ehdr_addr + sym.st_value;
 
     if (check_preamble(sym_addr, pid)) {
-      free(remote_name);
       return true;
     }
 
     dynsym_addr += sizeof(sym);
-    free(remote_name);
   }
 
   return false;
@@ -274,7 +258,8 @@ insert_target_process(int pid, struct ulp_process **list)
     if (print_process_instead) {
       print_process(new, print_build_id);
       release_ulp_process(new);
-    } else {
+    }
+    else {
       new->next = *list;
       *list = new;
     }
