@@ -24,7 +24,7 @@ import subprocess
 child = testsuite.spawn('stress')
 child.expect("Processes launched")
 
-testsuite.childless_livepatch(wildcard='.libs/libstress_livepatch1.so', verbose=False, timeout=60)
+testsuite.childless_livepatch(wildcard='.libs/libstress_livepatch1.so', verbose=False, timeout=120)
 
 child.expect("Processes finished", reject=['returned non-zero'])
 child.close(force=True)
