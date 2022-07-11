@@ -1104,18 +1104,26 @@ initialize_data_structures(struct ulp_process *process)
 
   DEBUG("getting in-memory information about process %d.", process->pid);
 
+  if (attach(process->pid)) {
+    DEBUG("Unable to attach to %d to read data.\n", process->pid);
+    ret = 1;
+    goto detach_process;
+  }
+
   ret = parse_main_dynobj(process);
   if (ret) {
     WARN("unable to get in-memory information about the main executable: %s\n",
          libpulp_strerror(ret));
-    return 1;
+    ret = 1;
+    goto detach_process;
   }
 
   ret = parse_libs_dynobj(process);
   if (ret) {
     WARN("unable to get in-memory information about shared libraries: %s\n",
          libpulp_strerror(ret));
-    return 1;
+    ret = 1;
+    goto detach_process;
   }
 
   /* Check if libpulp constructor has already been executed.  */
@@ -1124,10 +1132,17 @@ initialize_data_structures(struct ulp_process *process)
                   process->dynobj_libpulp->state) ||
       ulp_state.load_state == 0) {
     WARN("libpulp not ready (constructors not yet run). Try again later.");
-    return EAGAIN;
+    ret = EAGAIN;
+    goto detach_process;
   }
 
-  return 0;
+detach_process:
+  if (detach(process->pid)) {
+    DEBUG("Unable to detach %d.\n", process->pid);
+    return ret;
+  }
+
+  return ret;
 }
 
 /*
@@ -2306,16 +2321,33 @@ ulp_read_state(struct ulp_process *process)
   struct ulp_patching_state state;
   pid_t pid = process->pid;
 
+  struct ulp_applied_patch *ret;
+
   if (!process->dynobj_libpulp || !process->dynobj_libpulp->state) {
     WARN("patching state address is NULL.");
     return NULL;
   }
 
+  if (attach(process->pid)) {
+    DEBUG("Unable to attach to %d to read data.\n", process->pid);
+    ret = NULL;
+    goto detach_process;
+  }
+
   if (read_memory((char *)&state, sizeof(state), pid,
                   (Elf64_Addr)process->dynobj_libpulp->state)) {
     WARN("Error reading patches state.");
-    return NULL;
+    ret = NULL;
+    goto detach_process;
   }
 
-  return read_ulp_applied_patch((Elf64_Addr)state.patches, pid);
+  ret = read_ulp_applied_patch((Elf64_Addr)state.patches, pid);
+
+detach_process:
+  if (detach(process->pid)) {
+    DEBUG("Unable to detach %d.\n", process->pid);
+    return ret;
+  }
+
+  return ret;
 }

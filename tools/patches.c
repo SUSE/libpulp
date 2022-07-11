@@ -157,9 +157,15 @@ static bool
 is_library_livepatchable(struct ulp_applied_patch *patch,
                          struct ulp_dynobj *obj, pid_t pid)
 {
-
+  int i, ret;
   if (has_livepatch_loaded(patch, obj->filename))
     return true;
+
+  if (attach(pid)) {
+    DEBUG("Unable to attach to %d to read data.\n", pid);
+    ret = false;
+    goto detach_process;
+  }
 
   ElfW(Addr) ehdr_addr = obj->link_map.l_addr;
 
@@ -168,26 +174,33 @@ is_library_livepatchable(struct ulp_applied_patch *patch,
   /* Only look the first 64 symbols, else we may take too much time.  */
   int len = MIN(obj->num_symbols, 64);
 
-  int i, ret;
   for (i = 0; i < len; i++) {
     ElfW(Sym) sym;
 
     ret = read_memory((char *)&sym, sizeof(sym), pid, dynsym_addr);
     if (ret) {
       WARN("Unable to read dynamic symbol");
-      return false;
+      ret = false;
+      goto detach_process;
     }
 
     ElfW(Addr) sym_addr = ehdr_addr + sym.st_value;
 
     if (check_preamble(sym_addr, pid)) {
-      return true;
+      ret = true;
+      goto detach_process;
     }
 
     dynsym_addr += sizeof(sym);
   }
 
-  return false;
+detach_process:
+  if (detach(pid)) {
+    DEBUG("Unable to detach %d.\n", pid);
+    return false;
+  }
+
+  return (bool)ret;
 }
 
 void

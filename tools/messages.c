@@ -106,8 +106,19 @@ print_message_buffer(const struct ulp_process *p, bool debug)
     return 1;
   }
 
+  if (attach(p->pid)) {
+    DEBUG("unable to attach to %d to read string.", p->pid);
+    return 1;
+  }
+
   ret = read_memory((void *)&msg_queue, sizeof(struct msg_queue), p->pid,
                     msgq_addr);
+
+  if (detach(p->pid)) {
+    DEBUG("unable to detach from %d.", p->pid);
+    return 1;
+  }
+
   if (ret > 0) {
     WARN("could not read libpulp.so message queue in process %d.", p->pid);
     return 1;

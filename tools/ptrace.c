@@ -221,11 +221,6 @@ read_memory(char *byte, size_t len, int pid, Elf64_Addr addr)
 
   long *word = (long *)byte;
 
-  if (attach(pid)) {
-    DEBUG("unable to attach to %d to read data.\n", pid);
-    return 1;
-  };
-
   /* Read as much as we can using longs, since it has larger bandwith when
      compared to bytes.  */
   for (i = 0; i < len_word; i++) {
@@ -242,11 +237,6 @@ read_memory(char *byte, size_t len, int pid, Elf64_Addr addr)
       return 1;
   }
 
-  if (detach(pid)) {
-    DEBUG("unable to detach from %d after reading data.\n", pid);
-    return 1;
-  };
-
   return 0;
 }
 
@@ -256,11 +246,6 @@ read_string(char **buffer, int pid, Elf64_Addr addr)
   int i = 0;
   char *string;
   int buffer_len;
-
-  if (attach(pid)) {
-    DEBUG("unable to attach to %d to read string.", pid);
-    return 1;
-  }
 
   buffer_len = 32;
   string = (char *)malloc(buffer_len);
@@ -279,11 +264,6 @@ read_string(char **buffer, int pid, Elf64_Addr addr)
     }
   }
   while (string[i++] != '\0');
-
-  if (detach(pid)) {
-    DEBUG("unable to detach from %d after reading string.", pid);
-    return 1;
-  };
 
   *buffer = string;
   return 0;
