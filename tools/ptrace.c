@@ -68,6 +68,14 @@ ulp_ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data)
   time_t t0, t1;
   long ret;
 
+  /* Unroll first iteration to avoid calls to time if it succeeds on first try.
+   */
+  errno = 0;
+  ret = ptrace(request, pid, addr, data);
+  if (!(errno == EBUSY || errno == EPERM)) {
+    return ret;
+  }
+
   t0 = time(NULL);
   do {
     errno = 0;

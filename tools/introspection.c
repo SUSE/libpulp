@@ -460,6 +460,9 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
 
   int i, num_symbols = 0, ret;
 
+  bool pt_dynamic_ran = false;
+  bool pt_note_ran = false;
+
   /* If object has no link map attached to it, there is nothing we can do.  */
   if (!obj->link_map.l_name) {
     DEBUG("no link map object found");
@@ -507,7 +510,7 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
     }
 
     /* Look for the dynamic section.  */
-    if (phdr.p_type == PT_DYNAMIC) {
+    if (phdr.p_type == PT_DYNAMIC && !pt_dynamic_ran) {
       ElfW(Dyn) dyn;
       ElfW(Addr) dyn_addr = ehdr_addr + phdr.p_paddr;
 
@@ -543,6 +546,12 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
             break;
         }
         dyn_addr += sizeof(dyn);
+
+        /* There is no point in continuing if we already found what we want. */
+        if (dynsym_addr && dynstr_addr && hash_addr) {
+          pt_dynamic_ran = true;
+          break;
+        }
       }
       while (dyn.d_tag != DT_NULL);
     }
@@ -573,6 +582,7 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
         if (note.n_type == NT_GNU_BUILD_ID) {
           /* Build id note section found.  */
           buildid_addr = note_addr + sizeof(note) + name_len;
+          pt_note_ran = true;
           break;
         }
 
@@ -580,6 +590,10 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
       }
       while (note_addr < note_addr_end);
     }
+
+    /* There is no point in continuing if we already found what we want.  */
+    if (pt_dynamic_ran == true && pt_note_ran == true)
+      break;
   }
 
   if (buildid_addr) {
