@@ -230,6 +230,7 @@ trigger_many_ulps(struct ulp_process *p, int retries,
   char buffer[ULP_PATH_LEN];
 
   int ret = 0, r;
+  int ulp_folder_path_len = strlen(ulp_folder_path);
 
   if (!directory) {
     FATAL("Unable to open directory: %s", ulp_folder_path);
@@ -237,18 +238,23 @@ trigger_many_ulps(struct ulp_process *p, int retries,
     goto wildcard_clean;
   }
 
+  strcpy(buffer, ulp_folder_path);
+  strcat(buffer, "/");
+  ulp_folder_path_len += 1;
+
   while ((entry = readdir(directory)) != NULL) {
     struct stat stbuf;
     int bytes;
-    memset(buffer, '\0', ULP_PATH_LEN);
 
-    bytes = snprintf(buffer, ULP_PATH_LEN, "%s/%s", ulp_folder_path,
-                     entry->d_name);
-    if (bytes == ULP_PATH_LEN) {
+    bytes = ulp_folder_path_len + strlen(entry->d_name);
+
+    if (bytes >= ULP_PATH_LEN) {
       WARN("Path to %s is larger than %d bytes. Skipping...\n", entry->d_name,
            ULP_PATH_LEN);
       continue;
     }
+
+    strcpy(buffer + ulp_folder_path_len, entry->d_name);
 
     if (stat(buffer, &stbuf)) {
       WARN("Error retrieving stats for %s. Skiping...\n", buffer);
