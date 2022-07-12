@@ -1203,28 +1203,6 @@ set_id_buffer(struct ulp_process *process, unsigned char *patch_id)
   return 0;
 }
 
-int
-set_string_buffer(struct ulp_process *process, const char *string)
-{
-  struct ulp_thread *thread;
-  Elf64_Addr path_addr;
-
-  if (!process->all_threads_hijacked) {
-    WARN("not all threads hijacked.");
-    return EUNKNOWN;
-  }
-
-  thread = process->main_thread;
-  path_addr = process->dynobj_libpulp->metadata_buffer;
-
-  if (write_string(string, thread->tid, path_addr, strlen(string))) {
-    WARN("Unable to write string in __ulp_metadata_buffer");
-    return ETARGETHOOK;
-  }
-
-  return 0;
-}
-
 /** @brief Writes the metadata into libpulp's '__ulp_metadata_buffer'.
  *
  * This operation is a pre-condition to apply a new live patch.
@@ -1235,9 +1213,10 @@ set_string_buffer(struct ulp_process *process, const char *string)
  * @return 0 on success, anything else on failure.
  */
 static int
-set_metadata_buffer(struct ulp_process *process, void *metadata, size_t size)
+set_metadata_buffer(struct ulp_process *process, const void *metadata,
+                    size_t size)
 {
-  char *cmetadata = metadata;
+  const char *cmetadata = metadata;
 
   struct ulp_thread *thread;
   Elf64_Addr metadata_addr;
@@ -1255,6 +1234,12 @@ set_metadata_buffer(struct ulp_process *process, void *metadata, size_t size)
   }
 
   return ENONE;
+}
+
+int
+set_string_buffer(struct ulp_process *process, const char *string)
+{
+  return set_metadata_buffer(process, string, strlen(string) + 1);
 }
 
 /*
