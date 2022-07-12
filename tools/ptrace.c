@@ -151,17 +151,9 @@ write_bytes(const void *buf, size_t n, int pid, Elf64_Addr addr)
  * Returns 0 if the operation succeeds; 1 otherwise.
  */
 int
-write_string(const char *buffer, int pid, Elf64_Addr addr, int size)
+write_string(const char *buffer, int pid, Elf64_Addr addr)
 {
-  size_t len = strlen(buffer);
-
-  if (len > (unsigned)size) {
-    len = size;
-  }
-
-  /* Invalidate tlb because we are commiting changes to memory.  */
-  tlb = 0;
-
+  size_t len = strlen(buffer) + 1;
   return write_bytes(buffer, len, pid, addr);
 }
 
