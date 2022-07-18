@@ -331,6 +331,194 @@ dl_find_base_addr(struct dl_phdr_info *info, size_t size, void *data)
   return 1;
 }
 
+/* Enable a cache on libpulp's side to speedup the symbol discovery process.  */
+#ifdef ENABLE_DLINFO_CACHE
+
+struct ulp_dlinfo_cache *__ulp_dlinfo_cache = NULL;
+static pthread_mutex_t dlinfo_cache_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static struct ulp_dlinfo_cache *
+new_dlinfo_cache(ElfW(Addr) bias, ElfW(Addr) dynsym, ElfW(Addr) dynstr, int num_symbols, const char *buildid_addr, int buildid_len)
+{
+  struct ulp_dlinfo_cache *ret = (struct ulp_dlinfo_cache *) calloc(1, sizeof(*ret));
+  if (ret == NULL) {
+    return NULL;
+  }
+
+  if (buildid_len > 32) {
+    buildid_len = 32;
+  }
+
+  ret->bias = bias;
+  ret->dynsym = dynsym;
+  ret->dynstr = dynstr;
+  ret->num_symbols = num_symbols;
+  memcpy(ret->buildid, buildid_addr, buildid_len);
+
+  ret->sentinel = 0xdeadf00d;
+
+  return ret;
+}
+
+static void
+release_dlinfo_cache(struct ulp_dlinfo_cache *cache)
+{
+  struct ulp_dlinfo_cache *next;
+
+  while (cache != NULL) {
+    next = cache->next;
+    free(cache);
+    cache = next;
+  }
+}
+
+static int
+dl_build_cache(struct dl_phdr_info *info, size_t size, void *a __attribute__((unused)))
+{
+  /* We call the symbol table as dynsym because that is most likely to be the
+   * section in DT_SYMTAB.  However, this is not necessary true in all cases.
+   */
+  Elf64_Sym *dynsym = NULL;
+  const char *dynstr = NULL;
+  int *hash_addr;
+
+  int i;
+  int num_symbols = 0;
+
+  const char *buildid_addr = NULL;
+  unsigned buildid_len = 0;
+  unsigned name_len = 0;
+
+  /* Sanity check if size matches the size of the struct.  */
+  if (size != sizeof(*info)) {
+    libpulp_errx(EXIT_FAILURE, "dl_phdr_info size is unexpected");
+    return 0;
+  }
+
+  /* Pointers to linux-vdso.so are invalid, so skip this library.  */
+  if (!strcmp(info->dlpi_name, "linux-vdso.so.1"))
+    return 0;
+
+  /* Iterate each program headers to find the information we need. */
+  for (i = 0; i < info->dlpi_phnum; i++) {
+    const Elf64_Phdr *phdr_addr = &info->dlpi_phdr[i];
+
+    /* We are interested in symbols, so look for the dynamic symbols in the
+     * PT_DYNAMIC tag. */
+    if (phdr_addr->p_type == PT_DYNAMIC) {
+
+      /* The address in p_paddr is relative to the .so header, so we need to
+       * add the base address where the .so was mapped in the process. In case
+       * it is the binary itself, dlpi_addr is zero.  */
+      Elf64_Dyn *dyn = (Elf64_Dyn *)(info->dlpi_addr + phdr_addr->p_paddr);
+
+      /* Iterate over each tag in this section.  */
+      for (; dyn->d_tag != DT_NULL; dyn++) {
+        switch (dyn->d_tag) {
+          case DT_SYMTAB:
+            dynsym = (Elf64_Sym *)dyn->d_un.d_ptr;
+            break;
+
+          case DT_STRTAB:
+            dynstr = (const char *)dyn->d_un.d_ptr;
+            break;
+
+          case DT_SYMENT:
+            /* This section stores the size of a symbol entry. So compare it
+             * with the size of Elf64_Sym as a sanity check.  */
+            if (dyn->d_un.d_val != sizeof(Elf64_Sym)) {
+              libpulp_errx(EXIT_FAILURE, "DT_SYMENT value of %s is unexpected",
+                           info->dlpi_name);
+              return 0;
+            }
+            break;
+
+          case DT_HASH:
+            /* Look at the hash section for the number of the symbols in the
+             * symbol table.  This section structure in memory is:
+             *
+             * hash_t nbuckets;
+             * hash_t nchains;
+             * hash_t buckets[nbuckets];
+             * hash_t chain[nchains];
+             *
+             * hash_t is either int32_t or int64_t according to the arch.
+             * On x86_64 it is 32-bits.
+             * */
+            hash_addr = (int *)dyn->d_un.d_ptr;
+            num_symbols = hash_addr[1]; /* Get nchains.  */
+            break;
+        }
+      }
+    }
+    else if (phdr_addr->p_type == PT_NOTE) {
+      /* We are after the build id.  */
+
+      ElfW(Addr) note_addr = info->dlpi_addr + phdr_addr->p_paddr;
+      unsigned sec_size = phdr_addr->p_memsz;
+      ElfW(Addr) note_addr_end = note_addr + sec_size;
+
+      do {
+        /* Get the note section.  */
+        ElfW(Nhdr) *note = (void *) note_addr;
+
+        name_len = note->n_namesz;
+        buildid_len = note->n_descsz;
+
+        /* Align with the 4 bytes boundary.  */
+        buildid_len += buildid_len % 4;
+        name_len += name_len % 4;
+
+        if (note->n_type == NT_GNU_BUILD_ID) {
+          /* Build id note section found.  */
+          buildid_addr = (const char *) (note_addr + sizeof(*note) + name_len);
+          break;
+        }
+
+        note_addr += buildid_len + name_len + 12;
+      }
+      while (note_addr < note_addr_end);
+    }
+  }
+
+  /* With the symbol table identified, find the wanted symbol.  */
+  if (dynstr && dynsym && num_symbols > 0) {
+    struct ulp_dlinfo_cache *cache = new_dlinfo_cache((ElfW(Addr))info->dlpi_addr,
+                                                      (ElfW(Addr)) dynsym,
+                                                      (ElfW(Addr))dynstr,
+                                                      num_symbols,
+                                                      buildid_addr,
+                                                      buildid_len);
+
+    if (cache == NULL) {
+      libpulp_errx(EXIT_FAILURE, "malloc returned NULL when building dlinfo cache");
+    }
+
+    cache->next = __ulp_dlinfo_cache;
+    __ulp_dlinfo_cache = cache;
+  }
+  return 0;
+}
+
+static void
+release_dlcache(void)
+{
+  release_dlinfo_cache(__ulp_dlinfo_cache);
+  __ulp_dlinfo_cache = NULL;
+}
+
+static void
+build_dlcache(void)
+{
+  pthread_mutex_lock(&dlinfo_cache_lock);
+  {
+    release_dlcache();
+    dl_iterate_phdr(dl_build_cache, NULL);
+  }
+  pthread_mutex_unlock(&dlinfo_cache_lock);
+}
+#endif /* ENABLE_DLINFO_CACHE.  */
+
 void *
 get_loaded_library_base_addr(const char *library)
 {
@@ -463,11 +651,19 @@ __ulp_asunsafe_begin(void)
   libpulp_crash_assert(real_posix_memalign);
 
   get_ld_global_locks();
+
+#ifdef ENABLE_DLINFO_CACHE
+  build_dlcache();
+#endif
 }
 
 static bool
 dl_locks_held(void)
 {
+
+  libpulp_assert(0 <= dl_load_lock->__data.__lock && dl_load_lock->__data.__lock <= 1);
+  libpulp_assert(0 <= dl_load_write_lock->__data.__lock && dl_load_write_lock->__data.__lock <= 1);
+
   return (dl_load_lock->__data.__lock || dl_load_write_lock->__data.__lock);
 }
 
@@ -653,6 +849,11 @@ dlopen(const char *filename, int flags)
 
   __sync_fetch_and_add(&flag, 1);
   result = real_dlopen(filename, flags);
+  #if 0
+  if (result) {
+    build_dlcache();
+  }
+  #endif
   __sync_fetch_and_sub(&flag, 1);
 
   return result;
@@ -668,6 +869,11 @@ dlmopen(Lmid_t nsid, const char *file, int mode)
 
   __sync_fetch_and_add(&flag, 1);
   result = real_dlmopen(nsid, file, mode);
+  #if 0
+  if (result) {
+    build_dlcache();
+  }
+  #endif
   __sync_fetch_and_sub(&flag, 1);
 
   return result;
@@ -683,6 +889,11 @@ dlclose(void *handle)
 
   __sync_fetch_and_add(&flag, 1);
   result = real_dlclose(handle);
+#ifdef ENABLE_DLINFO_CACHE
+  if (result == 0) {
+    build_dlcache();
+  }
+#endif
   __sync_fetch_and_sub(&flag, 1);
 
   return result;

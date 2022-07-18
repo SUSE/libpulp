@@ -111,6 +111,7 @@ struct ulp_dynobj
   Elf64_Addr msg_queue;
   Elf64_Addr revert_all;
   Elf64_Addr metadata_buffer;
+  Elf64_Addr dlinfo_cache;
   /* end FIXME.  */
 
   struct thread_state *thread_states;
@@ -147,9 +148,6 @@ int dig_load_bias(struct ulp_process *process);
 int parse_main_dynobj(struct ulp_process *process);
 
 int parse_libs_dynobj(struct ulp_process *process);
-
-struct link_map *parse_lib_dynobj(struct ulp_process *process,
-                                  struct link_map *link_map_addr);
 
 struct ulp_dynobj *dynobj_first(struct ulp_process *);
 
