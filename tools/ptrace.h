@@ -37,6 +37,8 @@ int write_string(const char *buffer, int pid, Elf64_Addr addr);
 
 int read_memory(void *byte, size_t len, int pid, Elf64_Addr addr);
 
+int read_string_allocated(void *buffer, size_t n, int pid, Elf64_Addr addr);
+
 int read_string(char **buffer, int pid, Elf64_Addr addr);
 
 /* Signaling functions */

@@ -473,7 +473,8 @@ get_dynobj_elf_by_cache(struct ulp_process *process)
   struct ulp_dlinfo_cache dlinfo_cache;
   Elf64_Addr remote_dlinfo_cache;
 
-  if (read_memory(&remote_dlinfo_cache, sizeof(Elf64_Addr), pid, process->dynobj_libpulp->dlinfo_cache)) {
+  if (read_memory(&remote_dlinfo_cache, sizeof(Elf64_Addr), pid,
+                  process->dynobj_libpulp->dlinfo_cache)) {
     return 1;
   }
 
@@ -483,7 +484,8 @@ get_dynobj_elf_by_cache(struct ulp_process *process)
   }
 
   while (remote_dlinfo_cache) {
-    if (read_memory(&dlinfo_cache, sizeof(dlinfo_cache), pid, remote_dlinfo_cache)) {
+    if (read_memory(&dlinfo_cache, sizeof(dlinfo_cache), pid,
+                    remote_dlinfo_cache)) {
       return 1;
     }
     struct ulp_dynobj *obj = get_dynobj_by_bias(process, dlinfo_cache.bias);
@@ -495,7 +497,7 @@ get_dynobj_elf_by_cache(struct ulp_process *process)
       memcpy(obj->build_id, dlinfo_cache.buildid, BUILDID_LEN);
     }
 
-    remote_dlinfo_cache = (Elf64_Addr) dlinfo_cache.next;
+    remote_dlinfo_cache = (Elf64_Addr)dlinfo_cache.next;
   }
 
   return 0;
@@ -769,6 +771,8 @@ get_libpulp_extern_symbols(struct ulp_dynobj *obj, int pid)
 
   int bitfield = 0;
 
+  char remote_name[64];
+
   /* If, for some reason, parse_dynobj_elf_headers failed to locate
     `num_symbols`, `dynsym`, or `dynstr`, we can't continue.  */
   if (!dynsym_addr || !dynstr_addr || num_symbols <= 0)
@@ -777,57 +781,76 @@ get_libpulp_extern_symbols(struct ulp_dynobj *obj, int pid)
   int i, ret;
   for (i = 0; i < num_symbols; i++) {
     ElfW(Sym) sym;
-    char *remote_name;
 
-    ret = read_memory((char *)&sym, sizeof(sym), pid, dynsym_addr);
+    /* Only read the part of the struct we need.  */
+    ret = read_memory(&sym.st_name, sizeof(sym.st_name), pid,
+                      dynsym_addr + offsetof(ElfW(Sym), st_name));
+
     if (ret) {
       WARN("Unable to read dynamic symbol");
       return 1;
     }
 
-    /* WARNING: remote name has to be released.  */
-    ret = read_string(&remote_name, pid, dynstr_addr + sym.st_name);
+    /* Read first part of string.  We are reading from remote process, so reads
+       are expensive.  */
+    ret = read_memory(remote_name, 5, pid, dynstr_addr + sym.st_name);
     if (ret) {
       WARN("Unable to read dynamic symbol name");
       return 1;
     }
 
     if (!strncmp(remote_name, "__ulp", 5)) {
-      if (!strcmp(remote_name, "__ulp_trigger")) {
+
+      /* Now read the rest of the string.  5 here comes from "__ulp" size,
+       * without '\0'.  */
+      ret = read_string_allocated(remote_name, 64, pid,
+                                  dynstr_addr + sym.st_name + 5);
+      if (ret) {
+        WARN("Unable to read dynamic symbol name");
+        return 1;
+      }
+
+      /* Read the entire struct now.  */
+      ret = read_memory(&sym, sizeof(sym), pid, dynsym_addr);
+      if (ret) {
+        WARN("Unable to read dynamic symbol");
+        return 1;
+      }
+
+      if (!strcmp(remote_name, "_trigger")) {
         obj->trigger = ehdr_addr + sym.st_value;
         bitfield |= (1 << 0);
       }
-      else if (!strcmp(remote_name, "__ulp_check_patched")) {
+      else if (!strcmp(remote_name, "_check_patched")) {
         obj->check = ehdr_addr + sym.st_value;
         bitfield |= (1 << 1);
       }
-      else if (!strcmp(remote_name, "__ulp_state")) {
+      else if (!strcmp(remote_name, "_state")) {
         obj->state = ehdr_addr + sym.st_value;
         bitfield |= (1 << 2);
       }
-      else if (!strcmp(remote_name, "__ulp_get_global_universe")) {
+      else if (!strcmp(remote_name, "_get_global_universe")) {
         obj->global = ehdr_addr + sym.st_value;
         bitfield |= (1 << 3);
       }
-      else if (!strcmp(remote_name, "__ulp_msg_queue")) {
+      else if (!strcmp(remote_name, "_msg_queue")) {
         obj->msg_queue = ehdr_addr + sym.st_value;
         bitfield |= (1 << 4);
       }
-      else if (!strcmp(remote_name, "__ulp_revert_all")) {
+      else if (!strcmp(remote_name, "_revert_all")) {
         obj->revert_all = ehdr_addr + sym.st_value;
         bitfield |= (1 << 5);
       }
-      else if (!strcmp(remote_name, "__ulp_metadata_buffer")) {
+      else if (!strcmp(remote_name, "_metadata_buffer")) {
         obj->metadata_buffer = ehdr_addr + sym.st_value;
         bitfield |= (1 << 6);
       }
-      else if (!strcmp(remote_name, "__ulp_dlinfo_cache")) {
+      else if (!strcmp(remote_name, "_dlinfo_cache")) {
         obj->dlinfo_cache = ehdr_addr + sym.st_value;
         bitfield |= (1 << 7);
       }
     }
 
-    free(remote_name); /* (*).  */
     dynsym_addr += sizeof(sym);
 
     if (bitfield == 0xff)
@@ -1111,7 +1134,6 @@ parse_lib_dynobj(struct ulp_dynobj *obj, struct ulp_process *process)
     /* libpulp must expose all these symbols. */
     if (obj->trigger && obj->check && obj->state && obj->global &&
         obj->revert_all && obj->metadata_buffer) {
-      //obj->next = NULL;
       process->dynobj_libpulp = obj;
       DEBUG("(libpulp found)");
     }
@@ -1192,7 +1214,7 @@ parse_libs_dynobj(struct ulp_process *process)
 
   /* Iterate over the link map to build the list of libraries. */
   struct ulp_dynobj *obj;
-  for (obj = process->dynobj_targets; obj != NULL ; obj = obj->next) {
+  for (obj = process->dynobj_targets; obj != NULL; obj = obj->next) {
     if (obj != process->dynobj_libpulp) {
       if (parse_lib_dynobj(obj, process))
         break;
