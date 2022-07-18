@@ -51,7 +51,7 @@
 const char *
 get_basename(const char *name)
 {
-  const char *base = strrchr(name, '/');
+  const char *base = (name) ? strrchr(name, '/') : name;
 
   /* If strrchr returned non-null, it means that it found the last '/' in the
    * path, so add one to get the base name.  */
