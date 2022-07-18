@@ -45,11 +45,6 @@
  */
 #define RESTART_SYSCALL_SIZE 2
 
-/* Translation Lookaside Buffer of size 1.  This is enough to reduce calls to
- * ptrace when calling read_byte because often it is used to read sequential
- * number of bytes.  */
-static ElfW(Addr) tlb = 0;
-
 /** Timeout for run_and_redirect function.  Set default to 10s.  */
 static long rr_timeout = 10;
 
@@ -109,8 +104,6 @@ ulp_ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data)
 int
 write_bytes(const void *buf, size_t n, int pid, Elf64_Addr addr)
 {
-  /* Invalidate tlb because we are commiting changes to memory.  */
-  tlb = 0;
   unsigned long *lbuf = (unsigned long *)buf;
   size_t num_longs = n / sizeof(long);
   size_t num_remainders = n % sizeof(long);
@@ -173,7 +166,7 @@ ptrace_peekdata(long *value, int pid, Elf64_Addr addr)
 /* Read the content of size `long`.  This should increase the ptrace bandwidth
    when compared to read_bytes.  */
 int
-read_long(long *word, int pid, Elf64_Addr addr)
+read_long(void *word, int pid, Elf64_Addr addr)
 {
   long value;
   int ret = ptrace_peekdata(&value, pid, addr);
@@ -185,87 +178,94 @@ read_long(long *word, int pid, Elf64_Addr addr)
 }
 
 int
-read_byte(char *byte, int pid, Elf64_Addr addr)
+read_memory(void *src, size_t len, int pid, Elf64_Addr addr)
 {
-  /* Hold last ptrace_peekdata.  */
-  static char tlb_value[sizeof(long)];
-
-  long value;
-  int ret;
-
-  /* In case the requested data is cached, access the cache
-   * and return the value there.
-   */
-  if (tlb <= addr && addr < tlb + sizeof(long)) {
-    *byte = tlb_value[addr - tlb];
-    return 0;
-  }
-
-  ret = ptrace_peekdata(&value, pid, addr);
-  if (!ret) {
-    /* Update the tlb structure with the last ptrace_peekdata.  */
-    tlb = addr;
-    memcpy(tlb_value, &value, sizeof(long));
-    *byte = tlb_value[0];
-  }
-
-  return ret;
-}
-
-int
-read_memory(char *byte, size_t len, int pid, Elf64_Addr addr)
-{
-  size_t i;
   size_t len_word = len / sizeof(long);
   size_t len_remaining = len % sizeof(long);
 
-  long *word = (long *)byte;
+  unsigned long *word = (unsigned long *)src;
 
   /* Read as much as we can using longs, since it has larger bandwith when
      compared to bytes.  */
-  for (i = 0; i < len_word; i++) {
-    if (read_long(&word[i], pid, addr + i * sizeof(long)))
+  while (len_word-- > 0) {
+    if (read_long(word++, pid, addr))
       return 1;
+
+    addr += sizeof(unsigned long);
   }
 
   /* In case the size of long does not divide len, then we must also read the
      remainder.  */
-  byte = byte + len_word * sizeof(long);
-  addr = addr + len_word * sizeof(long);
-  for (i = 0; i < len_remaining; i++) {
-    if (read_byte(&byte[i], pid, addr + i))
+  if (len_remaining > 0) {
+    unsigned long l;
+    if (read_long(&l, pid, addr))
       return 1;
+
+    memcpy(word, &l, len_remaining);
   }
 
   return 0;
 }
 
+/** @brief Check if given long `l` contains a byte 0
+ *
+ * This is a hack used to fast compare if a long has a 0x00 byte. This way we
+ * can check for the '\0' character without having to compare every byte in
+ * it.
+ *
+ * @param l  Long in question.
+ *
+ * @return true if contains a zero byte, false otherwise.
+ */
+static bool
+hasbytezero(unsigned long l)
+{
+  const unsigned long mask1 = 0x0101010101010101UL;
+  const unsigned long mask2 = 0x8080808080808080UL;
+
+  return (bool)(((l)-mask1) & ~(l)&mask2);
+}
+
+/** @brief Read string from remote process.
+ *
+ * This functions allocates enough memory and reads a string at address
+ * `addr` on target process with pid `pid`.  The string is returned on the
+ * variable `buffer`, by reference.
+ *
+ * @param buffer   returned string.
+ * @param pid      pid of target process.
+ * @param addr     address of string in target process.
+ *
+ * @return 0 if success, anything else on error.
+ */
 int
 read_string(char **buffer, int pid, Elf64_Addr addr)
 {
-  int i = 0;
-  char *string;
-  int buffer_len;
+  size_t i = 0;
+  unsigned long *string;
+  size_t buffer_word_len;
 
-  buffer_len = 32;
-  string = (char *)malloc(buffer_len);
+  buffer_word_len = 8;
+  string = (unsigned long *)malloc(buffer_word_len * sizeof(long));
 
   do {
     /* Grow the buffer if the string won't fit in it.  */
-    if (i >= buffer_len) {
-      buffer_len *= 2;
-      string = realloc(string, buffer_len);
+    if (i >= buffer_word_len) {
+      buffer_word_len *= 2;
+      string = realloc(string, buffer_word_len * sizeof(long));
     }
 
-    if (read_byte(&string[i], pid, addr + i)) {
-      WARN("Unable to read string at address 0x%lx", addr + i);
+    if (read_long(&string[i], pid, addr)) {
+      WARN("Unable to read string at address 0x%lx", addr);
       free(string);
       return 1;
     }
-  }
-  while (string[i++] != '\0');
 
-  *buffer = string;
+    addr += sizeof(long);
+  }
+  while (!hasbytezero(string[i++]));
+
+  *buffer = (char *)string;
   return 0;
 }
 
@@ -322,8 +322,6 @@ detach(int pid)
     return 1;
   }
 
-  /* Invalidate tlb because we are returning control to the process.  */
-  tlb = 0;
   return 0;
 }
 
