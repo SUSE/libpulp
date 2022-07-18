@@ -35,9 +35,7 @@ int write_bytes(const void *buf, size_t n, int pid, Elf64_Addr addr);
 
 int write_string(const char *buffer, int pid, Elf64_Addr addr);
 
-int read_byte(char *byte, int pid, Elf64_Addr addr);
-
-int read_memory(char *byte, size_t len, int pid, Elf64_Addr addr);
+int read_memory(void *byte, size_t len, int pid, Elf64_Addr addr);
 
 int read_string(char **buffer, int pid, Elf64_Addr addr);
 
