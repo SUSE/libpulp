@@ -243,7 +243,6 @@ trigger_many_ulps(struct ulp_process *p, int retries,
   ulp_folder_path_len += 1;
 
   while ((entry = readdir(directory)) != NULL) {
-    struct stat stbuf;
     int bytes;
 
     bytes = ulp_folder_path_len + strlen(entry->d_name);
@@ -256,16 +255,6 @@ trigger_many_ulps(struct ulp_process *p, int retries,
 
     strcpy(buffer + ulp_folder_path_len, entry->d_name);
 
-    if (stat(buffer, &stbuf)) {
-      WARN("Error retrieving stats for %s. Skiping...\n", buffer);
-      continue;
-    }
-
-    if ((stbuf.st_mode & S_IFMT) == S_IFDIR) {
-      /* Skip directories.  */
-      continue;
-    }
-
     const char *extension = strrchr(entry->d_name, '.');
     if (!extension) {
       /* File with no extension, skip.  */
@@ -274,6 +263,11 @@ trigger_many_ulps(struct ulp_process *p, int retries,
 
     if (strcmp(extension, ".so") != 0) {
       /* This is not an .so file, skip.  */
+      continue;
+    }
+
+    if (is_directory(buffer)) {
+      /* Skip directories.  */
       continue;
     }
 
@@ -430,15 +424,21 @@ trigger_many_processes(const char *process_wildcard, int retries,
   struct ulp_process *curr_item;
   int ret = 0;
 
+  bool is_wildcard = ulp_folder_path && strchr(ulp_folder_path, '*');
+
   /* Iterate over the process list that have libpulp preloaded.  */
   for (curr_item = list; curr_item != NULL; curr_item = curr_item->next) {
     int r;
 
-    if (ulp_folder_path) {
-      /* If a path to ulp files were provided, trigger all files that match the
-         wildcard.  */
+    if (is_wildcard) {
+      /* If a wildcard is provided, trigger all files that matches it.  */
       r = trigger_many_ulps(curr_item, retries, ulp_folder_path, library,
                             check_stack, revert);
+    }
+    else if (ulp_folder_path) {
+      /* This may simply be a file.  Patch it. */
+      r = trigger_one_process(curr_item, retries, ulp_folder_path, library,
+                              check_stack, revert);
     }
     else {
       /* No path or wildcard provided.  The user may have requested to
