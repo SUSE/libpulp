@@ -22,6 +22,7 @@
 #ifndef _ULP_LIB_COMMON_
 #define _ULP_LIB_COMMON_
 
+#include <elf.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -129,6 +130,44 @@ struct ulp_applied_unit
   char jmp_type;
   struct ulp_applied_unit *next;
 };
+
+/** Uncomment this to enable a dlinfo cache on libpulp's side.  It does
+    improve patching time marginally, but requires to be more intrusive
+    on the interposed functions.  */
+
+/*
+#define ENABLE_DLINFO_CACHE
+*/
+
+#ifdef ENABLE_DLINFO_CACHE
+/** Caches dynamic link information required when running `paches` or `trigger`
+    command.  This is maintained for performance reasons.  */
+struct ulp_dlinfo_cache
+{
+  /* Next library cache info.  Must be the first element of this struct so
+     later libpulp versions can add information here without breaking past
+     versions.  */
+  struct ulp_dlinfo_cache *next;
+
+  /** Load bias of component.  */
+  Elf64_Addr bias;
+
+  /** Address of dynsym.  */
+  Elf64_Addr dynsym;
+
+  /** Address of dynstr.  */
+  Elf64_Addr dynstr;
+
+  /** Build ID of library.  */
+  unsigned char buildid[32];
+
+  /** Number of symbols in library.  */
+  int num_symbols;
+
+  /* Sentinel used to mark end of struct.  */
+  uint32_t sentinel;
+};
+#endif
 
 /* Functions present in libcommon, linked agaist both libpulp.so and tools.  */
 const char *get_basename(const char *);

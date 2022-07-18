@@ -134,6 +134,24 @@ debug_ulp_object(struct ulp_object *obj)
   debug_ulp_unit(obj->units);
 }
 
+void
+debug_ulp_dynobj(struct ulp_dynobj *obj)
+{
+  WARN("");
+  WARN("obj->filename = %s", obj->filename);
+  WARN("obj->num_symbols = %d", obj->num_symbols);
+  WARN("obj->dynsym_addr = %lx", obj->dynsym_addr);
+  WARN("obj->dynstr_addr = %lx", obj->dynstr_addr);
+  WARN("obj->dynstr_addr = %lx", obj->dynstr_addr);
+  WARN("obj->trigger = %lx", obj->trigger);
+  WARN("obj->check = %lx", obj->check);
+  WARN("obj->state = %lx", obj->state);
+  WARN("obj->global = %lx", obj->global);
+  WARN("obj->revert_all = %lx", obj->revert_all);
+  WARN("obj->metadata_buffer = %lx", obj->metadata_buffer);
+  WARN("obj->dlinfo_cache = %lx", obj->dlinfo_cache);
+}
+
 /** Release `x` if non null, and also set it to `NULL`.  */
 #define FREE_NON_NULL(x) \
   do { \
@@ -177,8 +195,9 @@ release_ulp_dynobj(struct ulp_dynobj *obj)
   for (; obj != NULL; obj = nexto) {
     nexto = obj->next;
 
-    if (obj->filename)
+    if (obj->filename) {
       free(obj->filename);
+    }
     if (obj->thread_states)
       free(obj->thread_states);
     free(obj);
@@ -426,6 +445,62 @@ static ElfW(Addr)
   /* Exit point 4: memory released by (*).  */
   return 0;
 }
+
+#ifdef ENABLE_DLINFO_CACHE
+static struct ulp_dynobj *
+get_dynobj_by_bias(struct ulp_process *p, ElfW(Addr) bias)
+{
+  struct ulp_dynobj *d;
+  for (d = dynobj_first(p); d != NULL; d = dynobj_next(p, d)) {
+    if (d->link_map.l_addr == bias) {
+      return d;
+    }
+  }
+
+  return NULL;
+}
+
+int
+get_dynobj_elf_by_cache(struct ulp_process *process)
+{
+  if (!process->dynobj_libpulp)
+    return 1;
+
+  if (!process->dynobj_libpulp->dlinfo_cache)
+    return 1;
+
+  pid_t pid = process->pid;
+  struct ulp_dlinfo_cache dlinfo_cache;
+  Elf64_Addr remote_dlinfo_cache;
+
+  if (read_memory(&remote_dlinfo_cache, sizeof(Elf64_Addr), pid, process->dynobj_libpulp->dlinfo_cache)) {
+    return 1;
+  }
+
+  if (remote_dlinfo_cache == 0) {
+    /* No remote cache.  */
+    return 1;
+  }
+
+  while (remote_dlinfo_cache) {
+    if (read_memory(&dlinfo_cache, sizeof(dlinfo_cache), pid, remote_dlinfo_cache)) {
+      return 1;
+    }
+    struct ulp_dynobj *obj = get_dynobj_by_bias(process, dlinfo_cache.bias);
+
+    if (obj) {
+      obj->dynsym_addr = dlinfo_cache.dynsym;
+      obj->dynstr_addr = dlinfo_cache.dynstr;
+      obj->num_symbols = dlinfo_cache.num_symbols;
+      memcpy(obj->build_id, dlinfo_cache.buildid, BUILDID_LEN);
+    }
+
+    remote_dlinfo_cache = (Elf64_Addr) dlinfo_cache.next;
+  }
+
+  return 0;
+}
+#endif //ENABLE_DLINFO_CACHE
 
 /** @brief Parses ELF headers of dynobj `obj` from process with pid `pid`.
  *
@@ -746,12 +821,16 @@ get_libpulp_extern_symbols(struct ulp_dynobj *obj, int pid)
         obj->metadata_buffer = ehdr_addr + sym.st_value;
         bitfield |= (1 << 6);
       }
+      else if (!strcmp(remote_name, "__ulp_dlinfo_cache")) {
+        obj->dlinfo_cache = ehdr_addr + sym.st_value;
+        bitfield |= (1 << 7);
+      }
     }
 
     free(remote_name); /* (*).  */
     dynsym_addr += sizeof(sym);
 
-    if (bitfield == 0x7f)
+    if (bitfield == 0xff)
       break;
   }
 
@@ -986,42 +1065,6 @@ parse_main_dynobj(struct ulp_process *process)
   return 0;
 }
 
-/* Iterates over all objects that have been dynamically loaded into
- * PROCESS, parsing and sorting them into appropriate lists (for
- * instance, libpulp.so will be stored into PROCESS->dynobj_libpulp.
- * Returns 0, on success. If libpulp has not been found among the
- * dynamically loaded objects, returns 1.
- */
-int
-parse_libs_dynobj(struct ulp_process *process)
-{
-  struct link_map *obj_link_map, *aux_link_map;
-
-  DEBUG("getting in-memory information about shared libraries.");
-
-  /* Iterate over the link map to build the list of libraries. */
-  obj_link_map = process->dynobj_main->link_map.l_next;
-  while (obj_link_map) {
-    aux_link_map = parse_lib_dynobj(process, obj_link_map);
-    if (!aux_link_map)
-      break;
-    obj_link_map = aux_link_map->l_next;
-  }
-
-  /* When libpulp has been loaded (usually with LD_PRELOAD),
-   * parse_lib_dynobj will find the symbols it provides, such as
-   * __ulp_trigger, which are all required for userspace live-patching.
-   * If libpulp has not been found, process->dynobj_libpulp will be NULL
-   * and this function returns an error.
-   */
-  if (process->dynobj_libpulp == NULL) {
-    DEBUG("libpulp not loaded, thus live patching not possible.");
-    return ENOLIBPULP;
-  }
-
-  return 0;
-}
-
 /* Attach into PROCESS, then reads the link_map structure pointed to by
  * LINK_MAP_ADDR, which contains information about a dynamically loaded
  * object, such as the name of the file from which it has been loaded.
@@ -1036,8 +1079,53 @@ parse_libs_dynobj(struct ulp_process *process)
  * On success, returns the link_map that has been read from the attached
  * PROCESS. Otherwise, returns NULL.
  */
+int
+parse_lib_dynobj(struct ulp_dynobj *obj, struct ulp_process *process)
+{
+  char *libname = obj->filename;
+  int pid = process->pid;
+
+  DEBUG("reading in-memory information about %s.", libname);
+
+  /* ensure that PIE was verified */
+  if (!process->dynobj_main)
+    return EUNKNOWN;
+
+  /*
+   * While parsing a DSO, see if it exports the symbols required by
+   * live-patching. Most symbols will be provided by libpulp.so, and
+   * some by the target library.
+   */
+
+  if (obj->num_symbols > 0 && obj->dynstr_addr > 0 && obj->dynsym_addr > 0)
+    return 0;
+
+  /* Pointers to linux-vdso.so are invalid, so skip this library.  */
+  if (strcmp(obj->filename, "linux-vdso.so.1"))
+    parse_dynobj_elf_headers(pid, obj);
+
+  /* Only libpulp.so should have those symbols exported.  */
+  if (strstr(libname, "libpulp.so")) {
+    get_libpulp_extern_symbols(obj, pid);
+
+    /* libpulp must expose all these symbols. */
+    if (obj->trigger && obj->check && obj->state && obj->global &&
+        obj->revert_all && obj->metadata_buffer) {
+      //obj->next = NULL;
+      process->dynobj_libpulp = obj;
+      DEBUG("(libpulp found)");
+    }
+    /* No other library should expose these symbols. */
+    else if (obj->trigger || obj->check || obj->state || obj->global ||
+             obj->revert_all || obj->metadata_buffer)
+      WARN("unexpected subset of libpulp symbols exposed by %s.", libname);
+  }
+
+  return 0;
+}
+
 struct link_map *
-parse_lib_dynobj(struct ulp_process *process, struct link_map *link_map_addr)
+get_libname_dynobj(struct ulp_process *process, struct link_map *link_map_addr)
 {
   struct ulp_dynobj *obj;
   char *libname;
@@ -1057,45 +1145,72 @@ parse_lib_dynobj(struct ulp_process *process, struct link_map *link_map_addr)
     return NULL;
   }
 
-  DEBUG("reading in-memory information about %s.", libname);
-
   obj->filename = libname;
-
-  /* ensure that PIE was verified */
-  if (!process->dynobj_main)
-    return NULL;
-
-  /*
-   * While parsing a DSO, see if it exports the symbols required by
-   * live-patching. Most symbols will be provided by libpulp.so, and
-   * some by the target library.
-   */
-
-  /* Pointers to linux-vdso.so are invalid, so skip this library.  */
-  if (strcmp(obj->filename, "linux-vdso.so.1"))
-    parse_dynobj_elf_headers(pid, obj);
-
-  /* Only libpulp.so should have those symbols exported.  */
-  if (strstr(libname, "libpulp.so")) {
-    get_libpulp_extern_symbols(obj, pid);
-
-    /* libpulp must expose all these symbols. */
-    if (obj->trigger && obj->check && obj->state && obj->global &&
-        obj->revert_all && obj->metadata_buffer) {
-      obj->next = NULL;
-      process->dynobj_libpulp = obj;
-      DEBUG("(libpulp found)");
-    }
-    /* No other library should expose these symbols. */
-    else if (obj->trigger || obj->check || obj->state || obj->global ||
-             obj->revert_all || obj->metadata_buffer)
-      WARN("unexpected subset of libpulp symbols exposed by %s.", libname);
-  }
 
   obj->next = process->dynobj_targets;
   process->dynobj_targets = obj;
 
+  if (strstr(libname, "libpulp.so")) {
+    process->dynobj_libpulp = obj;
+  }
+
   return &obj->link_map;
+}
+
+/* Iterates over all objects that have been dynamically loaded into
+ * PROCESS, parsing and sorting them into appropriate lists (for
+ * instance, libpulp.so will be stored into PROCESS->dynobj_libpulp.
+ * Returns 0, on success. If libpulp has not been found among the
+ * dynamically loaded objects, returns 1.
+ */
+int
+parse_libs_dynobj(struct ulp_process *process)
+{
+  struct link_map *obj_link_map, *aux_link_map;
+
+  DEBUG("getting in-memory information about shared libraries.");
+
+  /* Iterate over the link map to build the list of libraries. */
+  obj_link_map = process->dynobj_main->link_map.l_next;
+  while (obj_link_map) {
+    aux_link_map = get_libname_dynobj(process, obj_link_map);
+    if (!aux_link_map)
+      break;
+    obj_link_map = aux_link_map->l_next;
+  }
+
+  if (parse_lib_dynobj(process->dynobj_libpulp, process)) {
+    DEBUG("libpulp not loaded, thus live patching not possible.");
+    return ENOLIBPULP;
+  }
+
+#ifdef ENABLE_DLINFO_CACHE
+  if (get_dynobj_elf_by_cache(process)) {
+    DEBUG("libpulp dlinfo cache not available");
+  }
+#endif
+
+  /* Iterate over the link map to build the list of libraries. */
+  struct ulp_dynobj *obj;
+  for (obj = process->dynobj_targets; obj != NULL ; obj = obj->next) {
+    if (obj != process->dynobj_libpulp) {
+      if (parse_lib_dynobj(obj, process))
+        break;
+    }
+  }
+
+  /* When libpulp has been loaded (usually with LD_PRELOAD),
+   * parse_lib_dynobj will find the symbols it provides, such as
+   * __ulp_trigger, which are all required for userspace live-patching.
+   * If libpulp has not been found, process->dynobj_libpulp will be NULL
+   * and this function returns an error.
+   */
+  if (process->dynobj_libpulp == NULL) {
+    DEBUG("libpulp not loaded, thus live patching not possible.");
+    return ENOLIBPULP;
+  }
+
+  return 0;
 }
 
 /* Collects multiple pieces of information about PROCESS, so that it can
