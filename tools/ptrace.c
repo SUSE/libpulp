@@ -309,6 +309,42 @@ hasbytezero(unsigned long l)
   return (bool)(((l)-mask1) & ~(l)&mask2);
 }
 
+/** Read string assuming that buffer is already allocated.  */
+int
+read_string_allocated(void *buffer, size_t n, int pid, Elf64_Addr addr)
+{
+  unsigned long *string = (unsigned long *)buffer;
+
+  size_t num_longs = n / sizeof(long);
+  size_t remaining = n % sizeof(long);
+
+  while (num_longs-- > 0) {
+    if (read_long(string, pid, addr)) {
+      return 1;
+    }
+
+    if (hasbytezero(*string)) {
+      return 0;
+    }
+    string++;
+    addr += sizeof(long);
+  }
+
+  /* In the case it doesn't divide, we don't need to look if the string has the
+     '\0' character because we will read a word anyway.  Just be careful to
+     not write outside of 'buffer' space.  */
+  if (remaining > 0) {
+    unsigned long l;
+    if (read_long(&l, pid, addr)) {
+      WARN("Unable to read string at address 0x%lx", addr);
+      return 1;
+    }
+    memcpy(string, &l, remaining);
+  }
+
+  return 0;
+}
+
 /** @brief Read string from remote process.
  *
  * This functions allocates enough memory and reads a string at address
