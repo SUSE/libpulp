@@ -168,8 +168,13 @@ is_library_livepatchable(struct ulp_applied_patch *patch,
   }
 
   ElfW(Addr) ehdr_addr = obj->link_map.l_addr;
-
   ElfW(Addr) dynsym_addr = obj->dynsym_addr;
+
+  if (ehdr_addr == 0) {
+    /* If l_addr is zero, it means that there is no load bias.  In that case,
+     * the elf address is on address 0x400000 on x86_64.  */
+    ehdr_addr = 0x400000UL;
+  }
 
   /* Only look the first 64 symbols, else we may take too much time.  */
   int len = MIN(obj->num_symbols, 64);
