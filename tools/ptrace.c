@@ -19,6 +19,16 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/* If this macro is defined, libpulp will use process_vm_read and
+   process_vm_write instead of ptrace when possible.  This is done
+   to improve performance.  */
+#define USE_VM_READV_WRITEV
+
+#ifdef USE_VM_READV_WRITEV
+#define _GNU_SOURCE
+#include <sys/uio.h>
+#endif
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -104,6 +114,30 @@ ulp_ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data)
 int
 write_bytes(const void *buf, size_t n, int pid, Elf64_Addr addr)
 {
+#ifdef USE_VM_READV_WITEV
+  struct iovec local = { .iov_base = buf, .iov_len = n };
+  struct iovec remote = { .iov_base = (void *)addr, .iov_len = n };
+
+  ssize_t ret;
+  size_t acc = 0;
+
+  do {
+    ret = process_vm_writev(pid, &local, 1, &remote, 1, 0);
+
+    if (ret < 0) {
+      DEBUG("Unable to write byte at address %lx: %s\n", addr,
+            strerror(errno));
+      /* Error in process_vm_readv.  */
+      return errno;
+    }
+
+    acc += ret;
+  }
+  while (acc != len);
+
+  return 0;
+
+#else
   unsigned long *lbuf = (unsigned long *)buf;
   size_t num_longs = n / sizeof(long);
   size_t num_remainders = n % sizeof(long);
@@ -134,6 +168,7 @@ write_bytes(const void *buf, size_t n, int pid, Elf64_Addr addr)
     }
   }
   return 0;
+#endif
 }
 
 /*
@@ -150,6 +185,7 @@ write_string(const char *buffer, int pid, Elf64_Addr addr)
   return write_bytes(buffer, len, pid, addr);
 }
 
+#ifndef USE_VM_READV_WRITEV
 static int
 ptrace_peekdata(long *value, int pid, Elf64_Addr addr)
 {
@@ -162,24 +198,70 @@ ptrace_peekdata(long *value, int pid, Elf64_Addr addr)
 
   return 0;
 }
+#endif
 
 /* Read the content of size `long`.  This should increase the ptrace bandwidth
    when compared to read_bytes.  */
 int
-read_long(void *word, int pid, Elf64_Addr addr)
+read_long(void *src, int pid, Elf64_Addr addr)
 {
+#ifdef USE_VM_READV_WRITEV
+  struct iovec local = { .iov_base = src, .iov_len = sizeof(long) };
+  struct iovec remote = { .iov_base = (void *)addr, .iov_len = sizeof(long) };
+
+  ssize_t ret;
+  size_t acc = 0;
+
+  do {
+    ret = process_vm_readv(pid, &local, 1, &remote, 1, 0);
+
+    if (ret < 0) {
+      /* Error in process_vm_readv.  */
+      return errno;
+    }
+
+    acc += ret;
+  }
+  while (acc != sizeof(long));
+
+  return 0;
+
+#else
   long value;
   int ret = ptrace_peekdata(&value, pid, addr);
   if (!ret) {
-    memcpy(word, &value, sizeof(long));
+    memcpy(src, &value, sizeof(long));
   }
 
   return ret;
+#endif
 }
 
 int
 read_memory(void *src, size_t len, int pid, Elf64_Addr addr)
 {
+#ifdef USE_VM_READV_WRITEV
+  struct iovec local = { .iov_base = src, .iov_len = len };
+  struct iovec remote = { .iov_base = (void *)addr, .iov_len = len };
+
+  ssize_t ret;
+  size_t acc = 0;
+
+  do {
+    ret = process_vm_readv(pid, &local, 1, &remote, 1, 0);
+
+    if (ret < 0) {
+      /* Error in process_vm_readv.  */
+      return errno;
+    }
+
+    acc += ret;
+  }
+  while (acc != len);
+
+  return 0;
+
+#else
   size_t len_word = len / sizeof(long);
   size_t len_remaining = len % sizeof(long);
 
@@ -205,6 +287,7 @@ read_memory(void *src, size_t len, int pid, Elf64_Addr addr)
   }
 
   return 0;
+#endif
 }
 
 /** @brief Check if given long `l` contains a byte 0
