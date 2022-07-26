@@ -116,7 +116,7 @@ libpulp_strerror(ulp_error_t errnum)
 const char *
 get_target_binary_name(int pid)
 {
-  static char binary_name[PATH_MAX];
+  static __thread char binary_name[PATH_MAX];
 
   char fname[PATH_MAX];
   char cmdline[PATH_MAX];

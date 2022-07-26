@@ -289,116 +289,106 @@ wildcard_clean:
 }
 
 static void
-print_patched_unpatched_processes(struct ulp_process *list, bool summarize)
+print_patched_unpatched(struct ulp_process *p, bool summarize)
 {
-  struct ulp_process *curr_item;
-  int count = 0;
-  for (curr_item = list; curr_item != NULL; curr_item = curr_item->next) {
-    pid_t pid = curr_item->pid;
-    struct trigger_results *results, *summarized_result = NULL;
-    printf("  %s (pid: %d):", get_process_name(curr_item), pid);
+  struct ulp_process *curr_item = p;
 
-    /* Try to summarize the patches result.  */
-    ulp_error_t err = EUNKNOWN;
-    bool summarized = true;
-    bool hide_skipped = false;
+  pid_t pid = curr_item->pid;
+  struct trigger_results *results, *summarized_result = NULL;
+  printf("  %s (pid: %d):", get_process_name(curr_item), pid);
 
-    if (curr_item->results)
-      err = curr_item->results->err;
+  /* Try to summarize the patches result.  */
+  ulp_error_t err = EUNKNOWN;
+  bool summarized = true;
+  bool hide_skipped = false;
 
-    for (results = curr_item->results; results; results = results->next) {
-      if (results->err == 0 ||
-          (results->err != EBUILDID && results->err != ENOTARGETLIB)) {
-        /* Patch applied or critical error found.  Hide minor 'skipped' errors
-           and try to summarize this error.  */
-        err = results->err;
-        hide_skipped = true;
-      }
+  if (curr_item->results)
+    err = curr_item->results->err;
+
+  for (results = curr_item->results; results; results = results->next) {
+    if (results->err == 0 ||
+        (results->err != EBUILDID && results->err != ENOTARGETLIB)) {
+      /* Patch applied or critical error found.  Hide minor 'skipped' errors
+         and try to summarize this error.  */
+      err = results->err;
+      hide_skipped = true;
     }
+  }
 
-    for (results = curr_item->results; results; results = results->next) {
-      /* if marked to hide sipped patches, then proceed to next one.  */
-      if (hide_skipped &&
-          (results->err == EBUILDID || results->err == ENOTARGETLIB))
-        continue;
+  for (results = curr_item->results; results; results = results->next) {
+    /* if marked to hide sipped patches, then proceed to next one.  */
+    if (hide_skipped &&
+        (results->err == EBUILDID || results->err == ENOTARGETLIB))
+      continue;
 
-      if (results->err != err) {
-        /* There are multiple events  and we are unable to summarize.  */
-        summarized = false;
-      }
-      else if (results->err != EBUILDID && results->err != ENOTARGETLIB) {
-        if (!summarized_result) {
-          /* So far, only one important event was catch.  */
-          summarized_result = results;
-        }
-        else {
-          /* Multiple important events happened.  Unable to summarize.  */
-          summarized = false;
-        }
-      }
-    }
-
-    if (!summarize) {
+    if (results->err != err) {
+      /* There are multiple events  and we are unable to summarize.  */
       summarized = false;
-      hide_skipped = false;
     }
-
-    if (summarized) {
-      if (err == EBUILDID || err == ENOTARGETLIB) {
-        change_color(TERM_COLOR_YELLOW);
-        printf(" SKIPPED");
-        change_color(TERM_COLOR_RESET);
-        printf(" %s\n", libpulp_strerror(err));
-        count++;
-      }
-      else if (err) {
-        change_color(TERM_COLOR_RED);
-        printf(" FAILED");
-        change_color(TERM_COLOR_RESET);
-        printf(" %s: %s\n", summarized_result->patch_name,
-               libpulp_strerror(err));
-        count++;
+    else if (results->err != EBUILDID && results->err != ENOTARGETLIB) {
+      if (!summarized_result) {
+        /* So far, only one important event was catch.  */
+        summarized_result = results;
       }
       else {
-        change_color(TERM_COLOR_GREEN);
-        printf(" SUCCESS");
-        change_color(TERM_COLOR_RESET);
-        printf(" %s\n", summarized_result->patch_name);
-        count++;
-      }
-    }
-    else {
-      putchar('\n');
-      for (results = curr_item->results; results; results = results->next) {
-        if (results->err == EBUILDID || results->err == ENOTARGETLIB) {
-          if (!hide_skipped) {
-            change_color(TERM_COLOR_YELLOW);
-            printf("    SKIPPED");
-            change_color(TERM_COLOR_RESET);
-            printf(" %s: %s\n", results->patch_name,
-                   libpulp_strerror(results->err));
-          }
-        }
-        else if (results->err) {
-          change_color(TERM_COLOR_RED);
-          printf("    FAILED");
-          change_color(TERM_COLOR_RESET);
-          printf(" %s: %s\n", results->patch_name,
-                 libpulp_strerror(results->err));
-        }
-        else {
-          change_color(TERM_COLOR_GREEN);
-          printf("    SUCCESS");
-          change_color(TERM_COLOR_RESET);
-          printf(" %s\n", results->patch_name);
-        }
-        count++;
+        /* Multiple important events happened.  Unable to summarize.  */
+        summarized = false;
       }
     }
   }
 
-  if (count == 0) {
-    printf("    (empty)\n");
+  if (!summarize) {
+    summarized = false;
+    hide_skipped = false;
+  }
+
+  if (summarized) {
+    if (err == EBUILDID || err == ENOTARGETLIB) {
+      change_color(TERM_COLOR_YELLOW);
+      printf(" SKIPPED");
+      change_color(TERM_COLOR_RESET);
+      printf(" %s\n", libpulp_strerror(err));
+    }
+    else if (err) {
+      change_color(TERM_COLOR_RED);
+      printf(" FAILED");
+      change_color(TERM_COLOR_RESET);
+      printf(" %s: %s\n", summarized_result->patch_name,
+             libpulp_strerror(err));
+    }
+    else {
+      change_color(TERM_COLOR_GREEN);
+      printf(" SUCCESS");
+      change_color(TERM_COLOR_RESET);
+      printf(" %s\n", summarized_result->patch_name);
+    }
+  }
+  else {
+    putchar('\n');
+    for (results = curr_item->results; results; results = results->next) {
+      if (results->err == EBUILDID || results->err == ENOTARGETLIB) {
+        if (!hide_skipped) {
+          change_color(TERM_COLOR_YELLOW);
+          printf("    SKIPPED");
+          change_color(TERM_COLOR_RESET);
+          printf(" %s: %s\n", results->patch_name,
+                 libpulp_strerror(results->err));
+        }
+      }
+      else if (results->err) {
+        change_color(TERM_COLOR_RED);
+        printf("    FAILED");
+        change_color(TERM_COLOR_RESET);
+        printf(" %s: %s\n", results->patch_name,
+               libpulp_strerror(results->err));
+      }
+      else {
+        change_color(TERM_COLOR_GREEN);
+        printf("    SUCCESS");
+        change_color(TERM_COLOR_RESET);
+        printf(" %s\n", results->patch_name);
+      }
+    }
   }
 }
 
@@ -420,43 +410,59 @@ trigger_many_processes(const char *process_wildcard, int retries,
                        const char *ulp_folder_path, const char *library,
                        bool check_stack, bool revert)
 {
-  struct ulp_process *list = build_process_list(process_wildcard);
-  struct ulp_process *curr_item;
+  struct ulp_process *p;
   int ret = 0;
+  int successes = 0;
+  int skippes = 0;
+  int failures = 0;
 
   bool is_wildcard = ulp_folder_path && strchr(ulp_folder_path, '*');
 
   /* Iterate over the process list that have libpulp preloaded.  */
-  for (curr_item = list; curr_item != NULL; curr_item = curr_item->next) {
+  FOR_EACH_ULP_PROCESS_MATCHING_WILDCARD(p, process_wildcard)
+  {
     int r;
 
     if (is_wildcard) {
       /* If a wildcard is provided, trigger all files that matches it.  */
-      r = trigger_many_ulps(curr_item, retries, ulp_folder_path, library,
-                            check_stack, revert);
+      r = trigger_many_ulps(p, retries, ulp_folder_path, library, check_stack,
+                            revert);
     }
     else if (ulp_folder_path) {
       /* This may simply be a file.  Patch it. */
-      r = trigger_one_process(curr_item, retries, ulp_folder_path, library,
+      r = trigger_one_process(p, retries, ulp_folder_path, library,
                               check_stack, revert);
     }
     else {
       /* No path or wildcard provided.  The user may have requested to
          revert-all.  */
-      r = trigger_one_process(curr_item, retries, NULL, library, check_stack,
-                              revert);
+      r = trigger_one_process(p, retries, NULL, library, check_stack, revert);
     }
 
     /* If the livepatch failed because the patch wasn't targeted to the
        proccess, we ignore because we are batch processing.  */
-    if (!(r == EBUILDID || r == ENOTARGETLIB))
+    if (r == EBUILDID || r == ENOTARGETLIB) {
+      skippes++;
+    }
+    else {
       ret |= r;
+      if (r == 0) {
+        successes++;
+      }
+      else {
+        failures++;
+      }
+    }
+
+    if (!ulp_quiet)
+      print_patched_unpatched(p, !ulp_verbose);
   }
 
-  if (!ulp_quiet)
-    print_patched_unpatched_processes(list, !ulp_verbose);
+  if (successes + skippes + failures > 0) {
+    WARN("Processes patched: %d, Skipped: %d, Failed: %d.", successes, skippes,
+         failures);
+  }
 
-  release_ulp_process(list);
   return ret;
 }
 
@@ -529,6 +535,8 @@ diagnose_patch_apply(ulp_error_t ret, bool revert, const char *livepatch,
   }
 }
 
+extern bool enable_threading;
+
 /** @brief Trigger command entry point.
  */
 int
@@ -537,6 +545,7 @@ run_trigger(struct arguments *arguments)
   /* Set the verbosity level in the common introspection infrastructure. */
   ulp_verbose = arguments->verbose;
   ulp_quiet = arguments->quiet;
+  enable_threading = !arguments->disable_threads;
 
   bool check_stack = false;
   const char *livepatch = arguments->args[0];

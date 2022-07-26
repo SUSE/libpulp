@@ -124,6 +124,7 @@ static const char doc[] =
 #define ULP_OP_REVERT 257
 #define ULP_OP_COLOR 258
 #define ULP_OP_TIMEOUT 259
+#define ULP_OP_DISABLE_THREADING 260
 
 static struct argp_option options[] = {
   { 0, 0, 0, 0, "Options:", 0 },
@@ -131,6 +132,8 @@ static struct argp_option options[] = {
   { "quiet", 'q', 0, 0, "Don't produce any output", 0 },
   { 0, 0, 0, 0, "patches, check & trigger commands only:", 0 },
   { "process", 'p', "process", 0, "Target process name, wildcard, or PID", 0 },
+  { "disable-threading", ULP_OP_DISABLE_THREADING, 0, 0,
+    "Do not launch additional threads", 0 },
   { 0, 0, 0, 0, "dump & patches command only:", 0 },
   { "buildid", 'b', 0, 0, "Print the build id", 0 },
   { 0, 0, 0, 0, "trigger command only:", 0 },
@@ -319,6 +322,10 @@ parser(int key, char *arg, struct argp_state *state)
     case ULP_OP_REVERT:
       arguments->revert = 1;
       break;
+    case ULP_OP_DISABLE_THREADING:
+      arguments->disable_threads = 1;
+      break;
+
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
     case 'c':
       arguments->check_stack = 1;

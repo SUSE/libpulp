@@ -394,7 +394,8 @@ check_PROGRAMS = \
   endbr64 \
   manyprocesses \
   dlsym \
-  stress
+  stress \
+  pcqueue
 
 numserv_SOURCES = numserv.c
 numserv_LDADD = libdozens.la libhundreds.la
@@ -511,6 +512,9 @@ stress_SOURCES = stress.c
 stress_LDADD = libstress.la
 stress_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
+pcqueue_SOURCES = pcqueue.c
+pcqueue_LDADD = -lpthread
+
 TESTS = \
   numserv.py \
   numserv_bsymbolic.py \
@@ -548,7 +552,8 @@ TESTS = \
   endbr64.py \
   dlsym_lock.py \
   stress.py \
-  tempfiles.py
+  tempfiles.py \
+  pcqueue.py
 
 XFAIL_TESTS = \
   blocked.py \
