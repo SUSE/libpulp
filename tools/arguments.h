@@ -52,6 +52,7 @@ struct arguments
   int verbose;
   int buildid;
   int revert;
+  int disable_threads;
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
   int check_stack;
 #endif

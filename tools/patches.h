@@ -22,8 +22,39 @@
 #ifndef PATCHES_H
 #define PATCHES_H
 
+#include "pcqueue.h"
+
+#include <dirent.h>
+#include <stdbool.h>
+
 struct arguments;
 struct ulp_process;
+
+struct ulp_process_iterator
+{
+  struct ulp_process *now;
+  struct ulp_process *last;
+
+  const char *wildcard;
+  DIR *slashproc;
+  struct dirent *subdir;
+
+  producer_consumer_t *pcqueue;
+};
+
+struct ulp_process *process_list_next(struct ulp_process_iterator *);
+struct ulp_process *process_list_begin(struct ulp_process_iterator *,
+                                       const char *);
+int process_list_end(struct ulp_process_iterator *);
+
+#define FOR_EACH_ULP_PROCESS_MATCHING_WILDCARD(p, wildcard) \
+  struct ulp_process_iterator _it; \
+  for (p = process_list_begin(&_it, wildcard); process_list_end(&_it); \
+       p = process_list_next(&_it))
+
+#define FOR_EACH_ULP_PROCESS(p) FOR_EACH_ULP_PROCESS_MATCHING_WILDCARD(p, NULL)
+
+bool has_libpulp_loaded(int pid);
 
 const char *buildid_to_string(const unsigned char[BUILDID_LEN]);
 

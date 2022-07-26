@@ -59,9 +59,19 @@ AS_HELP_STRING([--enable-sanitizers],
 
 AM_CONDITIONAL([ENABLE_ADDRSAN], [test "x$enable_sanitizers" == "xyes"])
 
+# Enable thread sanitizer. It can't run together with addrsan.
+AC_ARG_ENABLE(thread-sanitizer,
+AS_HELP_STRING([--enable-thread-sanitizer],
+[compile ulp tools with thread sanitizer [default=no]]),
+[enable_thread_sanitizer=yes]
+[],
+[enable_thread_sanitizer=no; break])
+
+AM_CONDITIONAL([ENABLE_THREADSAN], [test "x$enable_thread_sanitizer" == "xyes"])
+
 # We need to disable optimizations if libsanitizer is enabled, else we
 # lose interesting informations about the leaks/errors.
-AS_IF([test "x$enable_sanitizers" == "xyes"],
+AS_IF([test "x$enable_sanitizers" == "xyes" -o "x$enable_thread_sanitizer" == "xyes"],
       [CFLAGS="-O0 -g"], [])
 
 # Enable valgrind on testing. Catches memory errors in libpulp.so.

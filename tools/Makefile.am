@@ -32,7 +32,8 @@ noinst_HEADERS = \
   post.h \
   messages.h \
   livepatchable.h \
-  elf-extra.h
+  elf-extra.h \
+  pcqueue.h
 
 ulp_SOURCES = \
   ulp.c \
@@ -47,8 +48,9 @@ ulp_SOURCES = \
   introspection.c \
   ptrace.c \
   livepatchable.c \
-  elf-extra.c
-ulp_LDADD = $(top_builddir)/common/libcommon.la -lelf -ldl $(LIBUNWIND_LIBS)
+  elf-extra.c \
+  pcqueue.c
+ulp_LDADD = $(top_builddir)/common/libcommon.la -lelf -lpthread -ldl $(LIBUNWIND_LIBS)
 
 # Ensure access to the include directory
 AM_CFLAGS += -I$(abs_top_srcdir)/include
@@ -57,4 +59,10 @@ if ENABLE_ADDRSAN
 # Add address sanitizer
 AM_CFLAGS += -fsanitize=address,undefined
 AM_LDFLAGS += -fsanitize=address,undefined
+endif
+
+if ENABLE_THREADSAN
+# Add thread sanitizer
+AM_CFLAGS += -fsanitize=thread
+AM_LDFLAGS += -fsanitize=thread
 endif
