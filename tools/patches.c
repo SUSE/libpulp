@@ -98,6 +98,10 @@ process_list_next(struct ulp_process_iterator *it)
   return it->now;
 }
 
+/** Thread object that runs generating the process list and parsing the libpulp
+    symbols.  */
+static pthread_t process_list_thread;
+
 struct ulp_process *
 process_list_begin(struct ulp_process_iterator *it, const char *wildcard)
 {
@@ -123,8 +127,7 @@ process_list_begin(struct ulp_process_iterator *it, const char *wildcard)
 
   if (enable_threading) {
     it->pcqueue = producer_consumer_new(512);
-    pthread_t thread;
-    pthread_create(&thread, NULL, generate_ulp_list_thread, it);
+    pthread_create(&process_list_thread, NULL, generate_ulp_list_thread, it);
   }
 
   return process_list_next(it);
@@ -136,6 +139,9 @@ process_list_end(struct ulp_process_iterator *it)
   if (it->now == NULL) {
     release_ulp_process(it->last);
     producer_consumer_delete(it->pcqueue);
+    if (enable_threading) {
+      pthread_join(process_list_thread, NULL);
+    }
     return 0;
   }
 
