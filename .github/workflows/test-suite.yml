@@ -21,6 +21,10 @@ jobs:
             compiler: gcc
             build-type: sanitizers
             extra-configure: --enable-sanitizers
+          - opensuse: tumbleweed
+            compiler: gcc
+            build-type: thread-sanitizer
+            extra-configure: --enable-thread-sanitizer
 #         - opensuse: tumbleweed
 #           compiler: gcc
 #           build-type: valgrind
