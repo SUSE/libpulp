@@ -72,6 +72,7 @@ struct ulp_metadata
   uint32_t nrefs;
   struct ulp_reference *refs;
   uint8_t type;
+  char *comments;
 };
 
 struct ulp_object

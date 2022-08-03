@@ -58,7 +58,7 @@ bool has_libpulp_loaded(int pid);
 
 const char *buildid_to_string(const unsigned char[BUILDID_LEN]);
 
-struct ulp_process *build_process_list(const char *wildcard);
+size_t extract_ulp_comment_to_mem(const char *livepatch, char **out);
 
 int run_patches(struct arguments *);
 

@@ -214,7 +214,8 @@ check_LTLIBRARIES += libdozens_livepatch1.la \
                      libprocess_access_livepatch1.la \
                      libendbr64_livepatch1.la \
                      libmanyprocesses_livepatch1.la \
-                     libstress_livepatch1.la
+                     libstress_livepatch1.la \
+                     libcomments_livepatch1.la
 
 libdozens_livepatch1_la_SOURCES = libdozens_livepatch1.c
 libdozens_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
@@ -288,6 +289,9 @@ libmanyprocesses_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 libstress_livepatch1_la_SOURCES = libstress_livepatch1.c
 libstress_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
+libcomments_livepatch1_la_SOURCES = libcomments_livepatch1.c
+libcomments_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
+
 METADATA = \
   libdozens_livepatch1.dsc \
   libdozens_livepatch1.ulp \
@@ -335,6 +339,8 @@ METADATA = \
   libprocess_livepatch1.ulp \
   libprocess_access_livepatch1.dsc \
   libprocess_access_livepatch1.ulp \
+  libcomments_livepatch1.dsc \
+  libcomments_livepatch1.ulp \
   libstress_livepatch1.dsc \
   libstress_livepatch1.ulp
 
@@ -362,6 +368,7 @@ EXTRA_DIST = \
   libmanyprocesses_livepatch1.in \
   libprocess_livepatch1.in \
   libprocess_access_livepatch1.in \
+  libcomments_livepatch1.in \
   libstress_livepatch1.in
 
 clean-local:
@@ -395,7 +402,8 @@ check_PROGRAMS = \
   manyprocesses \
   dlsym \
   stress \
-  pcqueue
+  pcqueue \
+  comments
 
 numserv_SOURCES = numserv.c
 numserv_LDADD = libdozens.la libhundreds.la
@@ -515,6 +523,10 @@ stress_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 pcqueue_SOURCES = pcqueue.c
 pcqueue_LDADD = -lpthread
 
+comments_SOURCES = comments.c
+comments_CFLAGS = -fpatchable-function-entry=16,14 $(AM_CFLAGS)
+comments_LDADD =
+
 TESTS = \
   numserv.py \
   numserv_bsymbolic.py \
@@ -553,7 +565,8 @@ TESTS = \
   dlsym_lock.py \
   stress.py \
   tempfiles.py \
-  pcqueue.py
+  pcqueue.py \
+  comments.py
 
 XFAIL_TESTS = \
   blocked.py \
@@ -628,3 +641,5 @@ libbuildid_livepatch1.ulp: libbuildid_livepatch1.dsc $(check_LTLIBRARIES)
 libprocess_livepatch1.ulp: process libprocess_livepatch1.dsc
 
 libprocess_access_livepatch1.ulp: process_access libprocess_access_livepatch1.dsc
+
+libcomments_livepatch1.ulp: comments libprocess_livepatch1.dsc

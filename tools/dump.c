@@ -80,6 +80,22 @@ dump_metadata(struct ulp_metadata *ulp, int buildid_only)
   }
 }
 
+static void
+dump_ulp_comments(const char *lib)
+{
+  char *out;
+
+  extract_ulp_comment_to_mem(lib, &out);
+
+  if (out == NULL)
+    return;
+
+  printf("* comments: \n");
+  puts(out);
+
+  free(out);
+}
+
 int
 run_dump(struct arguments *arguments)
 {
@@ -100,6 +116,8 @@ run_dump(struct arguments *arguments)
     return 1;
   }
   dump_metadata(&ulp, arguments->buildid);
+
+  dump_ulp_comments(arguments->args[0]);
   free(livepatch);
   return 0;
 }

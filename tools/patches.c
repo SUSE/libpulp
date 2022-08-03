@@ -23,6 +23,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fnmatch.h>
+#include <libelf.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,6 +33,7 @@
 
 #include "arguments.h"
 #include "config.h"
+#include "elf-extra.h"
 #include "error_common.h"
 #include "introspection.h"
 #include "patches.h"
@@ -173,6 +175,152 @@ libpulp_loaded(FILE *map)
   return retcode;
 }
 
+/** @brief Extract .ulp.comment section from livepatch container .so
+ *
+ * Extract the content of the .ulp.comment section within the livepatch
+ * container .so file into a buffer passed by reference through `out`, and
+ * returns the size of it. If the section does not exists, then 0 is returned
+ * and out is set to NULL;
+ *
+ * @param livepatch  Path to livepatch container (.so)
+ * @param out        Buffer containing the .ulp.comment section, passed by
+ *                   reference.
+ *
+ * @return Size of the section content.
+ * */
+size_t
+extract_ulp_comment_to_mem(const char *livepatch, char **out)
+{
+  int fd;
+  const char *section = ".ulp.comments";
+
+  Elf *elf = load_elf(livepatch, &fd);
+  if (elf == NULL) {
+    *out = NULL;
+    return 0;
+  }
+
+  Elf_Scn *ulp_scn = get_elfscn_by_name(elf, section);
+  if (ulp_scn == NULL) {
+    unload_elf(&elf, &fd);
+    *out = NULL;
+    return 0;
+  }
+
+  Elf_Data *ulp_data = elf_getdata(ulp_scn, NULL);
+  if (ulp_data->d_buf == NULL || ulp_data->d_size == 0) {
+    unload_elf(&elf, &fd);
+    *out = NULL;
+    return 0;
+  }
+
+  /* Create buffer large enough to hold the final metadata.  */
+  uint32_t meta_size = ulp_data->d_size;
+  char *final_meta = (char *)malloc(meta_size);
+
+  memcpy(final_meta, ulp_data->d_buf, ulp_data->d_size);
+
+  unload_elf(&elf, &fd);
+  *out = final_meta;
+  return meta_size;
+}
+
+/** @brief Print only relevant labels in the comment section.
+ *
+ * The comment section may have references to bugs or cve codes. Those are
+ * important codes and should be displayed on the patch listing. This function
+ * will search for and print each of them so the user can be informed about
+ * the vulnerabilities
+ *
+ * @param lib_path   Path to library.
+ *
+ * @return Size of the section content.
+ **/
+static void
+print_relevant_labels(const char *lib_path)
+{
+  char *buf;
+
+  char *head;
+  bool printed_header = false;
+
+  extract_ulp_comment_to_mem(lib_path, &buf);
+
+  if (buf == NULL)
+    return;
+
+  head = buf;
+
+  while (*head != '\0') {
+    char *str = NULL;
+    if (!strncasecmp(head, "bsc#", 4)) {
+      /* bsc#<number>*.  */
+      str = head;
+      head += 4;
+
+      while (*head != '\0' && isdigit(*head))
+        head++;
+
+      if (*head != '\0') {
+        *head = '\0';
+      }
+    }
+    else if (!strncasecmp(head, "jsc#", 4)) {
+      /* bsc#<alpha>*-<number>*.  */
+
+      str = head;
+      head += 4;
+
+      while (*head != '\0' && isalpha(*head) && *head != '-')
+        head++;
+
+      if (*head == '-') {
+        head++;
+        while (*head != '\0' && isdigit(*head))
+          head++;
+      }
+
+      if (*head != '\0') {
+        *head = '\0';
+      }
+    }
+    else if (!strncasecmp(head, "cve-", 4)) {
+      /* cve-<number>*-<number>*.  */
+      str = head;
+      head += 4;
+
+      while (*head != '\0' && *head != '-' && isdigit(*head))
+        head++;
+
+      if (*head == '-') {
+        head++;
+        while (*head != '\0' && isdigit(*head))
+          head++;
+      }
+
+      if (*head != '\0') {
+        *head = '\0';
+      }
+    }
+
+    if (str) {
+      if (printed_header == false) {
+        printed_header = true;
+        printf("        bug labels: ");
+      }
+      printf("%s ", str);
+    }
+
+    head++;
+  }
+
+  if (printed_header) {
+    putchar('\n');
+  }
+
+  free(buf);
+}
+
 /** @brief Print all livepatches applied to library.
  *
  * @param patch   Patch object.
@@ -186,7 +334,8 @@ print_lib_patches(struct ulp_applied_patch *patch, const char *libname)
 
   while (patch) {
     if (!strcmp(libname, patch->lib_name)) {
-      printf("      livepatch: %s\n", patch->container_name);
+      printf("      livepatch: %s\n", get_basename(patch->container_name));
+      print_relevant_labels(patch->container_name);
     }
     patch = patch->next;
   }
