@@ -331,16 +331,18 @@ dl_find_base_addr(struct dl_phdr_info *info, size_t size, void *data)
   return 1;
 }
 
-/* Enable a cache on libpulp's side to speedup the symbol discovery process.  */
+/* Enable a cache on libpulp's side to speedup the symbol discovery process. */
 #ifdef ENABLE_DLINFO_CACHE
 
 struct ulp_dlinfo_cache *__ulp_dlinfo_cache = NULL;
 static pthread_mutex_t dlinfo_cache_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static struct ulp_dlinfo_cache *
-new_dlinfo_cache(ElfW(Addr) bias, ElfW(Addr) dynsym, ElfW(Addr) dynstr, int num_symbols, const char *buildid_addr, int buildid_len)
+new_dlinfo_cache(ElfW(Addr) bias, ElfW(Addr) dynsym, ElfW(Addr) dynstr,
+                 int num_symbols, const char *buildid_addr, int buildid_len)
 {
-  struct ulp_dlinfo_cache *ret = (struct ulp_dlinfo_cache *) calloc(1, sizeof(*ret));
+  struct ulp_dlinfo_cache *ret =
+      (struct ulp_dlinfo_cache *)calloc(1, sizeof(*ret));
   if (ret == NULL) {
     return NULL;
   }
@@ -373,7 +375,8 @@ release_dlinfo_cache(struct ulp_dlinfo_cache *cache)
 }
 
 static int
-dl_build_cache(struct dl_phdr_info *info, size_t size, void *a __attribute__((unused)))
+dl_build_cache(struct dl_phdr_info *info, size_t size,
+               void *a __attribute__((unused)))
 {
   /* We call the symbol table as dynsym because that is most likely to be the
    * section in DT_SYMTAB.  However, this is not necessary true in all cases.
@@ -460,7 +463,7 @@ dl_build_cache(struct dl_phdr_info *info, size_t size, void *a __attribute__((un
 
       do {
         /* Get the note section.  */
-        ElfW(Nhdr) *note = (void *) note_addr;
+        ElfW(Nhdr) *note = (void *)note_addr;
 
         name_len = note->n_namesz;
         buildid_len = note->n_descsz;
@@ -471,7 +474,7 @@ dl_build_cache(struct dl_phdr_info *info, size_t size, void *a __attribute__((un
 
         if (note->n_type == NT_GNU_BUILD_ID) {
           /* Build id note section found.  */
-          buildid_addr = (const char *) (note_addr + sizeof(*note) + name_len);
+          buildid_addr = (const char *)(note_addr + sizeof(*note) + name_len);
           break;
         }
 
@@ -483,15 +486,13 @@ dl_build_cache(struct dl_phdr_info *info, size_t size, void *a __attribute__((un
 
   /* With the symbol table identified, find the wanted symbol.  */
   if (dynstr && dynsym && num_symbols > 0) {
-    struct ulp_dlinfo_cache *cache = new_dlinfo_cache((ElfW(Addr))info->dlpi_addr,
-                                                      (ElfW(Addr)) dynsym,
-                                                      (ElfW(Addr))dynstr,
-                                                      num_symbols,
-                                                      buildid_addr,
-                                                      buildid_len);
+    struct ulp_dlinfo_cache *cache = new_dlinfo_cache(
+        (ElfW(Addr))info->dlpi_addr, (ElfW(Addr))dynsym, (ElfW(Addr))dynstr,
+        num_symbols, buildid_addr, buildid_len);
 
     if (cache == NULL) {
-      libpulp_errx(EXIT_FAILURE, "malloc returned NULL when building dlinfo cache");
+      libpulp_errx(EXIT_FAILURE,
+                   "malloc returned NULL when building dlinfo cache");
     }
 
     cache->next = __ulp_dlinfo_cache;
@@ -661,8 +662,10 @@ static bool
 dl_locks_held(void)
 {
 
-  libpulp_assert(0 <= dl_load_lock->__data.__lock && dl_load_lock->__data.__lock <= 1);
-  libpulp_assert(0 <= dl_load_write_lock->__data.__lock && dl_load_write_lock->__data.__lock <= 1);
+  libpulp_assert(0 <= dl_load_lock->__data.__lock &&
+                 dl_load_lock->__data.__lock <= 1);
+  libpulp_assert(0 <= dl_load_write_lock->__data.__lock &&
+                 dl_load_write_lock->__data.__lock <= 1);
 
   return (dl_load_lock->__data.__lock || dl_load_write_lock->__data.__lock);
 }
@@ -849,11 +852,11 @@ dlopen(const char *filename, int flags)
 
   __sync_fetch_and_add(&flag, 1);
   result = real_dlopen(filename, flags);
-  #if 0
+#if 0
   if (result) {
     build_dlcache();
   }
-  #endif
+#endif
   __sync_fetch_and_sub(&flag, 1);
 
   return result;
@@ -869,11 +872,11 @@ dlmopen(Lmid_t nsid, const char *file, int mode)
 
   __sync_fetch_and_add(&flag, 1);
   result = real_dlmopen(nsid, file, mode);
-  #if 0
+#if 0
   if (result) {
     build_dlcache();
   }
-  #endif
+#endif
   __sync_fetch_and_sub(&flag, 1);
 
   return result;

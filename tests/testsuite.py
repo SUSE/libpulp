@@ -330,6 +330,26 @@ class spawn(pexpect.spawn):
       return False
     return True
 
+  def get_patches(self, verbose=False):
+
+    # Build command-line from arguments
+    command = [ulptool, '-p', str(self.pid), "patches"]
+    if verbose:
+      command.append('-v')
+
+    try:
+      tool = subprocess.run(command, timeout=10, stdout=subprocess.PIPE)
+    except subprocess.TimeoutExpired:
+      self.print('Live patch status check timed out.')
+      raise
+
+    if tool.returncode != 0:
+      self.print('ulp tool returned an error code.')
+      raise
+
+    msg = str(tool.stdout.decode())
+    return msg
+
   # Get libpulp messages, currently by calling ulp_messages and parsing
   # its stdout.
   def get_libpulp_messages(self):

@@ -518,6 +518,11 @@ free_metadata(struct ulp_metadata *ulp)
   if (ulp->so_filename)
     free(ulp->so_filename);
 
+  if (ulp->comments) {
+    free(ulp->comments);
+    ulp->comments = NULL;
+  }
+
   for (ref = ulp->refs; ref != NULL; ref = next_ref) {
     if (ref->target_name)
       free(ref->target_name);

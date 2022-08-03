@@ -704,8 +704,7 @@ ulp_state_update(struct ulp_metadata *ulp)
     return 0;
   }
 
-  a_patch->container_name =
-      strndup(get_basename(ulp->so_filename), ULP_PATH_LEN);
+  a_patch->container_name = strndup(ulp->so_filename, ULP_PATH_LEN);
   if (!a_patch->container_name) {
     WARN("Unable to allocate filename buffer state.");
     return 0;

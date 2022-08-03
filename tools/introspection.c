@@ -502,7 +502,7 @@ get_dynobj_elf_by_cache(struct ulp_process *process)
 
   return 0;
 }
-#endif //ENABLE_DLINFO_CACHE
+#endif // ENABLE_DLINFO_CACHE
 
 /** @brief Parses ELF headers of dynobj `obj` from process with pid `pid`.
  *

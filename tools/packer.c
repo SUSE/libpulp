@@ -487,6 +487,27 @@ symbol_exists(struct shared_object *so, const char *sym)
   return true;
 }
 
+static void
+read_comment(struct ulp_metadata *ulp, const char *first, size_t n,
+             int *curr_pos, int *curr_size)
+{
+  int cur_comment_pos = *curr_pos;
+  int cur_comment_size = *curr_size;
+
+  if (cur_comment_pos + (int)(n + 1) >= cur_comment_size) {
+    cur_comment_size += 128 * 1024;
+    ulp->comments = realloc(ulp->comments, cur_comment_size);
+    if (!ulp->comments)
+      parse_error(loc, "unable to allocate comment buffer.");
+  }
+  strncpy(ulp->comments + cur_comment_pos, first + 1, n - 1);
+  cur_comment_pos += n;
+  ulp->comments[cur_comment_pos] = '\0';
+
+  *curr_pos = cur_comment_pos;
+  *curr_size = cur_comment_size;
+}
+
 /** @brief Parse description .dsc file.
  *
  * This function parses the livepatch description files in dsc format, as
@@ -514,6 +535,9 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
   FILE *parse_file;
   size_t len = 0;
   int n, ret;
+
+  int cur_comment_pos = 0;
+  int cur_comment_size = 0;
 
   struct shared_object container, target;
 
@@ -543,52 +567,61 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
   last_unit = NULL;
   len = 0;
 
-  n = getline(&first, &len, parse_file);
-  loc.line++;
-  loc.col = 1;
-  if (n <= 0) {
-    parse_error(loc, "Unable to parse description file: is empty");
-    ret = 0;
-    goto dsc_clean;
-  }
-
-  if (container_override) {
-    ulp->so_filename = strdup(container_override);
-  }
-  else {
-    ulp->so_filename = calloc(n + 1, sizeof(char));
-    if (!ulp->so_filename) {
-      parse_error(loc, "unable to allocate memory for patch so filename");
+  while (ulp->so_filename == NULL) {
+    n = getline(&first, &len, parse_file);
+    loc.line++;
+    loc.col = 1;
+    if (n <= 0) {
+      parse_error(loc, "Unable to parse description file: is empty");
       ret = 0;
       goto dsc_clean;
     }
-    strcpy(ulp->so_filename, first);
 
-    if (!ulp->so_filename) {
-      parse_error(loc, "unable to retrieve so filename from description");
-      ret = 0;
-      goto dsc_clean;
+    if (first[0] == '!') {
+      /* Lines starting with ! are comments.  */
+      read_comment(ulp, first, n, &cur_comment_pos, &cur_comment_size);
+      continue;
     }
-    if (ulp->so_filename[n - 1] == '\n')
-      ulp->so_filename[n - 1] = '\0';
-  }
+    else {
+      if (container_override) {
+        ulp->so_filename = strdup(container_override);
+      }
+      else {
+        ulp->so_filename = calloc(n + 1, sizeof(char));
+        if (!ulp->so_filename) {
+          parse_error(loc, "unable to allocate memory for patch so filename");
+          ret = 0;
+          goto dsc_clean;
+        }
+        strcpy(ulp->so_filename, first);
 
-  FILE *file_check = fopen(ulp->so_filename, "r");
-  if (!file_check) {
-    parse_error(loc, "livepatch container file not found");
-    ret = 0;
-    goto dsc_clean;
-  }
-  fclose(file_check);
-  if (is_directory(ulp->so_filename)) {
-    parse_error(loc, "livepatch container path is not a file");
-    ret = 0;
-    goto dsc_clean;
-  }
+        if (!ulp->so_filename) {
+          parse_error(loc, "unable to retrieve so filename from description");
+          ret = 0;
+          goto dsc_clean;
+        }
+        if (ulp->so_filename[n - 1] == '\n')
+          ulp->so_filename[n - 1] = '\0';
+      }
 
-  free(first);
-  first = NULL;
-  len = 0;
+      FILE *file_check = fopen(ulp->so_filename, "r");
+      if (!file_check) {
+        parse_error(loc, "livepatch container file not found");
+        ret = 0;
+        goto dsc_clean;
+      }
+      fclose(file_check);
+      if (is_directory(ulp->so_filename)) {
+        parse_error(loc, "livepatch container path is not a file");
+        ret = 0;
+        goto dsc_clean;
+      }
+    }
+
+    free(first);
+    first = NULL;
+    len = 0;
+  }
 
   container.path = ulp->so_filename;
   container.elf = load_elf(container.path, &container.fd);
@@ -622,8 +655,13 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
   }
 
   while (n > 0) {
+
+    if (first[0] == '!') {
+      /* Lines starting with ! are comments.  */
+      read_comment(ulp, first, n, &cur_comment_pos, &cur_comment_size);
+    }
     /* if this is another object */
-    if (first[0] == '@') {
+    else if (first[0] == '@') {
       if (ulp->objs) {
         parse_error(loc, "duplicated target object. Libpulp patches 1 shared "
                          "object per patch\n");
@@ -1181,6 +1219,34 @@ run_packer(struct arguments *arguments)
   }
 
   remove(tmp_path);
+
+  /* If there are comments then create an extra .ulp.comment section.  */
+  if (ulp.comments) {
+    tmp_path = create_path_to_tmp_file();
+    FILE *f = fopen(tmp_path, "wb");
+    if (f == NULL) {
+      ret = 1;
+      goto tmpfile_clean;
+    }
+
+    size_t n = strlen(ulp.comments) + 1;
+    size_t ret;
+
+    printf("n = %ld\n", n);
+    printf("comments: %s\n", ulp.comments);
+
+    ret = fwrite(ulp.comments, 1, n, f);
+    assert(n == ret);
+    fclose(f);
+
+    if (embed_patch_metadata_into_elf(NULL, arguments->livepatch, tmp_path,
+                                      ".ulp.comments")) {
+      ret = 1;
+      goto tmpfile_clean;
+    }
+
+    remove(tmp_path);
+  }
 
   if (!write_reverse_patch(&ulp, arguments->livepatch)) {
     WARN("Error gerenating reverse live patch.\n");

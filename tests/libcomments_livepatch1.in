@@ -1,0 +1,4 @@
+! This livepatch fixes bsc#1200316, jsc#SLE-20049, and CVE-2021-3449.
+__ABS_BUILDDIR__/.libs/libcomments_livepatch1.so
+@__ABS_BUILDDIR__/comments
+value:new_value
