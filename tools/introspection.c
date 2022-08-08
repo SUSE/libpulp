@@ -1781,8 +1781,8 @@ extract_ulp_from_so_to_mem(const char *livepatch, bool revert, char **out)
 
   Elf_Scn *ulp_scn = get_elfscn_by_name(elf, section);
   if (ulp_scn == NULL) {
-    WARN("Unable to get section .ulp from elf %s: %s", livepatch,
-         elf_errmsg(-1));
+    DEBUG("Unable to get section .ulp from elf %s: %s", livepatch,
+          elf_errmsg(-1));
     unload_elf(&elf, &fd);
     *out = NULL;
     return 0;

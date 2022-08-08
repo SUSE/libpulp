@@ -49,7 +49,7 @@ typedef int ulp_error_t;
 #define EINVALIDULP   266 /** Invalid ULP file.  */
 #define ENOOLDFUNC    267 /** To be patched function not found.  */
 #define ENONEWFUNC    268 /** New function not found.  */
-#define ENOMETA       269 /** Metadata load failure.  */
+#define ENOMETA       269 /** No metadata in .so.  */
 #define ESTATE        270 /** State update failure.  */
 #define ENOSTATE      271 /** Unable to retrieve ulp state.  */
 #define ENOTAPPLIED   272 /** Patch not applied. */
@@ -59,6 +59,7 @@ typedef int ulp_error_t;
 #define ENOTARGETLIB  276 /** Target library not loaded.  */
 #define EHOOKNOTRUN   277 /** libpulp.so hook routine not run.  */
 #define ENOPATCHABLE  278 /** Function is not livepatchable.  */
+#define EWILDNOMATCH  279 /** No file matched wildcard.  */
 
 /** Table used to map error code to message.  Define it here so that it is
  *  easier for it being maintained.
@@ -78,7 +79,7 @@ typedef int ulp_error_t;
     "Invalid .ulp file", \
     "To be patched function not found", \
     "New function not found", \
-    "Metadata load failure", \
+    "No metadata in .so", \
     "State update failure", \
     "Unable to retrieve ulp state", \
     "Patch not applied", \
@@ -88,6 +89,7 @@ typedef int ulp_error_t;
     "Target library not loaded", \
     "libpulp.so hook routine not run", \
     "Function is not livepatchable", \
+    "No file matched wildcard", \
   }
 /* clang-format on */
 
