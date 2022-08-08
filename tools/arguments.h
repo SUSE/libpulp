@@ -53,6 +53,7 @@ struct arguments
   int buildid;
   int revert;
   int disable_threads;
+  int recursive;
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
   int check_stack;
 #endif

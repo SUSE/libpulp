@@ -43,6 +43,8 @@
 #include "trigger.h"
 #include "ulp_common.h"
 
+static bool recursive_mode;
+
 /** @brief Apply a single live patch to one process.
  *
  *  This function does the dirty work of trigger: reverse and livepatching a
@@ -229,8 +231,10 @@ trigger_many_ulps(struct ulp_process *p, int retries,
   struct dirent *entry;
   char buffer[ULP_PATH_LEN];
 
-  int ret = 0, r;
+  int ret = EWILDNOMATCH, r;
   int ulp_folder_path_len = strlen(ulp_folder_path);
+
+  int wildcard_len = wildcard ? strlen(wildcard) : 0;
 
   if (!directory) {
     FATAL("Unable to open directory: %s", ulp_folder_path);
@@ -253,7 +257,38 @@ trigger_many_ulps(struct ulp_process *p, int retries,
       continue;
     }
 
+    if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+      /* Skip the current and previous directory to avoid infinite loop.  */
+      continue;
+    }
+
     strcpy(buffer + ulp_folder_path_len, entry->d_name);
+
+    if (is_directory(buffer)) {
+      if (recursive_mode) {
+        if (bytes + wildcard_len + 1 >= ULP_PATH_LEN) {
+          WARN("Skipping %s: buffer overrun\n", entry->d_name);
+          continue;
+        }
+
+        if (buffer[bytes - 1] != '/') {
+          buffer[bytes++] = '/';
+          buffer[bytes] = '\0';
+        }
+
+        if (wildcard) {
+          /* Concatenate the wildcard.  */
+          strcpy(buffer + bytes, wildcard);
+        }
+
+        r = trigger_many_ulps(p, retries, buffer, library, check_stack,
+                              revert);
+      }
+      else {
+        /* Skip directories.  */
+        continue;
+      }
+    }
 
     const char *extension = strrchr(entry->d_name, '.');
     if (!extension) {
@@ -266,15 +301,11 @@ trigger_many_ulps(struct ulp_process *p, int retries,
       continue;
     }
 
-    if (is_directory(buffer)) {
-      /* Skip directories.  */
-      continue;
-    }
-
     if (fnmatch(wildcard, entry->d_name, FNM_NOESCAPE) != 0) {
       /* Skip if file does not match wildcard.  */
       continue;
     }
+    r = 0;
 
     r = trigger_one_process(p, retries, buffer, library, check_stack, revert);
     if (!(ret == EBUILDID || ret == ENOTARGETLIB))
@@ -295,7 +326,6 @@ print_patched_unpatched(struct ulp_process *p, bool summarize)
 
   pid_t pid = curr_item->pid;
   struct trigger_results *results, *summarized_result = NULL;
-  printf("  %s (pid: %d):", get_process_name(curr_item), pid);
 
   /* Try to summarize the patches result.  */
   ulp_error_t err = EUNKNOWN;
@@ -337,11 +367,18 @@ print_patched_unpatched(struct ulp_process *p, bool summarize)
     }
   }
 
+  /* If the patched list is empty, it means that no patch was even tried to be
+     applied, perhaps because no files matched the wildcard.  */
+  if (summarized_result == NULL && summarized == true) {
+    return;
+  }
+
   if (!summarize) {
     summarized = false;
     hide_skipped = false;
   }
 
+  printf("  %s (pid: %d):", get_process_name(curr_item), pid);
   if (summarized) {
     if (err == EBUILDID || err == ENOTARGETLIB) {
       change_color(TERM_COLOR_YELLOW);
@@ -353,14 +390,16 @@ print_patched_unpatched(struct ulp_process *p, bool summarize)
       change_color(TERM_COLOR_RED);
       printf(" FAILED");
       change_color(TERM_COLOR_RESET);
-      printf(" %s: %s\n", summarized_result->patch_name,
-             libpulp_strerror(err));
+      if (summarized_result)
+        printf(" %s: %s\n", summarized_result->patch_name,
+               libpulp_strerror(err));
     }
     else {
       change_color(TERM_COLOR_GREEN);
       printf(" SUCCESS");
       change_color(TERM_COLOR_RESET);
-      printf(" %s\n", summarized_result->patch_name);
+      if (summarized_result)
+        printf(" %s\n", summarized_result->patch_name);
     }
   }
   else {
@@ -441,7 +480,7 @@ trigger_many_processes(const char *process_wildcard, int retries,
 
     /* If the livepatch failed because the patch wasn't targeted to the
        proccess, we ignore because we are batch processing.  */
-    if (r == EBUILDID || r == ENOTARGETLIB) {
+    if (r == EBUILDID || r == ENOTARGETLIB || r == EWILDNOMATCH) {
       skippes++;
     }
     else {
@@ -546,6 +585,7 @@ run_trigger(struct arguments *arguments)
   ulp_verbose = arguments->verbose;
   ulp_quiet = arguments->quiet;
   enable_threading = !arguments->disable_threads;
+  recursive_mode = arguments->recursive;
 
   bool check_stack = false;
   const char *livepatch = arguments->args[0];

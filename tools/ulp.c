@@ -125,6 +125,7 @@ static const char doc[] =
 #define ULP_OP_COLOR 258
 #define ULP_OP_TIMEOUT 259
 #define ULP_OP_DISABLE_THREADING 260
+#define ULP_OP_RECURSIVE 261
 
 static struct argp_option options[] = {
   { 0, 0, 0, 0, "Options:", 0 },
@@ -141,6 +142,7 @@ static struct argp_option options[] = {
   { "revert-all", ULP_OP_REVERT_ALL, "LIB", 0, "Revert all patches from LIB",
     0 },
   { "timeout", ULP_OP_TIMEOUT, "t", 0, "Set trigger timeout to t seconds", 0 },
+  { "recursive", ULP_OP_RECURSIVE, 0, 0, "Search for patches recursively", 0 },
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
   { "check-stack", 'c', 0, 0, "Check the call stack before live patching", 0 },
 #endif
@@ -324,6 +326,10 @@ parser(int key, char *arg, struct argp_state *state)
       break;
     case ULP_OP_DISABLE_THREADING:
       arguments->disable_threads = 1;
+      break;
+
+    case ULP_OP_RECURSIVE:
+      arguments->recursive = 1;
       break;
 
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
