@@ -1,0 +1,65 @@
+#!/bin/sh
+
+/home/giulianob/projects/kgr/ccp/build/klp-ccp \
+  --pol-cmd-may-include-header=/home/giulianob/projects/kgr/scripts/ccp-pol/kgr-ccp-pol-may-include-header.sh \
+  --pol-cmd-can-externalize-fun=/home/giulianob/projects/kgr/scripts/ccp-pol/kgr-ccp-pol-can-externalize-fun.sh \
+  --pol-cmd-shall-externalize-fun=/home/giulianob/projects/kgr/scripts/ccp-pol/kgr-ccp-pol-shall-externalize-fun.sh \
+  --pol-cmd-shall-externalize-obj=/home/giulianob/projects/kgr/scripts/ccp-pol/kgr-ccp-pol-shall-externalize-obj.sh \
+  --pol-cmd-modify-externalized-sym=/home/giulianob/projects/kgr/scripts/ccp-pol/kgr-ccp-pol-modify-externalized-sym.sh \
+  --pol-cmd-modify-patched-fun-sym=/home/giulianob/projects/kgr/scripts/ccp-pol/kgr-ccp-pol-modify-patched-sym.sh \
+  --pol-cmd-rename-rewritten-fun=/home/giulianob/projects/kgr/scripts/ccp-pol/kgr-ccp-pol-rename-rewritten-fun.sh \
+  --compiler=x86_64-gcc-9.1.0 \
+  -i __dlsym \
+  -o /tmp/lp.c -- -c -std=gnu11 -g -O2 -Wall -Wwrite-strings -Wundef -Werror -fmerge-all-constants -frounding-math \
+  -fno-stack-protector -Wstrict-prototypes -Wold-style-definition -fmath-errno -ftls-model=initial-exec \
+  -I/usr/lib64/gcc/x86_64-suse-linux/7/include/ \
+  -I/usr/lib64/gcc/x86_64-suse-linux/7/include-fixed \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/include \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/build/iconv \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/build \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/unix/sysv/linux/x86_64/64 \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/unix/sysv/linux/x86/include \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/unix/sysv/linux/x86 \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/x86/nptl \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/unix/sysv/linux/wordsize-64 \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/x86_64/nptl \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/unix/sysv/linux/include \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/unix/sysv/linux \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/nptl \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/pthread \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/gnu \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/unix/inet \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/unix/sysv \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/unix/x86_64 \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/unix \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/posix \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/x86_64/64 \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/x86_64/fpu/multiarch \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/x86_64/fpu \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/x86/fpu/include \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/x86/fpu \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/x86_64/multiarch \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/x86_64 \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/x86 \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/ieee754/float128 \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/ieee754/ldbl-96/include \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/ieee754/ldbl-96 \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/ieee754/dbl-64/wordsize-64 \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/ieee754/dbl-64 \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/ieee754/flt-32 \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/wordsize-64 \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/ieee754 \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/generic \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/sysdeps/unix/sysv/linux/x86_64 \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31 \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/libio \
+  -I/home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/build \
+  -I/usr/include/ \
+  -I/usr/include/bits/types/ \
+  -include /home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/build/libc-modules.h \
+  -include /home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/include/libc-symbols.h \
+  -D_LIBC_REENTRANT -DMODULE_NAME=libc -DTOP_NAMESPACE=glibc \
+  -o /home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/build/iconv/iconv_open.o \
+  -MD -MP -MF /home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/build/iconv/iconv_open.o.dt \
+  -MT /home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/build/iconv/iconv_open.o \
+  /home/giulianob/projects/libpulp/libpulp/scripts/15-SP4/glibc/2.31-150300.26.5/src/glibc-2.31/dlfcn/dlsym.c

@@ -1,215 +1,362 @@
 #!/bin/bash
 
-# Include our common lib. Don't use source, as it requires bash.
-. common_lib.sh
+PROGNAME=`basename "$0"`
 
-ULP_PACKAGE_NAME="openssl-1_1"
-# Use when library package and base package name are different ie libopenssl1_1 openssl-1_1
-ULP_LIB_NAME="libopenssl1_1"
-ULP_LIB_FILENAME="libcrypto.so.1.1"
+SLE_VERSION_REGEX="[0-9]{6}"
+VERSION_REGEX="([0-9\.a-zA-Z]+-$SLE_VERSION_REGEX\.[0-9\.]+[0-9])"
+PLATFORM=
+URL=
+PACKAGE=
+NO_CLEANUP=0
 
-ULP_MULTIBUILD_FILE="_multibuild.template"
-
-# Valid choices openSUSE / SUSE - Used for SUSE:Maintenance:XXXXX etc
-ULP_PRODUCT="SUSE"
-
-#ULP_DIST_NAME="SUSE:SLE-15-SP2"
-ULP_DIST_NAME="SUSE:SLE-15-SP2"
-
-# Comment out to disable debug prints
-ULP_DEBUG="On"
-
-# lp152 for Leap 15.2 for example - Not needed for SLE
-#ULP_PKG_SUFFIX="lp152"
-
-get_ga_version() {
-  # Get history from osc api
-  # Parse XML for versrel
-  # Only keep the last entry - sometimes stuff is broken and built multiple times
-  # Strip versrel=
-  # Strip Quotes
-  # Example api Call oosc api https://api.suse.de/build/SUSE:SLE-15-SP2:GA/standard/x86_64/openssl-1_1/_history
-
-  local package_name=$1
-  local dist_name=$2
-  local api=$3
-
-  debug "osc api $api/build/$dist_name:GA/standard/x86_64/$package_name/_history"
-  local tmp_version=$(osc api "$api/build/$dist_name:GA/standard/x86_64/$package_name/_history" |
-                   xpath -q  -e "//entry/@versrel" | tail -1 | grep -o '".*"' | sed 's/"//g')
-  local build_count=$(osc api "$api/build/$dist_name:GA/standard/x86_64/$package_name/_history" |
-                  xpath -q  -e "//entry/@bcnt" | tail -1 | grep -o '".*"' | sed 's/"//g')
-  echo "$tmp_version.$build_count"
+set_url_platform()
+{
+  PLATFORM=$1
+  URL="https://download.suse.de/updates/SUSE/Updates/SLE-Module-Basesystem/$PLATFORM/x86_64/update/x86_64"
 }
 
-get_update_version() {
-  # Get history from osc api
-  # Parse XML for versrel
-  # Only keep the last entry - sometimes stuff is broken and built multiple times
-  # Strip versrel=
-  # Strip Quotes
-  # Example api Call osc api "https://api.opensuse.org/build/openSUSE:Maintenance:16863/openSUSE_Leap_15.2_Update/x86_64/openssl-1_1.openSUSE_Leap_15.2_Update/_history"
-  local incident=$1
-  local package_name=$2
-  local product=$3
-  local api=$4
-  local build_target=$5
-
-  debug "osc api $api/build/$product:Maintenance:$incident/$build_target/x86_64/$package_name.$build_target/_history"
-  local tmp_version=$(osc api "$api/build/$product:Maintenance:$incident/$build_target/x86_64/$package_name.$build_target/_history" |
-                   xpath -q  -e "//entry/@versrel" | tail -1 | grep -o '".*"' | sed 's/"//g')
-  local build_count=$(osc api "$api/build/$product:Maintenance:$incident/$build_target/x86_64/$package_name.$build_target/_history" |
-                  xpath -q  -e "//entry/@bcnt" | tail -1 | grep -o '".*"' | sed 's/"//g')
-  echo "$tmp_version.$build_count"
-}
-
-get_rpm_filename() {
-  local lib_name=$1
-  local pkg_suffix=$2
-  local full_version=$3
-
-  if [[ -n $pkg_suffix ]]; then
-    echo "$lib_name-${full_version/"-"/"-$pkg_suffix."}.x86_64.rpm"
+web_get()
+{
+  echo downloading "$1"
+  if [ -z "$2" ]; then
+    wget  --show-progress --no-check-certificate "$1"
   else
-    echo "$lib_name-$full_version.x86_64.rpm"
+    wget  --show-progress --no-check-certificate -O "$2" "$1"
+  fi
+
+  if [ $? -eq 4 ]; then
+    echo Unable to download $1
+    exit 1
   fi
 }
 
-fetch_rpm() {
-  # Note if you have the dist NFS mount wget could be replaced with cp
+get_version_from_package_name()
+{
+  local package=$1
+  local version=$(echo "$1" | grep -Eo $VERSION_REGEX)
 
-  local tmp_dir=$1
-  local product=$2
-  local rpm_filename=$3
-  # Strip SUSE:
-  local dist=${4#*:}
-  local type=$5
+  echo $version
+}
 
-  local dist_lower="${dist,,}"
+get_name_from_package_name()
+{
+  local package=$1
+  IFS='-' tokens=( $package )
 
-  if [[ $type == "Update" ]]; then
-    # TODO: Also fetch non download RPM's
-    if [[ $product == "openSUSE" ]]; then
-      debug "wget -q -P \"$tmp_dir/rpms\" \"https://download.opensuse.org/update/leap/$dist/oss/x86_64/$rpm_filename\""
-      wget -q --show-progress -P "$tmp_dir/rpms" "https://download.opensuse.org/update/leap/$dist/oss/x86_64/$rpm_filename"
-      local ret=$?
-      if [[ $ret != 0 ]]; then
-        fail "wget returned $ret downloading $rpm_filename failed"
-      fi
-    elif [[ $product == "SUSE" ]]; then
-      # This one uses 15-SP2 rather then SLE-15-SP2
-      debug "wget -q -P \"$tmp_dir/rpms\" \"http://download.suse.de/updates/SUSE/Updates/SLE-Module-Basesystem/${dist#*-}/x86_64/update/x86_64/$rpm_filename\""
-      wget -q --show-progress -P "$tmp_dir/rpms" "http://download.suse.de/updates/SUSE/Updates/SLE-Module-Basesystem/${dist#*-}/x86_64/update/x86_64/$rpm_filename"
-      local ret=$?
-      if [[ $ret != 0 ]]; then
-        fail "wget returned $ret downloading $rpm_filename failed"
-      fi
+  echo ${tokens[0]}
+}
+
+get_sle_version_from_package_name()
+{
+  local package=$1
+  # Dechare a hash table mapping version number to a label used in
+  # download.suse.de
+
+  declare -A sle_hash=( ["150000"]="15"
+                        ["150100"]="15-SP1"
+                        ["150200"]="15-SP2"
+                        ["150300"]="15-SP3"
+                        ["150400"]="15-SP4"
+                        ["150500"]="15-SP5")
+
+
+  local version=$(echo "$1" | grep -Eo "($SLE_VERSION_REGEX)")
+  local sle_version=${sle_hash[$version]}
+
+  if [ "x$sle_version" = "x" ]; then
+    "Unsupported SLE package version $version"
+    exit 1
+  fi
+
+  echo $sle_version
+}
+
+extract_lib_package_names()
+{
+  local file=$1
+  local lib_name=$2
+
+  local interesting_lines=$(grep -Eo "$lib_name-$VERSION_REGEX\.x86_64.rpm\"" $1)
+  local final=""
+
+  for lib in ${interesting_lines}; do
+    lib=${lib%?} # Remove last " from string.
+    final="$final $lib"
+  done
+
+  echo $final
+}
+
+download_package_list()
+{
+  local url="$URL"
+  local list_path=$1
+
+  web_get "$url" "$list_path"
+}
+
+download_package()
+{
+  local package=$1
+  local url="$URL/$package"
+
+  web_get "$url"
+}
+
+parallel_download_packages()
+{
+  local packages="$*"
+
+  local pids=""
+
+  for package in $packages; do
+    local url="$URL/$package"
+    # If package already exists, do not bother downloading them again
+    if [ ! -f "$package" ]; then
+      echo "downloading from $url"
+      wget -q --show-progress --no-check-certificate "$url" &
+      pid=$!
+      pids="$pid $pids"
+    else
+      echo "Skipping $package because it is already downloaded"
     fi
-  else
-    if [[ $product == "openSUSE" ]]; then
-      debug "wget -q -P \"$tmp_dir/rpms\" \"http://download.opensuse.org/distribution/leap/$dist/repo/oss/x86_64//$rpm_filename\""
-      wget -q --show-progress -P "$tmp_dir/rpms" "http://download.opensuse.org/distribution/leap/$dist/repo/oss/x86_64/$rpm_filename"
-      local ret=$?
-      if [[ $ret != 0 ]]; then
-        fail "wget returned $ret downloading $rpm_filename failed"
-      fi
-    elif [[ $product == "SUSE" ]]; then
-      # Example http://download.suse.de/full/full-sle15-sp2-x86_64/allrpms/libopenssl1_1.rpm
-      # For some reason we need sle15-sp2 rather then sle-15-sp2
-      debug "wget -q -P \"$tmp_dir/rpms\" \"http://download.suse.de/full/full-${dist_lower/sle-/sle}-x86_64/allrpms/$rpm_filename\""
-      wget -q --show-progress -P "$tmp_dir/rpms" "http://download.suse.de/full/full-${dist_lower/sle-/sle}-x86_64/allrpms/$rpm_filename"
-      local ret=$?
-      if [[ $ret != 0 ]]; then
-        fail "wget returned $ret downloading $rpm_filename failed"
-      fi
+  done
+
+  # Wait download to finish
+  if [ ! -z "$pids" ]; then
+    for pid in $pids; do
+      wait ${pid}
+    done
+  fi
+}
+
+# Get list of ipa-clones artifact from rpm packages.
+get_list_of_ipa_clones()
+{
+  local packages="$*"
+  local ipa_clones_list=""
+
+  for package in $packages; do
+    local package_name=$(get_name_from_package_name $package)
+    local version=$(get_version_from_package_name $package)
+
+    # libopenssl1_1 ipa-clones artifacts are named openssl.
+    if [ "$package_name" = "libopenssl1_1" ]; then
+      package_name="openssl"
     fi
-  fi
+
+    ipa_clones_list="$ipa_clones_list $package_name-livepatch-$version.x86_64.tar.xz"
+  done
+
+  echo $ipa_clones_list
 }
 
-extract_so() {
-  local tmp_dir=$1
-  local package_name=$2
-  local full_version=$3
-  local lib_filename=$4
-  local rpm_filename=$5
+# Get list of source packages from a list of main binary packages
+get_list_of_src_packages()
+{
+  local packages="$*"
+  local src_package_list=""
 
-  # Extract filename
-  mkdir -p "$tmp_dir/$package_name-libs/extract"
-  pushd "$tmp_dir/$package_name-libs/extract"
-  rpm2cpio "$tmp_dir/rpms/$rpm_filename" | cpio -idmv
-  popd
-  mkdir -p "$tmp_dir/$package_name-libs/$full_version/usr/lib64/"
+  for package in $packages; do
+    local package_name=$(get_name_from_package_name $package)
+    local version=$(get_version_from_package_name $package)
 
-  cp "$tmp_dir/$package_name-libs/extract/usr/lib64/$lib_filename" "$tmp_dir/$package_name-libs/$full_version/usr/lib64/$lib_filename"
-  rm -r "$tmp_dir/$package_name-libs/extract"
+    # libopenssl1_1 src comes from openssl.
+    if [ "$package_name" = "libopenssl1_1" ]; then
+      package_name="openssl-1_1"
+    fi
 
-  is_lib_livepatcheable "$tmp_dir/$package_name-libs/$full_version/usr/lib64/$lib_filename"
-  if [ $? -ne 0 ]; then
-    warn "library $tmp_dir/$package_name-libs/$full_version/usr/lib64/$lib_filename is not livepatchable: missing NOP prologue"
-  fi
+    src_package_list="$src_package_list $package_name-$version.src.rpm"
+  done
+
+  echo $src_package_list
+
 }
 
-# Build Target is Dist Name but with _ instead of :
-__BUILD_TARGET="${ULP_DIST_NAME//:/_}_Update"
+download_src_packages()
+{
+  local packages=$(get_list_of_src_packages "$*")
+  local old_url=$URL
 
-if [[ $ULP_PRODUCT == "openSUSE" ]]; then
-__API="https://api.opensuse.org"
-elif [[ $ULP_PRODUCT == "SUSE" ]]; then
-__API="https://api.suse.de"
-else
-fail "ULP_PRODUCT is not correctly defined must be SUSE or openSUSE"
-fi
+  URL="https://download.suse.de/updates/SUSE/Updates/SLE-Module-Basesystem/$PLATFORM/x86_64/update/src/"
+  parallel_download_packages "$packages"
 
-if [[ -f "$ULP_MULTIBUILD_FILE" ]]; then
-  warn "$ULP_MULTIBUILD_FILE exists and therefore won't be recreated"
-  __SKIP_MULTIBUILD="1"
-fi
+  URL=$old_url
+}
 
-if [[ -z $__SKIP_MULTIBUILD ]]; then
-  echo "<multibuild>" >> $ULP_MULTIBUILD_FILE
-fi
+download_ipa_clones()
+{
+  # Set URL to IBS repository.
+  local ipa_clones_list=$(get_list_of_ipa_clones "$*")
+  local old_url=$URL
 
-__TMP_DIR=$(mktemp -d -t ulp-XXXXXXXXXX)
-mkdir -p "$__TMP_DIR/$ULP_PACKAGE_NAME-libs"
+  local sle_ver=$(get_sle_version_from_package_name $1)
 
-__FULL_VERSION=$(get_ga_version $ULP_PACKAGE_NAME $ULP_DIST_NAME $__API)
+  URL="https://download.suse.de/download/ibs/SUSE:/SLE-$sle_ver:/Update/standard/"
+  parallel_download_packages "$ipa_clones_list"
 
-info "GA Package"
-info "Version: \"$__FULL_VERSION\""
+  URL=$old_url
+}
 
-# SLE Doesn't have version in the filename but openSUSE does here
-if [[ $ULP_PRODUCT == "openSUSE" ]]; then
-  __RPM_FILENAME=$(get_rpm_filename "$ULP_LIB_NAME" "$ULP_PKG_SUFFIX" "$__FULL_VERSION")
-elif [[ $ULP_PRODUCT == "SUSE" ]]; then
-  __RPM_FILENAME="$ULP_LIB_NAME.rpm"
-fi
-fetch_rpm "$__TMP_DIR" "$ULP_PRODUCT" "$__RPM_FILENAME" "$ULP_DIST_NAME"
+extract_libs_from_package()
+{
+  local package=$1
+  local version=$(get_version_from_package_name $package)
+  local name=$(get_name_from_package_name $package)
+  local ipa_clones=$(get_list_of_ipa_clones $package)
+  local src_package=$(get_list_of_src_packages $package)
 
-extract_so "$__TMP_DIR" "$ULP_PACKAGE_NAME" "$__FULL_VERSION" "$ULP_LIB_FILENAME" "$ULP_LIB_NAME.rpm"
+  mkdir -p $PLATFORM/$name/$version
 
-# Fetch from updates
-for __PKG in $(osc -A $__API ls "$ULP_DIST_NAME:Update" | grep "$ULP_PACKAGE_NAME."); do
+  cp $package $PLATFORM/$name/$version/$package
+  cp $src_package $PLATFORM/$name/$version/$src_package
+  cp $ipa_clones $PLATFORM/$name/$version/$ipa_clones
 
-  info "### $__PKG ###"
-  __INCIDENT=${__PKG#*.}
+  cd $PLATFORM/$name/$version
+    mkdir -p binaries
+    cd binaries
+      rpm2cpio ../$package | cpio -idmv --quiet
+    cd ..
 
-  __FULL_VERSION=$(get_update_version "$__INCIDENT" "$ULP_PACKAGE_NAME" "$ULP_PRODUCT" "$__API" "$__BUILD_TARGET")
+    mkdir -p src
+    cd src
+      rpm2cpio ../$src_package | cpio -idmv --quiet
+      tar xf $(ls | grep -E "(\.tar\.xz$|\.tar\.gz$)")
+    cd ..
 
-  info "Version: \"$__FULL_VERSION\""
+    # Extract tar file and get rid of the version directory.
+    echo "Extracting IPA clones package $ipa_clones"
+    local extracted_tar_dir=$(tar tf $ipa_clones | sed -e 's@/.*@@' | uniq)
+    tar -xf $ipa_clones
+    mv $extracted_tar_dir/* ipa-clones
+    rm -rf $extracted_tar_dir
 
-  __RPM_FILENAME=$(get_rpm_filename "$ULP_LIB_NAME" "$ULP_PKG_SUFFIX" "$__FULL_VERSION")
+    # delete anything we don't need.
+    rm -f *.rpm *.tar.xz
+  cd ../../../
+}
 
-  fetch_rpm "$__TMP_DIR" "$ULP_PRODUCT" "$__RPM_FILENAME" "$ULP_DIST_NAME" "Update"
+sanitize_platform()
+{
+  local platforms="15-SP3 15-SP4"
 
-  if [[ ! -f "$__TMP_DIR/rpms/$__RPM_FILENAME" ]]; then
-    fail "$__TMP_DIR/rpms/$__RPM_FILENAME was not downloaded correctly"
+  for platform in ${platforms}; do
+    if [ "$PLATFORM" = "$platform" ]; then
+      # Supported platform found.
+      return 0
+    fi
+  done
+
+  echo "Unsupported platform $PLATFORM"
+  exit 1
+}
+
+sanitize_package()
+{
+  local packages="glibc libopenssl1_1"
+
+  if [ "x$PACKAGE" = "x" ]; then
+    echo "You must pass a --package=<PACKAGE> parameter!"
+    exit 1
   fi
 
-  extract_so "$__TMP_DIR" "$ULP_PACKAGE_NAME" "$__FULL_VERSION" "$ULP_LIB_FILENAME" "$__RPM_FILENAME"
-done
+  for package in ${packages}; do
+    if [ "$PACKAGE" = "$package" ]; then
+      # Supported package found.
+      return 0
+    fi
+  done
 
-tar -caf "$ULP_PACKAGE_NAME-libs.tar.xz" -C "$__TMP_DIR/" "$ULP_PACKAGE_NAME-libs"
+  echo "Unsupported package $PACKAGE"
+  exit 1
+}
 
-ok "Succesfully created $ULP_PACKAGE_NAME-libs.tar.xz"
+print_help_message()
+{
+  echo "SUSE Linux Enterprise package download script"
+  echo "Author: Giuliano Belinassi (gbelinassi@suse.de)"
+  echo ""
+  echo "Usage: $PROGNAME <switches>"
+  echo "where <switches>"
+  echo "  --platform PLATFORM            SLE version (ex 15-SP4)"
+  echo "  --package  PACKAGE             Package name to download (ex glibc)"
+  echo "  --no-cleanup                   Do not cleanup downloaded .rpm files."
+  echo ""
+  echo "supported <library> so far are 'glibc' and 'libopenssl1_1'"
+}
 
-rm -r "$__TMP_DIR"
+
+parse_program_argv()
+{
+  # If user didn't provide any arugment, then bails out with a help message.
+  if [[ -z "$@" ]]; then
+    print_help_message
+    exit 0
+  fi
+
+  # Parse arguments provided by user.
+  for i in "$@"; do
+    case $i in
+      --platform=*)
+        PLATFORM="${i#*=}"
+        shift
+        ;;
+      --package=*)
+        PACKAGE="${i#*=}"
+        shift
+        ;;
+      --no-cleanup)
+        NO_CLEANUP=1
+        shift
+        ;;
+      --help)
+        print_help_message
+        exit 0
+        shift
+        ;;
+      -*|--*)
+        echo "Unknown option $i"
+        echo ""
+        print_help_message
+
+        exit 1
+        ;;
+      *)
+        ;;
+    esac
+  done
+
+  # Do some sanity checking
+  sanitize_platform
+  sanitize_package
+
+  # Set platform globally
+  set_url_platform "$PLATFORM"
+}
+
+main()
+{
+  # Set default URL platform to "15-SP4".
+  set_url_platform "15-SP4"
+  parse_program_argv $*
+
+
+  download_package_list "/tmp/suse_package_list.html"
+  local names=$(extract_lib_package_names "/tmp/suse_package_list.html" $PACKAGE)
+
+  parallel_download_packages "$names"
+  download_src_packages "$names"
+  download_ipa_clones "$names"
+
+  for package in $names; do
+    extract_libs_from_package "$package"
+  done
+
+  # Delete all packages to cleanup.
+  if [ $NO_CLEANUP -ne 1 ]; then
+    rm -f *.rpm *tar.xz
+  fi
+  echo "Done."
+}
+
+main $*
