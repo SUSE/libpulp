@@ -141,7 +141,8 @@ static struct argp_option options[] = {
   { "retries", 'r', "N", 0, "Retry N times if process busy", 0 },
   { "revert-all", ULP_OP_REVERT_ALL, "LIB", 0, "Revert all patches from LIB",
     0 },
-  { "timeout", ULP_OP_TIMEOUT, "t", 0, "Set trigger timeout to t seconds", 0 },
+  { "timeout", ULP_OP_TIMEOUT, "t", 0,
+    "Set trigger timeout to t seconds (default 200s)", 0 },
   { "recursive", ULP_OP_RECURSIVE, 0, 0, "Search for patches recursively", 0 },
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
   { "check-stack", 'c', 0, 0, "Check the call stack before live patching", 0 },
