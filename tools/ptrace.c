@@ -55,8 +55,8 @@
  */
 #define RESTART_SYSCALL_SIZE 2
 
-/** Timeout for run_and_redirect function.  Set default to 10s.  */
-static long rr_timeout = 10;
+/** Timeout for run_and_redirect function.  Set default to 200s.  */
+static long rr_timeout = 200;
 
 /** @brief ulp ptrace wrapper
  *
