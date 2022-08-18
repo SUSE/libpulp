@@ -22,6 +22,6 @@
 
 import testsuite
 
-test = testsuite.spawn('./pcqueue', script=False, timeout=5)
+test = testsuite.spawn('./pcqueue', script=False, timeout=30)
 test.expect('Pass')
 test.close(force=True)
