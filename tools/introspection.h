@@ -173,13 +173,13 @@ int read_global_universe(struct ulp_process *process);
 
 char *extract_ulp_from_so_to_disk(const char *, bool);
 
-size_t extract_ulp_from_so_to_mem(const char *, bool, char **);
+size_t extract_ulp_from_so_to_mem(const char *, bool, char **, const char *);
 
 int load_patch_info_from_disk(const char *livepatch);
 
 int load_patch_info_from_mem(void *src, size_t size);
 
-int check_patch_sanity();
+int check_patch_sanity(struct ulp_process *, const char *);
 
 struct ulp_applied_patch *ulp_read_state(struct ulp_process *);
 

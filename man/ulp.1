@@ -265,6 +265,10 @@ Display a brief usage message.
 .B -V --version
 Print program version and exit.
 .TP
+.B -R --root=PREFIX
+Append PREFIX to the path to the livepatch .so file when it is send to the
+target process. This is useful if ulp is running inside a chroot.
+.TP
 .SH EXIT STATUS
 .B ulp packer
 exits 0 on success and 1 on error.

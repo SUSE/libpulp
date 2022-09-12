@@ -172,6 +172,14 @@ libendbr64_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
 POST_PROCESS += .libs/libendbr64.post
 
+check_LTLIBRARIES += libprefix.la
+
+libprefix_la_SOURCES = libprefix.c
+libprefix_la_CFLAGS = $(TARGET_CFLAGS)
+libprefix_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
+
+POST_PROCESS += .libs/libprefix.post
+
 # Target libraries to test static data access
 check_LTLIBRARIES += libmanyprocesses.la
 
@@ -213,6 +221,7 @@ check_LTLIBRARIES += libdozens_livepatch1.la \
                      libbuildid_livepatch1.la \
                      libprocess_access_livepatch1.la \
                      libendbr64_livepatch1.la \
+                     libprefix_livepatch1.la \
                      libmanyprocesses_livepatch1.la \
                      libstress_livepatch1.la \
                      libcomments_livepatch1.la
@@ -280,6 +289,9 @@ libbuildid_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 libendbr64_livepatch1_la_SOURCES = libhundreds_livepatch1.c
 libendbr64_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
+libprefix_livepatch1_la_SOURCES = libhundreds_livepatch1.c
+libprefix_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
+
 libprocess_access_livepatch1_la_SOURCES = process_access_livepatch1.c
 libprocess_access_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
@@ -335,6 +347,8 @@ METADATA = \
   libmanyprocesses_livepatch1.ulp \
   libendbr64_livepatch1.dsc \
   libendbr64_livepatch1.ulp \
+  libprefix_livepatch1.dsc \
+  libprefix_livepatch1.ulp \
   libprocess_livepatch1.dsc \
   libprocess_livepatch1.ulp \
   libprocess_access_livepatch1.dsc \
@@ -365,6 +379,7 @@ EXTRA_DIST = \
   libtls_livepatch1.in \
   libbuildid_livepatch1.in \
   libendbr64_livepatch1.in \
+  libprefix_livepatch1.in \
   libmanyprocesses_livepatch1.in \
   libprocess_livepatch1.in \
   libprocess_access_livepatch1.in \
@@ -399,6 +414,7 @@ check_PROGRAMS = \
   buildid \
   process_access \
   endbr64 \
+  prefix \
   manyprocesses \
   dlsym \
   stress \
@@ -416,6 +432,10 @@ numserv_bsymbolic_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 endbr64_SOURCES = endbr64.c
 endbr64_LDADD = libdozens.la libendbr64.la
 endbr64_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
+
+prefix_SOURCES = prefix.c
+prefix_LDADD = libdozens.la libprefix.la
+prefix_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
 parameters_SOURCES = parameters.c
 parameters_LDADD = libparameters.la
@@ -562,6 +582,7 @@ TESTS = \
   process_access.py \
   manyprocesses.py \
   endbr64.py \
+  prefix.py \
   dlsym_lock.py \
   stress.py \
   tempfiles.py \

@@ -1,7 +1,7 @@
 /*
  *  libpulp - User-space Livepatching Library
  *
- *  Copyright (C) 2017-2021 SUSE Software Solutions GmbH
+ *  Copyright (C) 2020-2022 SUSE Software Solutions GmbH
  *
  *  This file is part of libpulp.
  *
@@ -19,45 +19,37 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef ARGUMENTS_H
-#define ARGUMENTS_H
+#include <errno.h>
+#include <stdio.h>
+#include <string.h>
 
-#include "config.h"
+#include <dozens.h>
+#include <hundreds.h>
 
-#define ARGS_MAX 1
-
-typedef enum
+int
+main(void)
 {
-  ULP_NONE,
-  ULP_PATCHES,
-  ULP_CHECK,
-  ULP_DUMP,
-  ULP_PACKER,
-  ULP_TRIGGER,
-  ULP_POST,
-  ULP_MESSAGES,
-  ULP_LIVEPATCHABLE,
-} command_t;
+  char input[64];
 
-struct arguments
-{
-  const char *args[ARGS_MAX];
-  const char *livepatch;
-  const char *library;
-  const char *metadata;
-  const char *process_wildcard;
-  const char *prefix;
-  command_t command;
-  int retries;
-  int quiet;
-  int verbose;
-  int buildid;
-  int revert;
-  int disable_threads;
-  int recursive;
-#if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
-  int check_stack;
-#endif
-};
+  printf("Waiting for input.\n");
+  while (1) {
+    if (scanf("%s", input) == EOF) {
+      if (errno) {
+        perror("numserv");
+        return 1;
+      }
+      printf("Reached the end of file; quitting.\n");
+      return 0;
+    }
+    if (strncmp(input, "dozen", strlen("dozen")) == 0)
+      printf("%d\n", dozen());
+    if (strncmp(input, "hundred", strlen("hundred")) == 0)
+      printf("%d\n", hundred());
+    if (strncmp(input, "quit", strlen("quit")) == 0) {
+      printf("Quitting.\n");
+      return 0;
+    }
+  }
 
-#endif
+  return 1;
+}

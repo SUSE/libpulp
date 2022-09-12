@@ -144,6 +144,8 @@ static struct argp_option options[] = {
   { "timeout", ULP_OP_TIMEOUT, "t", 0,
     "Set trigger timeout to t seconds (default 200s)", 0 },
   { "recursive", ULP_OP_RECURSIVE, 0, 0, "Search for patches recursively", 0 },
+  { "root", 'R', "PREFIX", 0,
+    "Append prefix to livepatch path when passing it to target process", 0 },
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
   { "check-stack", 'c', 0, 0, "Check the call stack before live patching", 0 },
 #endif
@@ -318,6 +320,9 @@ parser(int key, char *arg, struct argp_state *state)
         argp_error(state,
                    "The argument to '-r' must be greater than zero; got %d.",
                    arguments->retries);
+      break;
+    case 'R':
+      arguments->prefix = arg;
       break;
     case ULP_OP_REVERT_ALL:
       arguments->library = get_basename(arg);
