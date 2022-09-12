@@ -57,7 +57,8 @@ run_check(struct arguments *arguments)
 
   container = arguments->args[0];
 
-  livepatch_size = extract_ulp_from_so_to_mem(container, false, &livepatch);
+  livepatch_size =
+      extract_ulp_from_so_to_mem(container, false, &livepatch, NULL);
 
   if (!livepatch) {
     WARN("error extracting .ulp section from %s", container);
@@ -87,7 +88,7 @@ run_check(struct arguments *arguments)
     goto ulp_process_clean;
   }
 
-  if (check_patch_sanity(target)) {
+  if (check_patch_sanity(target, NULL)) {
     WARN("error checking live patch sanity.");
     ret = -1;
     goto ulp_process_clean;

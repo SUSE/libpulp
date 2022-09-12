@@ -234,7 +234,7 @@ class spawn(pexpect.spawn):
   # output for more information).
   def livepatch(self, filename=None, timeout=10, retries=1,
                 verbose=True, quiet=False, revert=False, revert_lib=None,
-                sanity=True):
+                sanity=True, prefix=None):
 
     # Check sanity of command-line arguments
     if sanity is True:
@@ -259,6 +259,9 @@ class spawn(pexpect.spawn):
     if retries > 1:
       command.append('-r')
       command.append(str(retries))
+    if prefix is not None:
+      command.append('-R')
+      command.append(str(prefix))
 
     # Apply the live patch and check for common errors
     try:

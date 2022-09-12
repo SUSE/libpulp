@@ -44,6 +44,7 @@
 #include "ulp_common.h"
 
 static bool recursive_mode;
+static const char *prefix = NULL;
 
 /** @brief Apply a single live patch to one process.
  *
@@ -76,7 +77,7 @@ trigger_one_process(struct ulp_process *target, int retries,
   /* Extract the livepatch metadata from .so file.  */
   if (container_path) {
     livepatch_size =
-        extract_ulp_from_so_to_mem(container_path, revert, &livepatch);
+        extract_ulp_from_so_to_mem(container_path, revert, &livepatch, prefix);
     if (livepatch == NULL || livepatch_size == 0) {
       ret = ENOMETA;
       goto metadata_clean;
@@ -92,7 +93,7 @@ trigger_one_process(struct ulp_process *target, int retries,
   }
 
   if (livepatch) {
-    ret = check_patch_sanity(target);
+    ret = check_patch_sanity(target, prefix);
     if (ret) {
       /* Sanity may fail because the patch should not be applied to this
          process.  */
@@ -596,6 +597,9 @@ run_trigger(struct arguments *arguments)
   bool revert = (arguments->revert > 0);
   pid_t pid = 0;
   int ret;
+
+  /* Set global static prefix variable.  */
+  prefix = arguments->prefix;
 
   if (isnumber(process_wildcard))
     pid = atoi(process_wildcard);

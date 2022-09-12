@@ -1764,14 +1764,18 @@ restore_threads(struct ulp_process *process)
  * @param livepatch  Path to livepatch container (.so)
  * @param revert     Extract the revert patch instead.
  * @param out        Buffer containing the .ulp section, passed by reference.
+ * @param prefix     Optional argument which will be prepended to the final
+ *                   patch path.
  *
  * @return Size of the metadata content.
  * */
 size_t
-extract_ulp_from_so_to_mem(const char *livepatch, bool revert, char **out)
+extract_ulp_from_so_to_mem(const char *livepatch, bool revert, char **out,
+                           const char *prefix)
 {
   int fd;
   const char *section = revert ? ".ulp.rev" : ".ulp";
+  char path_buffer[2 * PATH_MAX];
 
   Elf *elf = load_elf(livepatch, &fd);
   if (elf == NULL) {
@@ -1791,9 +1795,31 @@ extract_ulp_from_so_to_mem(const char *livepatch, bool revert, char **out)
   Elf_Data *ulp_data = elf_getdata(ulp_scn, NULL);
   assert(ulp_data->d_buf != NULL && ulp_data->d_size > 0);
 
-  /* Get full path to patch container.  */
-  char *full_path = realpath(livepatch, NULL);
-  uint32_t path_size = strlen(full_path) + 1;
+  /* In case a prefix is given, copy it to the path buffer.  */
+  uint32_t path_size = 0;
+  if (prefix) {
+    strncpy(path_buffer, prefix, PATH_MAX);
+    path_size += strlen(prefix);
+
+    if (path_size >= PATH_MAX) {
+      WARN("metadata path is too large: has %u bytes, expected %d.", path_size,
+           PATH_MAX);
+      return 0;
+    }
+  }
+
+  /* Get full path to patch buffer.  */
+  if (realpath(livepatch, &path_buffer[path_size]) == NULL) {
+    WARN("Unable to retrieve realpath to %s", livepatch);
+    return 0;
+  }
+  path_size = strlen(path_buffer) + 1;
+
+  if (path_size >= PATH_MAX) {
+    WARN("metadata path is too large: has %u bytes, expected %d.", path_size,
+         PATH_MAX);
+    return 0;
+  }
 
   /* Create buffer large enough to hold the final metadata.  */
   uint32_t meta_size = ulp_data->d_size + path_size + sizeof(uint32_t);
@@ -1822,11 +1848,10 @@ extract_ulp_from_so_to_mem(const char *livepatch, bool revert, char **out)
   meta_head += 1 + 32;
   memcpy(meta_head, &path_size, sizeof(uint32_t));
   meta_head += sizeof(uint32_t);
-  memcpy(meta_head, full_path, path_size);
+  memcpy(meta_head, path_buffer, path_size);
   meta_head += path_size;
   memcpy(meta_head, ulp_data->d_buf + 1 + 32, ulp_data->d_size - (1 + 32));
 
-  free(full_path);
   unload_elf(&elf, &fd);
 
   *out = final_meta;
@@ -1855,7 +1880,7 @@ extract_ulp_from_so_to_disk(const char *livepatch, bool revert)
   char *buf;
   size_t meta_size;
 
-  meta_size = extract_ulp_from_so_to_mem(livepatch, revert, &buf);
+  meta_size = extract_ulp_from_so_to_mem(livepatch, revert, &buf, NULL);
 
   if (meta_size == 0 || buf == NULL) {
     return NULL;
@@ -2091,13 +2116,25 @@ load_patch_info_from_disk(const char *livepatch)
  * been initialized, typically by calling load_patch_info().
  */
 static int
-check_livepatch_functions_matches_metadata(void)
+check_livepatch_functions_matches_metadata(const char *prefix)
 {
   const char *so_filename = ulp.so_filename;
   const struct ulp_unit *curr_unit;
   void *container_handle;
 
   int ret = 0;
+
+  /* If a prefix has been passed to trigger then we should remove it from the
+     path, as it is only intended to get libpulp.so to find the correct path
+     to library.  It is assumed that ulp tool can always reach it.  */
+  if (prefix) {
+    int prefix_len = strlen(prefix);
+
+    /* Check that the prefix is there in the string.  */
+    assert(strncmp(prefix, so_filename, prefix_len) == 0);
+
+    so_filename += prefix_len;
+  }
 
   /* Open livepatch container .so file temporarly.  */
   container_handle = dlopen(so_filename, RTLD_LOCAL | RTLD_LAZY);
@@ -2138,7 +2175,7 @@ check_livepatch_functions_matches_metadata(void)
  * been initialized, typically by calling load_patch_info().
  */
 int
-check_patch_sanity(struct ulp_process *process)
+check_patch_sanity(struct ulp_process *process, const char *prefix)
 {
   const char *target;
   struct ulp_dynobj *d;
@@ -2150,7 +2187,7 @@ check_patch_sanity(struct ulp_process *process)
     return EUNKNOWN;
   }
 
-  if (check_livepatch_functions_matches_metadata()) {
+  if (check_livepatch_functions_matches_metadata(prefix)) {
     WARN("metadata contain functions that are not present in the livepatch.");
     return EUNKNOWN;
   }

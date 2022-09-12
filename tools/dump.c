@@ -104,7 +104,7 @@ run_dump(struct arguments *arguments)
   bool revert = arguments->revert;
 
   livepatch_size =
-      extract_ulp_from_so_to_mem(arguments->args[0], revert, &livepatch);
+      extract_ulp_from_so_to_mem(arguments->args[0], revert, &livepatch, NULL);
   if (!livepatch) {
     WARN("Unable to extract metadata file from %s", arguments->args[0]);
     return 1;
