@@ -89,7 +89,7 @@ get_ulp_elf_metadata(const char *filename, struct ulp_metadata *ulp)
   /* Symtab support should be optional. A linux binary can have it stripped. */
   symtab = get_symtab(elf);
 
-  if (!get_object_metadata(elf, obj)) {
+  if (get_object_metadata(elf, obj)) {
     WARN("Unable to get object metadata.");
     ret = 0;
     goto clean_elf;
@@ -114,16 +114,62 @@ clean_elf:
   return ret;
 }
 
+/** @brief Get build id of ELF structure given by `elf` parameter
+ *
+ * This function retrieves the Build ID of `elf` and stores it in the buffer
+ * given by `buildid_buf`, with length stored in the address pointed by `len`.
+ *
+ * @param elf         Elf structure. It has to contain .note.gnu.build-id
+ * section.
+ * @param buildid_buf Pointer to a buffer in which will hold the build id.
+ * @param len         Variable in which the length of the buildid will be
+ *
+ * return 0 if success, ENOENT if build id not found.
+ */
 int
-get_object_metadata(Elf *elf, struct ulp_object *obj)
+get_elf_buildid(Elf *elf, char *buildid_buf, unsigned *len)
 {
   Elf_Scn *s;
   s = get_build_id_note(elf);
   if (!s)
-    return 0;
-  if (!get_build_id(s, obj))
-    return 0;
-  return 1;
+    return ENOENT;
+
+  if (get_build_id(s, buildid_buf, len))
+    return ENOENT;
+
+  assert(*len == BUILDID_LEN && "ELF build id length is not BUILD_LEN bytes");
+
+  return 0;
+}
+
+/** @brief Get build id of ELF structure given by `elf` parameter and stores it
+ *         into the ulp_object `obj` datastructure.
+ *
+ * This function retrieves the Build ID of `elf` and stores it in the `obj`
+ * datastructure.
+ *
+ * @param elf         Elf structure. It has to contain .note.gnu.build-id
+ * section.
+ * @param obj         The ulp_object that the function will write to.
+ *
+ * return 0 if success, ENOENT if build id not found.
+ */
+
+int
+get_object_metadata(Elf *elf, struct ulp_object *obj)
+{
+  obj->build_id = calloc(1, BUILDID_LEN);
+  if (!obj->build_id) {
+    WARN("Unable to allocate memory for build id.");
+    return 1;
+  }
+
+  if (get_elf_buildid(elf, obj->build_id, &obj->build_id_len)) {
+    WARN("Unable to find Build ID of given ELF file.");
+    return 1;
+  }
+
+  return 0;
 }
 
 /** @brief Get offsets of symbols in target library
@@ -883,8 +929,21 @@ dsc_clean:
   return ret;
 }
 
+/** @brief Get build ID from .note.gnu.build-id section from the ELF binary.
+ *
+ * The section ".note.gnu.build-id" has the build id of the ELF file.  Given
+ * that this section was passed by 's', then it retrieves the build id of
+ * the binary in `buildid_buf` and its len in `len`. Those variables must
+ * be passed by reference.
+ *
+ * @param s           Section containing .note.gnu.build-id.
+ * @param buildid_buf Pointer to a buffer in which will hold the build id.
+ * @param len         Variable in which the length of the buildid will be
+ *
+ * return 1 if error, 0 if success.
+ */
 int
-get_build_id(Elf_Scn *s, struct ulp_object *obj)
+get_build_id(Elf_Scn *s, char *buildid_buf, unsigned *len)
 {
   GElf_Nhdr nhdr;
   Elf_Data *d;
@@ -895,7 +954,7 @@ get_build_id(Elf_Scn *s, struct ulp_object *obj)
   d = elf_getdata(s, NULL);
   if (!d) {
     WARN("Unable to find pointer to build id header.");
-    return 0;
+    return 1;
   }
 
   for (; (n = gelf_getnote(d, offset, &nhdr, &namep, &descp) > 0);
@@ -908,17 +967,12 @@ get_build_id(Elf_Scn *s, struct ulp_object *obj)
 
   if (!found) {
     WARN("Unable to note with expected build id type.");
-    return 0;
+    return 1;
   }
 
-  obj->build_id = calloc(1, sizeof(char) * nhdr.n_descsz);
-  if (!obj->build_id) {
-    WARN("Unable to allocate memory for build id.");
-    return 0;
-  }
-  memcpy(obj->build_id, d->d_buf + descp, nhdr.n_descsz);
-  obj->build_id_len = nhdr.n_descsz;
-  return 1;
+  memcpy(buildid_buf, d->d_buf + descp, nhdr.n_descsz);
+  *len = nhdr.n_descsz;
+  return 0;
 }
 
 int
