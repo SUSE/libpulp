@@ -38,6 +38,7 @@
 #include "patches.h"
 #include "post.h"
 #include "trigger.h"
+#include "extract.h"
 
 #include <unistd.h>
 
@@ -188,6 +189,7 @@ command_from_string(const char *str)
     { "dump", ULP_DUMP },         { "packer", ULP_PACKER },
     { "trigger", ULP_TRIGGER },   { "post", ULP_POST },
     { "messages", ULP_MESSAGES }, { "livepatchable", ULP_LIVEPATCHABLE },
+    { "extract", ULP_EXTRACT },
   };
 
   size_t i;
@@ -223,6 +225,7 @@ handle_end_of_arguments(const struct argp_state *state)
         argp_error(state, "Too many arguments.");
       break;
 
+    case ULP_EXTRACT:
     case ULP_PACKER:
     case ULP_CHECK:
       if (state->arg_num < 2)
@@ -479,6 +482,10 @@ main(int argc, char **argv, char *envp[] __attribute__((unused)))
 
     case ULP_LIVEPATCHABLE:
       ret = run_livepatchable(&arguments);
+      break;
+
+    case ULP_EXTRACT:
+      ret = run_extract(&arguments);
       break;
   }
 

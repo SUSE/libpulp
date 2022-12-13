@@ -37,6 +37,7 @@ typedef enum
   ULP_POST,
   ULP_MESSAGES,
   ULP_LIVEPATCHABLE,
+  ULP_EXTRACT,
 } command_t;
 
 struct arguments

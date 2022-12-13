@@ -33,7 +33,8 @@ noinst_HEADERS = \
   messages.h \
   livepatchable.h \
   elf-extra.h \
-  pcqueue.h
+  pcqueue.h \
+  extract.h
 
 ulp_SOURCES = \
   ulp.c \
@@ -49,8 +50,9 @@ ulp_SOURCES = \
   ptrace.c \
   livepatchable.c \
   elf-extra.c \
-  pcqueue.c
-ulp_LDADD = $(top_builddir)/common/libcommon.la -lelf -lpthread -ldl $(LIBUNWIND_LIBS)
+  pcqueue.c \
+  extract.c
+ulp_LDADD = $(top_builddir)/common/libcommon.la -lelf -ljson-c -lpthread -ldl $(LIBUNWIND_LIBS)
 
 # Ensure access to the include directory
 AM_CFLAGS += -I$(abs_top_srcdir)/include

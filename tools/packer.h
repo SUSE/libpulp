@@ -36,6 +36,8 @@ Elf *load_elf(const char *obj, int *fd);
 
 Elf_Scn *get_dynsym(Elf *elf);
 
+Elf_Scn *get_symtab(Elf *elf);
+
 Elf_Scn *get_build_id_note(Elf *elf);
 
 int get_ulp_elf_metadata(const char *filename, struct ulp_metadata *ulp);
@@ -50,6 +52,8 @@ int add_dependency(struct ulp_metadata *ulp, struct ulp_dependency *dep,
                    const char *filename);
 
 int get_build_id(Elf_Scn *s, char *buildid_buf, unsigned *len);
+
+int get_elf_buildid(Elf *elf, char *buf, unsigned *len);
 
 void *get_symbol_addr(Elf *elf, Elf_Scn *s, const char *search);
 
