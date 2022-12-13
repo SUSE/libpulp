@@ -484,3 +484,30 @@ Messages are output to stdout.
 .TP
 .B ulp messages
 exits 0 on success, anything else on error.
+
+.\"-------------------------------------------
+
+.SH EXTRACT
+.TP
+.SH NAME
+ulp extract \- Extract the relevant content from a livepatchable library
+.TP
+.SH SYNOPSIS
+.TP
+.B ulp extract
+.I livepatchable_library
+-o
+.I output_file
+.TP
+.SH DESCRIPTION
+.TP
+Extract the relevant content from
+.I livepatchable_library
+such as the library name, buildid, and symbols in the library; and write those
+informations into a JSON file specified by
+.I output_file.
+.PP
+.TP
+.SH EXIT STATUS
+.TP
+exits 0 on success, anything else on error.

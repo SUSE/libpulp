@@ -121,6 +121,9 @@ AS_IF([test "x$fcf_protection" == "xyes"],
 AC_CHECK_HEADER([gelf.h],,
 AC_MSG_ERROR([Libelf development files are missing.]))
 
+AC_CHECK_HEADER([json-c/json.h],,
+AC_MSG_ERROR([json-c development files are missing.]))
+
 # Python and python's pexpect are required to run the tests.
 AM_PATH_PYTHON([3])
 AX_PYTHON_MODULE([pexpect], [fatal])
