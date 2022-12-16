@@ -254,7 +254,7 @@ dl_find_symbol(struct dl_phdr_info *info, size_t size, void *data)
 
     sym = get_symbol_by_name(dynsym, dynstr, num_symbols, args->symbol);
     if (sym)
-      args->symbol_addr = (void *)(info->dlpi_addr + sym->st_value);
+      args->symbol_addr = (void *)(sym->st_value);
 
     args->bias_addr = info->dlpi_addr;
     /* Alert dl_iterate_phdr that we are finished.  */
@@ -291,11 +291,16 @@ get_loaded_symbol_addr(const char *library, const char *symbol,
   dl_iterate_phdr(dl_find_symbol, &arg);
 
   if (old_faddr != NULL && arg.symbol_addr != old_faddr) {
-    WARN("Symbol requested not found in .dymsym. Using address from .ulp");
+    WARN("Symbol requested not found in .dynsym. Using address from .ulp");
     return arg.bias_addr + old_faddr;
   }
 
-  return arg.symbol_addr;
+  if (arg.symbol_addr == NULL) {
+    /* Symbol not found.  */
+    return NULL;
+  }
+
+  return arg.bias_addr + arg.symbol_addr;
 }
 
 static int

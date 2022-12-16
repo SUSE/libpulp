@@ -35,14 +35,14 @@
 #include "arguments.h"
 #include "config.h"
 #include "elf-extra.h"
+#include "extract.h"
 #include "introspection.h"
 #include "md4.h"
 #include "packer.h"
 #include "terminal_colors.h"
 #include "ulp_common.h"
 
-static int get_elf_tgt_ref_addrs(Elf *, struct ulp_reference *, Elf_Scn *,
-                                 Elf_Scn *);
+static int get_target_ref_addrs(struct ulp_so_info *, struct ulp_reference *);
 
 Elf_Scn *
 get_dynsym(Elf *elf)
@@ -63,54 +63,31 @@ get_build_id_note(Elf *elf)
 }
 
 int
-get_ulp_elf_metadata(const char *filename, struct ulp_metadata *ulp)
+get_ulp_elf_metadata(struct ulp_so_info *info, struct ulp_metadata *ulp)
 {
-  int fd, ret;
-  Elf *elf;
-  Elf_Scn *dynsym;
-  Elf_Scn *symtab = NULL;
+  int ret;
   struct ulp_object *obj = ulp->objs;
   struct ulp_reference *ref = ulp->refs;
 
-  fd = 0;
-  elf = load_elf(filename, &fd);
-  if (!elf) {
-    WARN("Unable to load elf file: %s", filename);
-    return 0;
-  }
+  /* Copy the build id.  */
+  obj->build_id_len = BUILDID_LEN;
+  obj->build_id = calloc(1, BUILDID_LEN);
+  memcpy(obj->build_id, info->buildid, BUILDID_LEN);
 
-  dynsym = get_dynsym(elf);
-  if (!dynsym) {
-    WARN("Unable to get .dynsym section.");
-    ret = 0;
-    goto clean_elf;
-  }
-
-  /* Symtab support should be optional. A linux binary can have it stripped. */
-  symtab = get_symtab(elf);
-
-  if (get_object_metadata(elf, obj)) {
-    WARN("Unable to get object metadata.");
-    ret = 0;
-    goto clean_elf;
-  }
-
-  if (!get_elf_tgt_addrs(elf, obj, dynsym, symtab)) {
+  if (!get_target_addrs(info, obj)) {
     WARN("Unable to get target addresses.");
     ret = 0;
-    goto clean_elf;
+    goto clean_info;
   }
 
-  if (!get_elf_tgt_ref_addrs(elf, ref, dynsym, symtab)) {
-    WARN("Unable to get target reference addresses.");
+  if (!get_target_ref_addrs(info, ref)) {
     ret = 0;
-    goto clean_elf;
+    goto clean_info;
   }
 
   ret = 1;
 
-clean_elf:
-  unload_elf(&elf, &fd);
+clean_info:
   return ret;
 }
 
@@ -185,18 +162,19 @@ get_object_metadata(Elf *elf, struct ulp_object *obj)
  * @return 1
  */
 int
-get_elf_tgt_addrs(Elf *elf, struct ulp_object *obj, Elf_Scn *st1, Elf_Scn *st2)
+get_target_addrs(struct ulp_so_info *info, struct ulp_object *obj)
 {
   struct ulp_unit *unit;
 
   for (unit = obj->units; unit != NULL; unit = unit->next) {
-    /* First look at dynsym. This section is always present in binary.  */
-    unit->old_faddr = get_symbol_addr(elf, st1, unit->old_fname);
-    if (unit->old_faddr == NULL && st2 != NULL) {
-      /* In case we couldn't find the symbol there, look in the symtab, if
-       * available.  */
-      unit->old_faddr = get_symbol_addr(elf, st2, unit->old_fname);
+
+    struct symbol *s = get_symbol_with_name(info, unit->old_fname);
+    if (s == NULL) {
+      WARN("Unable to find symbol %s", unit->old_fname);
+      return 0;
     }
+
+    unit->old_faddr = (void *)s->offset;
   }
   return 1;
 }
@@ -215,22 +193,24 @@ get_elf_tgt_addrs(Elf *elf, struct ulp_object *obj, Elf_Scn *st1, Elf_Scn *st2)
  * @return 1
  */
 static int
-get_elf_tgt_ref_addrs(Elf *elf, struct ulp_reference *ref, Elf_Scn *st1,
-                      Elf_Scn *st2)
+get_target_ref_addrs(struct ulp_so_info *info, struct ulp_reference *ref)
 {
+  for (; ref != NULL; ref = ref->next) {
+    if (ref->target_offset != 0)
+      continue;
 
-  while (ref != NULL) {
-    if (ref->target_offset == 0) {
-      ref->target_offset =
-          (uintptr_t)get_symbol_addr(elf, st1, ref->target_name);
-      if (ref->target_offset == 0 && st2 != NULL) {
-        /* In case we couldn't find the symbol there, look in the symtab, if
-         * available.  */
-        ref->target_offset =
-            (uintptr_t)get_symbol_addr(elf, st2, ref->target_name);
-      }
+    /* In case the target_offset is zero, we must find the offset by the name
+       of the symbol.  */
+    struct symbol *s = get_symbol_with_name(info, ref->target_name);
+    if (!s) {
+      WARN("ERROR: symbol '%s' is not present in target library.",
+           ref->target_name);
+      dump_ulp_so_info(info);
+
+      return 0;
     }
-    ref = ref->next;
+
+    ref->target_offset = s->offset;
   }
   return 1;
 }
@@ -490,49 +470,6 @@ segfault_handler(int signum)
   exit(1);
 }
 
-/** Struct containing informations about a shared-link library (.so). */
-struct shared_object
-{
-  /** The path to the .so.  */
-  const char *path;
-
-  /** Elf object in memory.  */
-  Elf *elf;
-
-  /** Opened file descriptor.  */
-  int fd;
-
-  /** Dynsym object.  */
-  Elf_Scn *dynsym;
-
-  /** Symtab object.  */
-  Elf_Scn *symtab;
-};
-
-/** @brief Checks if symbol `sym` exists in shared object `so`
- *
- * @param so   The shared object.
- * @param sym  Symbol to query
- *
- * @return true if exists, false if not.
- **/
-static bool
-symbol_exists(struct shared_object *so, const char *sym)
-{
-  if (!get_symbol_addr(so->elf, so->dynsym, sym)) {
-    if (so->symtab) {
-      if (!get_symbol_addr(so->elf, so->symtab, sym)) {
-        return 0;
-      }
-    }
-    else {
-      return 0;
-    }
-  }
-
-  return true;
-}
-
 static void
 read_comment(struct ulp_metadata *ulp, const char *first, size_t n,
              int *curr_pos, int *curr_size)
@@ -565,12 +502,15 @@ read_comment(struct ulp_metadata *ulp, const char *first, size_t n,
  * one provided in the .dsc file
  * @param target_override    Use the following target file instead of the one
  *                           provided in .dsc file.
+ * @param info               Pointer to a pointer to an info object, in which
+ *                           the ulp_so_info object of the target library will
+ *                           be written to.
  *
  */
-
 static int
 parse_description(const char *filename, struct ulp_metadata *ulp,
-                  const char *container_override, const char *target_override)
+                  const char *container_override, const char *target_override,
+                  struct ulp_so_info **info)
 {
   struct ulp_unit *unit, *last_unit;
   struct ulp_dependency *dep;
@@ -585,10 +525,10 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
   int cur_comment_pos = 0;
   int cur_comment_size = 0;
 
-  struct shared_object container, target;
+  struct ulp_so_info *container = NULL, *target = NULL;
+  const char *container_path = NULL, *target_path = NULL;
 
-  memset(&container, 0, sizeof(container));
-  memset(&target, 0, sizeof(target));
+  *info = NULL;
 
   loc.line = 0;
   loc.col = 0;
@@ -669,10 +609,9 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
     len = 0;
   }
 
-  container.path = ulp->so_filename;
-  container.elf = load_elf(container.path, &container.fd);
-  container.dynsym = get_dynsym(container.elf);
-  container.symtab = get_symtab(container.elf);
+  /* Open livepatch container info.  */
+  container_path = ulp->so_filename;
+  container = ulp_so_info_open(container_path);
 
   n = getline(&first, &len, parse_file);
   loc.line++;
@@ -725,13 +664,13 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
         first[n - 1] = '\0';
 
       if (target_override)
-        ulp->objs->name = strdup(target_override);
+        target_path = target_override;
       else
-        ulp->objs->name = strdup(&first[1]);
+        target_path = &first[1];
       ulp->objs->nunits = 0;
       last_unit = NULL;
 
-      FILE *file_check = fopen(ulp->objs->name, "r");
+      FILE *file_check = fopen(target_path, "r");
       if (file_check == NULL) {
         parse_error(loc, "unable to open target file");
         ret = 0;
@@ -739,16 +678,14 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
       }
       fclose(file_check);
 
-      if (is_directory(ulp->objs->name)) {
+      if (is_directory(target_path)) {
         parse_error(loc, "target path is not a file");
         ret = 0;
         goto dsc_clean;
       }
 
-      target.path = ulp->objs->name;
-      target.elf = load_elf(target.path, &target.fd);
-      target.dynsym = get_dynsym(target.elf);
-      target.symtab = get_symtab(target.elf);
+      target = ulp_so_info_open(target_path);
+      ulp->objs->name = strdup(target->name);
     }
     else {
       if (!ulp->objs) {
@@ -774,14 +711,15 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
         }
 
         if (first[1] == '%') {
+          third = first + 2;
           ref->tls = true;
           loc.col++;
         }
         else {
+          third = first + 1;
           ref->tls = false;
         }
 
-        third = first + 1;
         second = strchr(third, ':');
         *second = '\0';
         ref->target_name = strdup(third);
@@ -793,18 +731,18 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
         if (second == NULL) {
           ref->reference_name = strdup(third);
 
-          if (!symbol_exists(&target, ref->target_name)) {
+          if (!get_symbol_with_name(target, ref->target_name)) {
             parse_error(loc, "symbol %s is not present in %s",
-                        ref->target_name, target.path);
+                        ref->target_name, target_path);
             ret = 0;
             goto dsc_clean;
           }
 
           loc.col += strlen(ref->target_name) + 1;
 
-          if (!symbol_exists(&container, ref->reference_name)) {
+          if (!get_symbol_with_name(container, ref->reference_name)) {
             parse_error(loc, "symbol %s is not present in %s",
-                        ref->reference_name, container.path);
+                        ref->reference_name, container_path);
             ret = 0;
             goto dsc_clean;
           }
@@ -845,9 +783,9 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
         first = strtok(first, ":");
         second = strtok(NULL, ":");
 
-        if (!symbol_exists(&target, first)) {
+        if (!get_symbol_with_name(target, first)) {
           parse_error(loc, "symbol %s is not present in %s", first,
-                      target.path);
+                      target_path);
           ret = 0;
           goto dsc_clean;
         }
@@ -865,9 +803,9 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
           goto dsc_clean;
         }
 
-        if (!symbol_exists(&container, second)) {
+        if (!get_symbol_with_name(container, second)) {
           parse_error(loc, "symbol %s is not present in %s", second,
-                      container.path);
+                      container_path);
           ret = 0;
           goto dsc_clean;
         }
@@ -915,6 +853,7 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
     loc.col = 1;
   }
   ret = 1;
+  *info = target;
 dsc_clean:
   if (parse_file)
     fclose(parse_file);
@@ -922,10 +861,10 @@ dsc_clean:
   if (first)
     free(first);
   signal(SIGSEGV, SIG_DFL);
-  if (container.elf)
-    unload_elf(&container.elf, &container.fd);
-  if (target.elf)
-    unload_elf(&target.elf, &target.fd);
+  if (container)
+    release_so_info(container);
+  if (target && *info == NULL)
+    release_so_info(target);
   return ret;
 }
 
@@ -1213,6 +1152,8 @@ run_packer(struct arguments *arguments)
   const char *description = arguments->args[0];
   int ret = 0;
 
+  struct ulp_so_info *target = NULL;
+
   /* Set the verbosity level in the common introspection infrastructure. */
   ulp_verbose = arguments->verbose;
   ulp_quiet = arguments->quiet;
@@ -1223,22 +1164,12 @@ run_packer(struct arguments *arguments)
 
   DEBUG("parsing the description file (%s).", description);
   if (!parse_description(description, &ulp, arguments->livepatch,
-                         arguments->library)) {
+                         arguments->library, &target)) {
     ret = 1;
     goto main_error;
   }
 
-  /* Select source of the target library filename. */
-  if (arguments->library == NULL) {
-    arguments->library = ulp.objs->name;
-    DEBUG("path to target library taken from the description file.");
-  }
-  else {
-    DEBUG("path to target library taken from the command-line.");
-  }
-  DEBUG("target library: %s.", arguments->library);
-
-  if (!get_ulp_elf_metadata(arguments->library, &ulp)) {
+  if (!get_ulp_elf_metadata(target, &ulp)) {
     WARN("unable to parse target library.");
     ret = 1;
     goto main_error;
@@ -1286,9 +1217,6 @@ run_packer(struct arguments *arguments)
     size_t n = strlen(ulp.comments) + 1;
     size_t ret;
 
-    printf("n = %ld\n", n);
-    printf("comments: %s\n", ulp.comments);
-
     ret = fwrite(ulp.comments, 1, n, f);
     assert(n == ret);
     fclose(f);
@@ -1313,6 +1241,8 @@ tmpfile_clean:
 
 main_error:
   free_metadata(&ulp);
+  if (target)
+    release_so_info(target);
   if (ret == 0) {
     WARN("metadata successfully embedded into livepatch container");
   }

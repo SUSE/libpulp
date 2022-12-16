@@ -22,6 +22,7 @@ ULP = $(top_builddir)/tools/ulp
 ULP_POST = $(ULP) post
 ULP_PACKER = $(ULP) packer
 ULP_REVERSE = $(ULP) reverse
+ULP_EXTRACT = $(ULP) extract
 
 # Build and link requirements for live-patchable (target) libraries.
 TARGET_CFLAGS = \
@@ -46,8 +47,13 @@ CONVENIENCE_LDFLAGS = -rpath $(libdir) $(AM_LDFLAGS)
 # ulp_post, which replaces single-byte with multi-byte nops. Files with
 # .post extension track whether the respective libraries have already
 # been post-processed.
+#
+# Since we also support to specify the target library as a dump of the
+# relevant informations (name, symbols, build id), we also have extra
+# logic to generate such dumps (JSON file).
 .libs/lib%.post: lib%.la
-	$(ULP_POST) .libs/lib$*.so
+	$(ULP_POST) .libs/lib$*.so.0
+	$(ULP_EXTRACT) .libs/lib$*.so.0 -o .libs/lib$*.so.0.json
 	touch $@
 
 # These rules cause the livepatch metadata to be built. The .ulp and
@@ -60,7 +66,10 @@ CONVENIENCE_LDFLAGS = -rpath $(libdir) $(AM_LDFLAGS)
 	$(top_srcdir)/tests/offsets.py $*.tmp $@
 	rm -f $*.tmp
 
+# This rule build the .ulp file, which at some point were used to hold
+# the compiled metadata description. Today it is directly integrated
+# into the .so file which holds the livepatch code, within the .ulp
+# and .ulp.rev section.
 %.ulp: %.dsc $(check_LTLIBRARIES)
-	echo .libs/$(basename $<).so
 	$(ULP_PACKER) $< #-o $@
 	echo Maintained here for legacy reasons > $@

@@ -31,6 +31,7 @@
 #include "check.h"
 #include "config.h"
 #include "dump.h"
+#include "extract.h"
 #include "introspection.h"
 #include "livepatchable.h"
 #include "messages.h"
@@ -38,7 +39,6 @@
 #include "patches.h"
 #include "post.h"
 #include "trigger.h"
-#include "extract.h"
 
 #include <unistd.h>
 

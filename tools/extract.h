@@ -2,6 +2,12 @@
 #define _EXTRACT_H_
 
 #include "arguments.h"
+#include "ulp_common.h"
+
+#include <stdbool.h>
+#include <stdio.h>
+#include <link.h>
+#include <libelf.h>
 
 /** Struct containing useful information for Userspace Livepatching retrieved
  *  from the target .so file.
@@ -56,6 +62,12 @@ bool so_info_equal(struct ulp_so_info *a, struct ulp_so_info *b);
 
 struct ulp_so_info *parse_so_json(const char *path);
 
+void dump_ulp_so_info(const struct ulp_so_info *info);
+
+struct symbol *get_symbol_with_name(struct ulp_so_info *info, const char *sym);
+
 int run_extract(struct arguments *arguments);
+
+struct ulp_so_info *ulp_so_info_open(const char *path);
 
 #endif /* _EXTRACT_H_.  */

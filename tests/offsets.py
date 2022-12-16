@@ -35,6 +35,7 @@ patch = patch.rstrip('\n')
 # which always starts with '@'
 target = ifile.readline()
 target = target.rstrip('\n')
+target = target.rstrip('.json')
 target = target.lstrip('@')
 
 # Rewind the input file

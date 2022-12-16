@@ -19,21 +19,20 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stddef.h>
 #include <assert.h>
-#include <stdlib.h>
-#include <string.h>
 #include <errno.h>
 #include <json-c/json.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "arguments.h"
 #include "config.h"
 #include "elf-extra.h"
+#include "extract.h"
+#include "packer.h"
 #include "terminal_colors.h"
 #include "ulp_common.h"
-#include "elf-extra.h"
-#include "packer.h"
-#include "extract.h"
 
 /** @brief Convert a string to a build id.
  *
@@ -57,9 +56,9 @@ str_to_buildid(unsigned char buf[BUILDID_LEN], const char *str)
 
   for (i = 0; i < BUILDID_LEN; i++) {
     unsigned val;
-    sscanf(&str[2*i], "%02x", &val);
+    sscanf(&str[2 * i], "%02x", &val);
 
-    buf[i] = (unsigned char) val;
+    buf[i] = (unsigned char)val;
   }
 
   return 0;
@@ -127,9 +126,10 @@ static const char *const stv_visibility_names[] = {
 
 #define FREE_AND_NULLIFY(x) \
   do { \
-    free((void *) (x)); \
+    free((void *)(x)); \
     (x) = NULL; \
-  } while (0);
+  } \
+  while (0);
 
 /** @brief dump symbol
  *
@@ -149,7 +149,8 @@ dump_symbol(const struct symbol *symbol)
     fprintf(o, "      type  : %s\n", GET_ST_TYPE_NAME(symbol->st_info));
     fprintf(o, "      bind  : %s\n", GET_ST_BIND_NAME(symbol->st_info));
     fprintf(o, "    st_other: %u\n", (unsigned)symbol->st_other);
-    fprintf(o, "      visibi: %s\n", GET_STV_VISIBILITY_NAME(symbol->st_other));
+    fprintf(o, "      visibi: %s\n",
+            GET_STV_VISIBILITY_NAME(symbol->st_other));
 
     symbol = symbol->next;
   }
@@ -163,7 +164,7 @@ dump_symbol(const struct symbol *symbol)
 void
 dump_ulp_so_info(const struct ulp_so_info *info)
 {
-  fprintf(stdout, "ulp_so_info: 0x%lx\n", (uintptr_t) info);
+  fprintf(stdout, "ulp_so_info: 0x%lx\n", (uintptr_t)info);
   fprintf(stdout, "  name: %s\n", info->name);
   fprintf(stdout, "  buildid: %s\n", buildid_to_string(info->buildid));
   dump_symbol(info->symbols);
@@ -220,7 +221,8 @@ write_ulp_so_info_json(FILE *stream, const struct ulp_so_info *info)
 
   /* Add the interesting stuff there.  */
   json_object_object_add(library, "name", JSTR(info->name));
-  json_object_object_add(library, "buildid", JSTR(buildid_to_string(info->buildid)));
+  json_object_object_add(library, "buildid",
+                         JSTR(buildid_to_string(info->buildid)));
 
   /* Add the list of symbols.  */
   json_object *symbols = json_object_new_array();
@@ -279,7 +281,7 @@ get_list_of_symbols_in_section(Elf *elf, Elf_Scn *s)
     sym_name = elf_strptr(elf, sh.sh_link, sym.st_name);
 
     /* Do not include symbols that seems invalid.  */
-    if (sym.st_value == 0 || *sym_name == '\0') {
+    if (*sym_name == '\0') {
       continue;
     }
 
@@ -292,7 +294,6 @@ get_list_of_symbols_in_section(Elf *elf, Elf_Scn *s)
 
     symbol->next = symbol_head;
     symbol_head = symbol;
-
   }
   return symbol_head;
 }
@@ -320,7 +321,6 @@ build_symbols_list(Elf *elf)
   /* Iterate on the dynsym first and list all symbols there.  */
   struct symbol *symbols_dynsym = get_list_of_symbols_in_section(elf, dynsym);
   struct symbol *symbols_symtab = get_list_of_symbols_in_section(elf, symtab);
-
 
   /* Merge both lists.  */
   struct symbol **it = &symbols_dynsym;
@@ -357,14 +357,14 @@ parse_so_elf(const char *target_path)
 
   /* Load the build id of elf object.  */
   unsigned buildid_len = 0;
-  if (get_elf_buildid(elf, (char *) so_info->buildid, &buildid_len)) {
+  if (get_elf_buildid(elf, (char *)so_info->buildid, &buildid_len)) {
     WARN("Elf in %s do not have a build id.", target_path);
     unload_elf(&elf, &fd);
     return NULL;
   }
 
   assert(buildid_len == BUILDID_LEN &&
-    "Build ID len doesn't match BUILDID_LEN macro");
+         "Build ID len doesn't match BUILDID_LEN macro");
 
   /* Build list of symbols.  */
   so_info->symbols = build_symbols_list(elf);
@@ -372,7 +372,6 @@ parse_so_elf(const char *target_path)
   unload_elf(&elf, &fd);
   return so_info;
 }
-
 
 /** @brief Parse json_object containing symbols array.
  *
@@ -410,8 +409,8 @@ parse_symbols_json(json_object *symbol_array)
     const char *name = strdup(json_object_get_string(jname));
     Elf64_Addr offset = json_object_get_int(joffset);
     size_t size = json_object_get_int(jsize);
-    unsigned char st_info = (unsigned char) json_object_get_int(jst_info);
-    unsigned char st_other = (unsigned char) json_object_get_int(jst_other);
+    unsigned char st_info = (unsigned char)json_object_get_int(jst_info);
+    unsigned char st_other = (unsigned char)json_object_get_int(jst_other);
 
     struct symbol *new = calloc(1, sizeof(struct symbol));
     assert(new && "Error allocating a new symbol element.");
@@ -426,7 +425,8 @@ parse_symbols_json(json_object *symbol_array)
     if (current == NULL) {
       current = new;
       first = new;
-    } else {
+    }
+    else {
       current->next = new;
       current = new;
     }
@@ -457,11 +457,9 @@ so_info_equal(struct ulp_so_info *a, struct ulp_so_info *b)
 
   while (a_cur && b_cur) {
     if (strcmp(a_cur->name, b_cur->name) != 0 ||
-        a_cur->offset != b_cur->offset ||
-        a_cur->size != b_cur->size ||
+        a_cur->offset != b_cur->offset || a_cur->size != b_cur->size ||
         a_cur->st_info != b_cur->st_info ||
-        a_cur->st_other != b_cur->st_other
-    ) {
+        a_cur->st_other != b_cur->st_other) {
       return false;
     }
 
@@ -488,8 +486,8 @@ so_info_equal(struct ulp_so_info *a, struct ulp_so_info *b)
  *
  * @param path          Path to the JSON file.
  *
- * @return              The ulp_so_info structure from the JSON, or NULL in case
- *                      of error.
+ * @return              The ulp_so_info structure from the JSON, or NULL in
+ * case of error.
  */
 struct ulp_so_info *
 parse_so_json(const char *path)
@@ -540,6 +538,43 @@ parse_so_json(const char *path)
   return so_info;
 }
 
+/** @brief Load the relevant so data from either JSON or ELF files.
+ *
+ * This function will open and parse the relevant informations from the target
+ * library either in its original ELF file or the parsed JSON file.
+ *
+ * @param path          Path to file.
+ *
+ * @return              The ulp_so_info structure, or NULL in case of error.
+ */
+struct ulp_so_info *
+ulp_so_info_open(const char *path)
+{
+  /* Check if path points to an ELF file and decide what to do.  */
+  FILE *f = fopen(path, "rb");
+
+  if (!f) {
+    return NULL;
+  }
+
+  static const unsigned char elf_magic[] = { 127, 'E', 'L', 'F', 2, 1, 1, 0 };
+  unsigned char elf_header[16];
+
+  size_t n = fread(elf_header, 1, 16, f);
+  fclose(f);
+
+  if (n != 16) {
+    return NULL;
+  }
+
+  if (memcmp(elf_magic, elf_header, ARRAY_LENGTH(elf_magic)) == 0) {
+    return parse_so_elf(path);
+  }
+  else {
+    return parse_so_json(path);
+  }
+}
+
 /** @brief Release the `symbol` linked list object.
  *
  * Release all dynamic memory structures allocated when the symbol linked list
@@ -577,6 +612,32 @@ release_so_info(struct ulp_so_info *info)
   }
 }
 
+/** @brief Get symbol with name  `sym`.
+ *
+ * This function transverses the `ulp_so_info` in order to find the symbol with
+ * name that matches `sym` and returns it.]
+ *
+ * @param info     ulp_so_info to look for.
+ * @param sym      Name of the symbol.
+ *
+ * @return         Symbol object with name = sym.
+ */
+struct symbol *
+get_symbol_with_name(struct ulp_so_info *info, const char *sym)
+{
+  struct symbol *symbol = info->symbols;
+
+  while (symbol) {
+    if (!strcmp(symbol->name, sym)) {
+      return symbol;
+    }
+
+    symbol = symbol->next;
+  }
+
+  return symbol;
+}
+
 int
 run_extract(struct arguments *arguments)
 {
@@ -594,9 +655,9 @@ run_extract(struct arguments *arguments)
   FILE *out;
 
   if (!strcmp(output_file, "-"))
-    out = fopen("test.json", "w");
-  else
     out = stdout;
+  else
+    out = fopen(output_file, "w");
 
   /* Write the ulp_so_info structure as a JSON object.  */
   write_ulp_so_info_json(out, info);

@@ -1,4 +1,5 @@
-int value(void)
+int
+value(void)
 {
   return 1;
 }
