@@ -1,4 +1,4 @@
 __ABS_BUILDDIR__/.libs/libtls_livepatch1.so
-@__ABS_BUILDDIR__/.libs/libtls.so.0
+@__ABS_BUILDDIR__/.libs/libtls.so.0.json
 banner_set:new_banner_set
 #%banner:ti:__TARGET_OFFSET__:__PATCH_OFFSET__

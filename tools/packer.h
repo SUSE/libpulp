@@ -29,6 +29,7 @@
 #include "ulp_common.h"
 
 struct arguments;
+struct ulp_so_info;
 
 void unload_elf(Elf **elf, int *fd);
 
@@ -40,11 +41,9 @@ Elf_Scn *get_symtab(Elf *elf);
 
 Elf_Scn *get_build_id_note(Elf *elf);
 
-int get_ulp_elf_metadata(const char *filename, struct ulp_metadata *ulp);
-
 int get_object_metadata(Elf *elf, struct ulp_object *obj);
 
-int get_elf_tgt_addrs(Elf *, struct ulp_object *, Elf_Scn *st1, Elf_Scn *st2);
+int get_target_addrs(struct ulp_so_info *, struct ulp_object *);
 
 int create_patch_metadata_file(struct ulp_metadata *ulp, const char *filename);
 
