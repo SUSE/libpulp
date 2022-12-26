@@ -1,4 +1,23 @@
 #!/bin/bash
+#
+#   libpulp - User-space Livepatching Library
+#
+#   Copyright (C) 2020-2023 SUSE Software Solutions GmbH
+#
+#   This file is part of libpulp.
+#
+#   libpulp is free software; you can redistribute it and/or
+#   modify it under the terms of the GNU Lesser General Public
+#   License as published by the Free Software Foundation; either
+#   version 2.1 of the License, or (at your option) any later version.
+#
+#   libpulp is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+#   Lesser General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
 PROGNAME=`basename "$0"`
 
@@ -8,6 +27,12 @@ PLATFORM=
 URL=
 PACKAGE=
 NO_CLEANUP=0
+
+# If this flag is enabled, then download of src packages will be blocked.
+NO_SRC_DOWNLOAD=0
+
+# If this flag is enabled, then download of ipa clones tarballs will be blocked.
+NO_IPA_CLONES_DOWNLOAD=0
 
 set_url_platform()
 {
@@ -19,9 +44,9 @@ web_get()
 {
   echo downloading "$1"
   if [ -z "$2" ]; then
-    wget  --show-progress --no-check-certificate "$1"
+    wget -4 --show-progress --no-check-certificate "$1"
   else
-    wget  --show-progress --no-check-certificate -O "$2" "$1"
+    wget -4 --show-progress --no-check-certificate -O "$2" "$1"
   fi
 
   if [ $? -eq 4 ]; then
@@ -114,7 +139,7 @@ parallel_download_packages()
     # If package already exists, do not bother downloading them again
     if [ ! -f "$package" ]; then
       echo "downloading from $url"
-      wget -q --show-progress --no-check-certificate "$url" &
+      wget -4 -q --show-progress --no-check-certificate "$url" &
       pid=$!
       pids="$pid $pids"
     else
@@ -236,6 +261,23 @@ extract_libs_from_package()
   cd ../../../
 }
 
+dump_interesting_info_from_elfs()
+{
+  local list_of_sos=$(find $PLATFORM | grep -E "*.so[\.0-9]*$")
+
+  # Extract the relevant so information needed for livepatching.
+  for so in $list_of_sos; do
+    ulp extract $so -o $so.json
+  done
+
+  echo $list_of_sos
+
+  # Delete all .so we don't need.
+  for so in $list_of_sos; do
+    rm -f $so
+  done
+}
+
 sanitize_platform()
 {
   local platforms="15-SP3 15-SP4"
@@ -278,8 +320,10 @@ print_help_message()
   echo ""
   echo "Usage: $PROGNAME <switches>"
   echo "where <switches>"
-  echo "  --platform PLATFORM            SLE version (ex 15-SP4)"
-  echo "  --package  PACKAGE             Package name to download (ex glibc)"
+  echo "  --platform=PLATFORM            SLE version (ex 15-SP4)."
+  echo "  --package=PACKAGE              Package name to download (ex glibc)."
+  echo "  --no-src-download              Do not download the src package."
+  echo "  --no-ipa-clones-download       Do not download the ipa-clones tarballs."
   echo "  --no-cleanup                   Do not cleanup downloaded .rpm files."
   echo ""
   echo "supported <library> so far are 'glibc' and 'libopenssl1_1'"
@@ -307,6 +351,14 @@ parse_program_argv()
         ;;
       --no-cleanup)
         NO_CLEANUP=1
+        shift
+        ;;
+      --no-src-download)
+        NO_SRC_DOWNLOAD=1
+        shift
+        ;;
+      --no-ipa-clones-download)
+        NO_IPA_CLONES_DOWNLOAD=1
         shift
         ;;
       --help)
@@ -345,12 +397,19 @@ main()
   local names=$(extract_lib_package_names "/tmp/suse_package_list.html" $PACKAGE)
 
   parallel_download_packages "$names"
-  download_src_packages "$names"
-  download_ipa_clones "$names"
+
+  if [ $NO_SRC_DOWNLOAD -eq 0 ]; then
+    download_src_packages "$names"
+  fi
+  if [ $NO_IPA_CLONES_DOWNLOAD -eq 0 ]; then
+    download_ipa_clones "$names"
+  fi
 
   for package in $names; do
     extract_libs_from_package "$package"
   done
+
+  dump_interesting_info_from_elfs
 
   # Delete all packages to cleanup.
   if [ $NO_CLEANUP -ne 1 ]; then

@@ -235,6 +235,7 @@ AC_CONFIG_FILES([Makefile
 		 tests/Makefile
 		 tools/Makefile
 		 common/Makefile
-		 docs/Makefile])
+		 docs/Makefile
+		 scripts/Makefile])
 
 AC_OUTPUT

@@ -1,6 +1,6 @@
 #   libpulp - User-space Livepatching Library
 #
-#   Copyright (C) 2020-2021 SUSE Software Solutions GmbH
+#   Copyright (C) 2020-2023 SUSE Software Solutions GmbH
 #
 #   This file is part of libpulp.
 #
@@ -17,8 +17,4 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-ACLOCAL_AMFLAGS = -I config
-
-SUBDIRS = include common lib man tools tests docs scripts
-
-EXTRA_DIST = LICENSE README.md
+dist_bin_SCRIPTS=setup_package.sh
