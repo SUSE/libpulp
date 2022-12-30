@@ -139,6 +139,13 @@ trigger_one_process(struct ulp_process *target, int retries,
         FATAL("fatal error reverting livepatches (hijacked execution).");
         retry = 0;
       }
+      /* In case we received a `No Target Lib` error, ignore it because we are
+         doing atomic patching and it may be the first patch we are trying to
+         apply.  */
+      if (livepatch && result == ENOTARGETLIB) {
+        result = 0;
+      }
+
       if (result) {
         DEBUG("live patching revert %d failed (attempt #%d).", target->pid,
               (retries - retry));
@@ -193,7 +200,7 @@ metadata_clean:
   }
   else {
     char buf[128];
-    snprintf(buf, 128, "reverted all patches from %s", revert_library);
+    snprintf(buf, 128, "reverted all patches from '%s'", revert_library);
     entry->patch_name = strdup(buf);
   }
   entry->err = ret;

@@ -140,7 +140,9 @@ static struct argp_option options[] = {
   { "buildid", 'b', 0, 0, "Print the build id", 0 },
   { 0, 0, 0, 0, "trigger command only:", 0 },
   { "retries", 'r', "N", 0, "Retry N times if process busy", 0 },
-  { "revert-all", ULP_OP_REVERT_ALL, "LIB", 0, "Revert all patches from LIB",
+  { "revert-all", ULP_OP_REVERT_ALL, "LIB", 0,
+    "Revert all patches from LIB. If LIB=target, then all patches from the "
+    "target library within the passed livepatch will be reverted.",
     0 },
   { "timeout", ULP_OP_TIMEOUT, "t", 0,
     "Set trigger timeout to t seconds (default 200s)", 0 },

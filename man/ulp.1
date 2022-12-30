@@ -382,6 +382,11 @@ aborts the live patching operation; on the other hand, if no threads are within
 the target library, the live patch can be applied with additional consistency
 guarantees.
 .TP
+.B --revert-all=LIB
+Before applying the live patch to the target process, revert all livepatches
+applied to the library LIB. If LIB=target, then all patches to the target
+library of the livepatch will be removed.
+.TP
 .B -q, --quiet
 Do not produce any output.
 .TP
