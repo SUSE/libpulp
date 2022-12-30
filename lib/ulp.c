@@ -104,7 +104,7 @@ revert_all_patches_from_lib(const char *lib_name)
 
   const char *lib_basename = get_basename(lib_name);
 
-  int ret = 0;
+  int ret = ENOTARGETLIB;
 
   /* Paranoid: check if the path buffer didn't overflow.  */
   if ((ptrdiff_t)(lib_basename - lib_name) >= ULP_PATH_LEN) {
@@ -117,10 +117,12 @@ revert_all_patches_from_lib(const char *lib_name)
     if (!strncmp(lib_basename, patch->lib_name, ULP_PATH_LEN)) {
       ret = ulp_can_revert_patch(patch->patch_id);
       if (ret) {
-        break;
+        continue;
       }
 
       ret = ulp_revert_patch(patch->patch_id);
+      if (ret)
+        return ret;
     }
 
     patch = next;

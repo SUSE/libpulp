@@ -1651,6 +1651,14 @@ revert_patches_from_lib(struct ulp_process *process, const char *lib_name)
 
   DEBUG("beginning patches removal.");
 
+  /* In case the revert_library is set to target, then we must revert the
+   * target library of the patch.  */
+  if (!strcmp(lib_name, "target") && ulp.objs) {
+    /* TODO: We only support one target library per patch.  If we want to
+       expand this, this also has to be changed.  */
+    lib_name = ulp.objs->name;
+  }
+
   if (!process->all_threads_hijacked) {
     WARN("not all threads hijacked.");
     return EUNKNOWN;

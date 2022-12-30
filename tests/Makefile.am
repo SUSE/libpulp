@@ -574,6 +574,8 @@ TESTS = \
   libpulp_messages.py \
   relative_path.py \
   revert_all.py \
+  revert_all_target1.py \
+  revert_all_target2.py \
   revert_and_patch.py \
   process.py \
   process_revert.py \
