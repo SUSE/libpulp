@@ -557,13 +557,13 @@ ulp_so_info_open(const char *path)
     return NULL;
   }
 
-  static const unsigned char elf_magic[] = { 127, 'E', 'L', 'F', 2, 1, 1, 0 };
-  unsigned char elf_header[16];
+  static const unsigned char elf_magic[] = { 127, 'E', 'L', 'F' };
+  unsigned char elf_header[5];
 
-  size_t n = fread(elf_header, 1, 16, f);
+  size_t n = fread(elf_header, 1, 5, f);
   fclose(f);
 
-  if (n != 16) {
+  if (n != 5) {
     return NULL;
   }
 
