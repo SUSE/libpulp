@@ -24,5 +24,3 @@ noinst_LTLIBRARIES = libcommon.la
 AM_CFLAGS += -I$(abs_top_srcdir)/include
 
 libcommon_la_SOURCES = common.c
-libcommon_la_LIBADD = $(LIBUNWIND_LIBS)
-

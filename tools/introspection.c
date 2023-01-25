@@ -2307,6 +2307,7 @@ library_range_detect(pid_t pid, char *library, uintptr_t *range_start,
     WARN("error parsing /proc/%d/maps: %s", pid, strerror(errno));
 
   free(line);
+  fclose(fp);
 
   if (errno)
     return errno;
