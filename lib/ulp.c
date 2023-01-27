@@ -78,8 +78,6 @@ char ulp_prologue_endbr64[ULP_NOPS_LEN_ENDBR64] = {
 unsigned int __ulp_root_index_counter = 0;
 unsigned long __ulp_global_universe = 0;
 
-extern void __ulp_prologue();
-
 __attribute__((constructor)) void
 begin(void)
 {
@@ -194,12 +192,6 @@ __ulp_apply_patch()
   return result;
 }
 
-void
-__ulp_print()
-{
-  fprintf(stderr, "ULP DEBUG PRINT MSG\n");
-}
-
 int
 __ulp_check_applied_patch()
 {
@@ -216,6 +208,13 @@ __ulp_check_applied_patch()
     return 0;
 }
 
+/** @brief Get ULP global universe.
+ *
+ * Every time a patch is applied or reverted, the global universe counter is
+ * incremented.
+ *
+ * @return current global universe counter.
+ */
 unsigned long
 __ulp_get_global_universe_value()
 {
@@ -234,6 +233,12 @@ unload_handlers(struct ulp_metadata *ulp)
   return status;
 }
 
+/** @brief Load symbol with name 'fname' from so in 'handler'.
+ *
+ * Given a dlopen 'handle', get the symbol which matches the 'fname'.
+ *
+ * @return Address to symbol.
+ */
 void *
 load_so_symbol(char *fname, void *handle)
 {
@@ -250,6 +255,15 @@ load_so_symbol(char *fname, void *handle)
   return func;
 }
 
+/** @brief Load the .so file handle from the ulp metadata object.
+ *
+ * Livepatches code are stored in shared object (.so) files.  This function
+ * will open the .so file and store its handler in the ulp object as well.
+ *
+ * @param ulp     The ulp metadata object.
+ *
+ * @return 0 if error, 1 if success.
+ */
 int
 load_so_handlers(struct ulp_metadata *ulp)
 {
@@ -264,6 +278,10 @@ load_so_handlers(struct ulp_metadata *ulp)
   return 1;
 }
 
+/** @brief undload the loaded metadata object.
+ *
+ * Free its resources and set the global metadata object to NULL.
+ */
 int
 unload_metadata(struct ulp_metadata *ulp)
 {
@@ -339,7 +357,7 @@ read_data(int from, void *to, size_t count, int line)
  * enough to hold LEN characteres. The offset into FD is advanced by the
  * amount of bytes read.
  *
- * Returns -1 on error, 0 on End-of-file, or the amount of bytes read.
+ * @return  -1 on error, 0 on End-of-file, or the amount of bytes read.
  */
 int
 read_line(int fd, char *buf, size_t len)
@@ -376,6 +394,7 @@ read_line(int fd, char *buf, size_t len)
   return -1;
 }
 
+/** @brief call dlopen and check for errors.  */
 void *
 load_so(char *obj)
 {
@@ -426,6 +445,13 @@ metadata_clean:
   return ret;
 }
 
+/** @brief Load patch from metadata buffer and apply its content.
+ *
+ * When a livepatch is issued, this function will parse the patch from the
+ * patch buffer and apply its content, either revert or apply.
+ *
+ * @return 0 if success, anything else if error.
+ */
 int
 load_patch()
 {
@@ -486,6 +512,13 @@ load_patch_success:
   return ret;
 }
 
+/** @brief Check if a patch with patchid = `id` can be reverted.
+ *
+ * Check if the patch with its id = `id` can be reverted.
+ *
+ * @param id    The id of patch to analyze.
+ * @return      0 if success, anything else if error.
+ */
 int
 ulp_can_revert_patch(const unsigned char *id)
 {
@@ -517,34 +550,40 @@ ulp_can_revert_patch(const unsigned char *id)
   return 0;
 }
 
+/** @brief Get the detour root (patched function) by index.
+ *
+ * @param idx    Index to querry.
+ * @return       NULL if not found, pointer to root object if found.
+ */
 struct ulp_detour_root *
 get_detour_root_by_index(unsigned int idx)
 {
   struct ulp_detour_root *r;
-  r = __ulp_root;
-
-  if (r == NULL)
-    return NULL;
-  for (r = __ulp_root; r != NULL && r->index != idx; r = r->next) {
-  };
+  for (r = __ulp_root; r != NULL && r->index != idx; r = r->next)
+    ;
 
   return r;
 }
 
+/** @brief Get the detour root (patched function) by its address.
+ *
+ * @param addr   Address of function to querry.
+ * @return       NULL if not found, pointer to root object if found.
+ */
 struct ulp_detour_root *
 get_detour_root_by_address(void *addr)
 {
   struct ulp_detour_root *r;
-  r = __ulp_root;
-
-  if (r == NULL)
-    return NULL;
-  for (r = __ulp_root; r != NULL && r->patched_addr != addr; r = r->next) {
-  };
+  for (r = __ulp_root; r != NULL && r->patched_addr != addr; r = r->next)
+    ;
 
   return r;
 }
 
+/** @brief Push a new empty detour object to the beginning to detour list.
+ *
+ * @return       New detour object.
+ */
 struct ulp_detour_root *
 push_new_root()
 {
@@ -556,17 +595,22 @@ push_new_root()
     return NULL;
   }
 
-  // since above we use calloc, the if/else below shouldn't be needed
-  if (!__ulp_root)
-    root_aux = NULL;
-  else
-    root_aux = __ulp_root;
+  /* Append the new root into the start of the chain.  */
+  root_aux = __ulp_root;
   __ulp_root = root;
   root->next = root_aux;
 
   return root;
 }
 
+/** @brief Apply parsed metadata object content.
+ *
+ * This function will apply all units (function replacements) in the
+ * livepatch, as well as the private data references.
+ *
+ * @param ulp       The parsed ulp_metadata object.
+ * @return          0 if success, anything else if error.
+ */
 int
 ulp_apply_all_units(struct ulp_metadata *ulp)
 {
@@ -682,6 +726,8 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
   return 0;
 }
 
+/** @brief TODO: merge with ulp_apply_all_units.  There seems to be no reason
+    why these two things are separated.  */
 struct ulp_applied_patch *
 ulp_state_update(struct ulp_metadata *ulp)
 {
@@ -770,9 +816,10 @@ ulp_state_update(struct ulp_metadata *ulp)
   return a_patch;
 }
 
-/*
- * Retrieves the memory protection bits of the page containing ADDR and
- * returns it. If errors ocurred, return -1.
+/* @brief Retrieves the memory protection bits of the page containing ADDR.
+ *
+ * @param addr    Address of the page.
+ * @return        If errors ocurred, return -1.
  */
 int
 memory_protection_get(uintptr_t addr)
@@ -824,6 +871,14 @@ memory_protection_get(uintptr_t addr)
   return result;
 }
 
+/** @brief Check if the patch metadata object is sane.
+ *
+ * This function checks if the given metadata object in `ulp` is sane in order
+ * to procceed with the patching.
+ *
+ * @param ulp        The metadata object.
+ * @return           0 if success, anything else if error.
+ */
 int
 check_patch_sanity(struct ulp_metadata *ulp)
 {
@@ -840,6 +895,15 @@ check_patch_sanity(struct ulp_metadata *ulp)
   return 0;
 }
 
+/** @brief Check the dependencies of the livepatch given in metadata.
+ *
+ * This function will check if the patch given in the parsed ulp_metadata
+ * object have its dependencies fullfiled.
+ *
+ * @param ulp         The parsed ulp_metadata object.
+ *
+ * @return            0 if success, EDEPEND if dependencies are not met.
+ */
 int
 check_patch_dependencies(struct ulp_metadata *ulp)
 {
@@ -864,6 +928,9 @@ check_patch_dependencies(struct ulp_metadata *ulp)
   return 0;
 }
 
+/** @brief Function used by dl_iterate_phdr to check if there are some library
+ *        that matches the buildid in the `data` ulp_metadata object.
+ */
 int
 compare_build_ids(struct dl_phdr_info *info,
                   size_t __attribute__((unused)) size, void *data)
@@ -933,32 +1000,41 @@ compare_build_ids(struct dl_phdr_info *info,
   return 0;
 }
 
-int
-all_build_ids_checked(struct ulp_metadata *ulp)
-{
-  if (!ulp->objs->build_id_check) {
-    WARN("Could not match patch target build id %s.", ulp->objs->name);
-    return 0;
-  }
-  return 1;
-}
-
+/** @brief Check if the build id in the patch matches some .
+ *
+ * Check if the build id in the patch was already compared and it is safe to
+ * continue with livepatching.
+ *
+ * @param ulp         The parsed ulp_metadata object.
+ * @return            1 if success, 0 if error.
+ */
 int
 check_build_id(struct ulp_metadata *ulp)
 {
   dl_iterate_phdr(compare_build_ids, ulp);
-  if (!all_build_ids_checked(ulp))
+  if (!ulp->objs->build_id_check) {
+    WARN("Could not match patch target build id %s.", ulp->objs->name);
     return 0;
+  }
+
   return 1;
 }
 
+/** @brief Copy the ulp proglogue layout into the function to be patched's
+ * prologue
+ *
+ * This function copies the new code prologue into the old function prologue
+ * in order to redirect the execution to the new function.
+ *
+ */
 static void
 ulp_patch_prologue_layout(void *old_fentry, const char *prologue, int len)
 {
   memcpy(old_fentry, prologue, len);
 }
 
-/*
+/** @brief skip the ulp prologue.
+ *
  * When a function gets live patch, the nops at its entry point get replaced
  * with a backwards-jump to a small segment of code that redirects execution to
  * the new version of the function. However, when all live patches to said
@@ -968,6 +1044,8 @@ ulp_patch_prologue_layout(void *old_fentry, const char *prologue, int len)
  * The following function replaces the backwards-jump with nops, thus making
  * the target function look like it did at the beginning of execution, i.e.
  * without live patches.
+ *
+ * @param fentry        Address to write the prologue to.
  */
 void
 ulp_skip_prologue(void *fentry)
@@ -981,6 +1059,13 @@ ulp_skip_prologue(void *fentry)
   memcpy(fentry + bias, insn_nop2, sizeof(insn_nop2));
 }
 
+/** @brief Get patched address of function with universe index = idx.
+ *
+ * This function will get the function address (plus 2) of the function whose
+ * universe index equals `idx`. Every time a function is livepatched or
+ * reverted this index number increases. It will save this address in register
+ * r11.
+ */
 void
 __ulp_manage_universes(unsigned long idx)
 {
@@ -1016,12 +1101,28 @@ __ulp_manage_universes(unsigned long idx)
   /* clang-format on */
 }
 
+/** @brief Get next root index and update the global counter.
+ *
+ * Every time a livepatch function is updated, this counter gets updated.
+ */
 unsigned int
 get_next_function_index()
 {
   return __ulp_root_index_counter++;
 }
 
+/** @brief Push new detour object into root object.
+ *
+ * This function will push a new detour object (reference to new function)
+ * into the root object (old function).
+ *
+ * @param universe     Global index state.
+ * @param patch_id     ID of patch.
+ * @param root         Root object representing old function.
+ * @param new_faddr    New function whose detour object will be created.
+ *
+ * @return             0 if error 1 if success.
+ */
 unsigned int
 push_new_detour(unsigned long universe, unsigned char *patch_id,
                 struct ulp_detour_root *root, void *new_faddr)
@@ -1173,16 +1274,23 @@ ulp_get_applied_patch(const unsigned char *id)
   return NULL;
 }
 
+/** @brief Remove applied patch and its units..
+ *
+ * If a patch removal is issued, this function will remove the patch from the
+ * patch list and also every unit that is associated with it.
+ *
+ * @brief id    Patch id to remove.
+ *
+ * @return      0 if success, ESTATE if error.
+ *
+ */
 int
 ulp_revert_patch(unsigned char *id)
 {
-  struct ulp_applied_patch *patch;
-
   __ulp_global_universe++;
-  patch = ulp_get_applied_patch(id);
 
   if (ulp_revert_all_units(id)) {
-    if (!ulp_state_remove(patch)) {
+    if (!ulp_state_remove(id)) {
       WARN("Problem updating state. Program may be inconsistent.");
       return ESTATE;
     }
@@ -1191,52 +1299,68 @@ ulp_revert_patch(unsigned char *id)
   return 0;
 }
 
+/** @brief Remove applied patch from the patches list.
+ *
+ * If a patch removal is issued, this function will remove the patch from the
+ * patch list.
+ *
+ * @brief id    Patch id to remove.
+ *
+ * @return      0 if no patch to remove, 1 if patch found.
+ *
+ */
 int
-ulp_state_remove(struct ulp_applied_patch *rm_patch)
+ulp_state_remove(unsigned char *id)
 {
-  struct ulp_applied_patch *patch;
+  struct ulp_applied_patch **patch, *patch_to_remove = NULL;
   struct ulp_applied_unit *unit, *next_unit;
   struct ulp_dependency *dep, *next_dep;
-  int found = 0;
 
   /* take it out from applied patches list */
-  if (__ulp_state.patches == rm_patch) {
-    found = 1;
-    __ulp_state.patches = rm_patch->next;
-  }
-  else {
-    for (patch = __ulp_state.patches; patch != NULL; patch = patch->next) {
-      if (patch == rm_patch) {
-        found = 1;
-        patch->next = rm_patch->next;
-        break;
-      }
+  /* Find the patch in the patch chain*/
+  for (patch = &__ulp_state.patches; *patch != NULL; patch = &(*patch)->next) {
+    /* Check if this is the patch we want.  */
+    if (memcmp((*patch)->patch_id, id, 32) == 0) {
+      /* Remove it from the patch chain.  */
+      patch_to_remove = *patch;
+      *patch = (*patch)->next;
+
+      /* We have found what we need.  */
+      break;
     }
   }
 
-  if (!found)
+  if (!patch_to_remove) {
     return 0;
+  }
 
-  /* free all units from it */
-  for (unit = rm_patch->units; unit != NULL; unit = next_unit) {
+  /* Free all units from it.  */
+  for (unit = patch_to_remove->units; unit != NULL; unit = next_unit) {
     next_unit = unit->next;
-    free(unit);
+    FREE_AND_NULLIFY(unit);
   }
 
-  /* free all deps from it */
-  for (dep = rm_patch->deps; dep != NULL; dep = next_dep) {
+  /* Free all deps from it.  */
+  for (dep = patch_to_remove->deps; dep != NULL; dep = next_dep) {
     next_dep = dep->next;
-    free(dep);
+    FREE_AND_NULLIFY(dep);
   }
 
-  free((void *)rm_patch->lib_name);
-
-  /* free it */
-  free(rm_patch);
+  FREE_AND_NULLIFY(patch_to_remove->lib_name);
+  FREE_AND_NULLIFY(patch_to_remove);
 
   return 1;
 }
 
+/** @brief Revert all units applied to given patch id.
+ *
+ * This function will revert all units applied by a patch which matches the
+ * given patch id, applying the units from a previous patch if available.
+ *
+ * @param patch_id    ID of the patch to revert.
+ *
+ * @return 1 if success or failure.
+ */
 int
 ulp_revert_all_units(unsigned char *patch_id)
 {
@@ -1263,7 +1387,8 @@ ulp_revert_all_units(unsigned char *patch_id)
         }
 
         /* Update the function prologue. */
-        if (dactive == NULL) {
+        if (!dactive) {
+          /* There is no previous patch in this function.  */
           ulp_patch_addr(r->patched_addr, NULL, false);
         }
         else {

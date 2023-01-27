@@ -43,6 +43,16 @@
 /** Intel endbr64 instruction optcode.  */
 #define INSN_ENDBR64 0xf3, 0x0f, 0x1e, 0xfa
 
+/** Free whatever pointer given and set it to NULL.  */
+#define FREE_AND_NULLIFY(x) \
+  do { \
+    if (x) { \
+      free((void *)(x)); \
+      (x) = NULL; \
+    } \
+  } \
+  while (0);
+
 extern __thread int __ulp_pending;
 
 /** Used on __tls_get_addr(tls_index *).  */

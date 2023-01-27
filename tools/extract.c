@@ -124,13 +124,6 @@ static const char *const stv_visibility_names[] = {
 /** Get STV_VISIBILITY name according to its value.  */
 #define GET_STV_VISIBILITY_NAME(s) stv_visibility_names[ELF64_ST_VISIBILITY(s)]
 
-#define FREE_AND_NULLIFY(x) \
-  do { \
-    free((void *)(x)); \
-    (x) = NULL; \
-  } \
-  while (0);
-
 /** @brief dump symbol
  *
  * Dump a struct symbol to stdout for debugging purposes.

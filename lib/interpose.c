@@ -675,6 +675,13 @@ dl_locks_held(void)
   return (dl_load_lock->__data.__lock || dl_load_write_lock->__data.__lock);
 }
 
+/** @brief Lock the `flag` lock to indicate that this process in being patched.
+ *
+ * This function will lock the `flag` lock, which indicates that this process
+ * is being analyzed by libpulp tools.  This runs when the thread was hijacked.
+ *
+ * @return   0 if lock was not held, 1 if held.
+ */
 int
 __ulp_asunsafe_trylock(void)
 {
@@ -688,12 +695,15 @@ __ulp_asunsafe_trylock(void)
   return 0;
 }
 
+/** @brief Unlock the `flag` lock.  */
 int
 __ulp_asunsafe_unlock(void)
 {
   __sync_fetch_and_and(&flag, 0);
   return 0;
 }
+
+/* Interposed functions.  */
 
 void
 free(void *ptr)
