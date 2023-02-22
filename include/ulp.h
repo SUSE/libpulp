@@ -33,8 +33,8 @@
  *
  * This object is created when a function is patched, and is unique per
  * function. If another patch modifies that function, this object is modified
- * rather than create a new one.  A new object is only created if a new function
- * is patched.
+ * rather than create a new one.  A new object is only created if a new
+ * function is patched.
  */
 struct ulp_detour_root
 {

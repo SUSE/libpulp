@@ -67,43 +67,89 @@ typedef struct
 
 struct ulp_patching_state
 {
+  /** 1 = libpulp loaded.  */
   char load_state;
+
+  /** List of patches applied.  */
   struct ulp_applied_patch *patches;
 };
 
 struct ulp_metadata
 {
+  /** BuildID of patch.  */
   unsigned char patch_id[32];
+
+  /** Name of the patch container.  */
   char *so_filename;
+
+  /** dlopen handle of the patch container.  */
   void *so_handler;
+
+  /** Content of a patch for a single library.  */
   struct ulp_object *objs;
   uint32_t ndeps;
+
+  /** Dependencies of the patch.
+      FIXME: This has been deprecated and should be removed.  */
   struct ulp_dependency *deps;
+
   uint32_t nrefs;
+
+  /** Number of indirect references to variables (private or tls or unexported
+      variables).  FIXME: This should be moved into ulp_object, but be careful
+        with compatibility with older versions of libpulp.  */
   struct ulp_reference *refs;
+
+  /** Type of patch (apply a patch, remove a patch).  */
   uint8_t type;
+
+  /** Comment section used to hold information that may be useful for a human,
+      like CVE or bugzilla references.  */
   char *comments;
 };
 
+/** Represents a */
 struct ulp_object
 {
   uint32_t build_id_len;
+
+  /** Flags if there was a match with the library's build id loaded in the
+      target program.  */
   uint32_t build_id_check;
+
+  /** Build id of target library ship in the livepatch.  */
   char *build_id;
+
+  /** Name of the library to be livepatched.  */
   char *name;
+
+  /** FIXME: Unused, but kept for compatibility with older libpulps.  */
   void *flag;
+
+  /** Number of units.  FIXME: Is this really necessary?  */
   uint32_t nunits;
+
+  /** Number of units to patch (symbols).  */
   struct ulp_unit *units;
 };
 
+/** Represents a single symbol that needs to be patched in the livepatch.  */
 struct ulp_unit
 {
+  /** Name of the symbol (function) that will be replaced in the library.  */
   char *old_fname;
+
+  /** Name of the symbol (function) that will replace the function in library.
+   */
   char *new_fname;
+
+  /** Address of function that will be patched.  */
   void *old_faddr;
   struct ulp_unit *next;
 };
 
+/** FIXME: Struct from the deprecated dependency model.  Remove and check
+   compatibility with older versions of libpulp.  */
 struct ulp_dependency
 {
   unsigned char dep_id[32];
@@ -111,13 +157,30 @@ struct ulp_dependency
   struct ulp_dependency *next;
 };
 
+/** Struct encapsulating references to variables.  This is used to livepatch
+    static variables (i.e. private to the compilation unit), tls variables,
+    and variables which are not exposed by the module at all.  This can also
+    be used to bypass linking issues.  */
 struct ulp_reference
 {
+  /** holds the name of the variable in the target library which we want to
+      reference to.  */
   char *target_name;
+
+  /** holds the name of the variable in the livepatch container which we want
+      the reference address to be written to.  */
   char *reference_name;
+
+  /** Reference to the variable in the library.  */
   uintptr_t target_offset;
+
+  /** Reference to the variable where we will write the reference to.  */
   uintptr_t patch_offset;
+
+  /** Is this a Thread Local Storage variable?  */
   bool tls;
+
+  /** Next reference in chain.  */
   struct ulp_reference *next;
 };
 
@@ -125,67 +188,47 @@ struct ulp_reference
 
 struct ulp_applied_patch
 {
+  /** ID of patch.  */
   unsigned char patch_id[32];
+
+  /** Name of target library.  */
   const char *lib_name;
+
+  /** Name of the patch container file (.so).  */
   const char *container_name;
+
   struct ulp_applied_unit *units;
   struct ulp_applied_patch *next;
+
+  /** Patch dependency.  Not used but kept for backwards compatibility.  */
   struct ulp_dependency *deps;
 };
 
 struct ulp_applied_unit
 {
+  /** The address of the new function, from the livepatch container.  */
   void *patched_addr;
+
+  /** The address of the old function, from the library itself.  */
   void *target_addr;
+
+  /** The content overwritten by the patch.  */
   char overwritten_bytes[14];
+
+  /** FIXME: Unused, but kept as backwards compatibility with older versions of
+      libpulp.   */
   char jmp_type;
+
+  /** Next in the chain.  */
   struct ulp_applied_unit *next;
 };
-
-/** Uncomment this to enable a dlinfo cache on libpulp's side.  It does
-    improve patching time marginally, but requires to be more intrusive
-    on the interposed functions.  */
-
-/*
-#define ENABLE_DLINFO_CACHE
-*/
-
-#ifdef ENABLE_DLINFO_CACHE
-/** Caches dynamic link information required when running `paches` or `trigger`
-    command.  This is maintained for performance reasons.  */
-struct ulp_dlinfo_cache
-{
-  /* Next library cache info.  Must be the first element of this struct so
-     later libpulp versions can add information here without breaking past
-     versions.  */
-  struct ulp_dlinfo_cache *next;
-
-  /** Load bias of component.  */
-  Elf64_Addr bias;
-
-  /** Address of dynsym.  */
-  Elf64_Addr dynsym;
-
-  /** Address of dynstr.  */
-  Elf64_Addr dynstr;
-
-  /** Build ID of library.  */
-  unsigned char buildid[32];
-
-  /** Number of symbols in library.  */
-  int num_symbols;
-
-  /* Sentinel used to mark end of struct.  */
-  uint32_t sentinel;
-};
-#endif
 
 /* Functions present in libcommon, linked agaist both libpulp.so and tools.  */
 const char *get_basename(const char *);
 
 const char *buildid_to_string(const unsigned char[BUILDID_LEN]);
 
-const char *get_target_binary_name(int);
+const char *get_target_binary_name(int pid);
 
 const char *get_current_binary_name(void);
 
