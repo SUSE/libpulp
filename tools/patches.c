@@ -437,8 +437,11 @@ is_library_livepatchable(struct ulp_applied_patch *patch,
     ehdr_addr = 0x400000UL;
   }
 
-  /* Only look the first 64 symbols, else we may take too much time.  */
-  int len = MIN(obj->num_symbols, 64);
+  /* FIXME: Some applications take a very long time to decide if library is
+     livepatchable because the library has a lot of symbols.  In this case we
+     limit the number of symbols to read to a constant value.  Statistics shows
+     that 8000 is a reasonable number (see issue #159).  */
+  int len = MIN(obj->num_symbols, 8000);
 
   for (i = 0; i < len; i++) {
     ElfW(Sym) sym;
