@@ -1201,26 +1201,6 @@ parse_libs_dynobj(struct ulp_process *process)
     obj_link_map = aux_link_map->l_next;
   }
 
-  if (parse_lib_dynobj(process->dynobj_libpulp, process)) {
-    DEBUG("libpulp not loaded, thus live patching not possible.");
-    return ENOLIBPULP;
-  }
-
-#ifdef ENABLE_DLINFO_CACHE
-  if (get_dynobj_elf_by_cache(process)) {
-    DEBUG("libpulp dlinfo cache not available");
-  }
-#endif
-
-  /* Iterate over the link map to build the list of libraries. */
-  struct ulp_dynobj *obj;
-  for (obj = process->dynobj_targets; obj != NULL; obj = obj->next) {
-    if (obj != process->dynobj_libpulp) {
-      if (parse_lib_dynobj(obj, process))
-        break;
-    }
-  }
-
   /* When libpulp has been loaded (usually with LD_PRELOAD),
    * parse_lib_dynobj will find the symbols it provides, such as
    * __ulp_trigger, which are all required for userspace live-patching.
@@ -1230,6 +1210,20 @@ parse_libs_dynobj(struct ulp_process *process)
   if (process->dynobj_libpulp == NULL) {
     DEBUG("libpulp not loaded, thus live patching not possible.");
     return ENOLIBPULP;
+  }
+
+  if (parse_lib_dynobj(process->dynobj_libpulp, process)) {
+    DEBUG("libpulp not loaded, thus live patching not possible.");
+    return ENOLIBPULP;
+  }
+
+  /* Iterate over the link map to build the list of libraries. */
+  struct ulp_dynobj *obj;
+  for (obj = process->dynobj_targets; obj != NULL; obj = obj->next) {
+    if (obj != process->dynobj_libpulp) {
+      if (parse_lib_dynobj(obj, process))
+        break;
+    }
   }
 
   return 0;

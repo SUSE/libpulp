@@ -73,7 +73,7 @@ typedef int ulp_error_t;
     "No link map in object", \
     "Invalid program header", \
     "Unable to find process entry address", \
-    "Libpulp not found", \
+    "Libpulp not found in target process", \
     "Thread attach failure", \
     "Thread dettach failure", \
     "Invalid .ulp file", \
