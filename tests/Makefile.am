@@ -589,7 +589,8 @@ TESTS = \
   stress.py \
   tempfiles.py \
   pcqueue.py \
-  comments.py
+  comments.py \
+  nolibpulp.py
 
 XFAIL_TESTS = \
   blocked.py \
