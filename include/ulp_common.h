@@ -246,6 +246,8 @@ void free_metadata(struct ulp_metadata *);
 
 bool is_directory(const char *path);
 
+uid_t get_process_owner(pid_t pid);
+
 #define FATAL(format, ...) \
   do { \
     fprintf(stderr, "ulp: " format "\n", ##__VA_ARGS__); \

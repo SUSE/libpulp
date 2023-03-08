@@ -36,6 +36,9 @@ struct ulp_process_iterator
   struct ulp_process *last;
 
   const char *wildcard;
+  const char *user_wildcard;
+  uid_t target_uid;
+
   DIR *slashproc;
   struct dirent *subdir;
 
@@ -44,13 +47,16 @@ struct ulp_process_iterator
 
 struct ulp_process *process_list_next(struct ulp_process_iterator *);
 struct ulp_process *process_list_begin(struct ulp_process_iterator *,
-                                       const char *);
+                                       const char *, const char *);
 int process_list_end(struct ulp_process_iterator *);
 
-#define FOR_EACH_ULP_PROCESS_MATCHING_WILDCARD(p, wildcard) \
+#define FOR_EACH_ULP_PROCESS_FROM_USER_WILDCARD(p, wildcard, user_wildcard) \
   struct ulp_process_iterator _it; \
-  for (p = process_list_begin(&_it, wildcard); process_list_end(&_it); \
-       p = process_list_next(&_it))
+  for (p = process_list_begin(&_it, wildcard, user_wildcard); \
+       process_list_end(&_it); p = process_list_next(&_it))
+
+#define FOR_EACH_ULP_PROCESS_MATCHING_WILDCARD(p, wildcard) \
+  FOR_EACH_ULP_PROCESS_FROM_USER_WILDCARD(p, wildcard, NULL)
 
 #define FOR_EACH_ULP_PROCESS(p) FOR_EACH_ULP_PROCESS_MATCHING_WILDCARD(p, NULL)
 

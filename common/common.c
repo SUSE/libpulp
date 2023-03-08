@@ -562,3 +562,17 @@ is_directory(const char *path)
   else
     return S_ISDIR(s.st_mode);
 }
+
+uid_t
+get_process_owner(pid_t pid)
+{
+  char procpath[128];
+  snprintf(procpath, sizeof(procpath), "/proc/%d/loginuid", pid);
+
+  struct stat info;
+  if (stat(procpath, &info)) {
+    return 0;
+  }
+
+  return info.st_uid;
+}

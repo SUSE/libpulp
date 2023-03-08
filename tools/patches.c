@@ -20,10 +20,12 @@
  */
 
 #include <argp.h>
+#include <assert.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fnmatch.h>
 #include <libelf.h>
+#include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,6 +54,9 @@ generate_ulp_list_thread(void *args)
 
   pid_t pid;
   const char *wildcard = it->wildcard;
+  const char *usr_wildcard = it->user_wildcard;
+  uid_t target_uid = it->target_uid;
+
   while ((it->subdir = readdir(it->slashproc))) {
     /* Skip non-numeric directories in /proc. */
     if (!isnumber(it->subdir->d_name))
@@ -67,6 +72,23 @@ generate_ulp_list_thread(void *args)
       if (wildcard != NULL && process_name != NULL &&
           fnmatch(wildcard, process_name, 0) != 0)
         continue;
+    }
+
+    if (usr_wildcard) {
+      uid_t uid = get_process_owner(pid);
+      if (target_uid > 0) {
+        if (uid != target_uid)
+          continue;
+      }
+      else if (uid > 0) {
+        struct passwd *pw = getpwuid(uid);
+        const char *usr_name = pw ? pw->pw_name : NULL;
+
+        /* Skip processes which does not match user name wildcard.  */
+        if (usr_name && fnmatch(usr_wildcard, usr_name, 0) != 0) {
+          continue;
+        }
+      }
     }
 
     /* If process is the ULP tool itself, skip it.  We cannot livepatch the
@@ -110,24 +132,32 @@ process_list_next(struct ulp_process_iterator *it)
 static pthread_t process_list_thread;
 
 struct ulp_process *
-process_list_begin(struct ulp_process_iterator *it, const char *wildcard)
+process_list_begin(struct ulp_process_iterator *it,
+                   const char *procname_wildcard, const char *user_wildcard)
 {
   memset(it, 0, sizeof(*it));
 
   pid_t pid;
-  it->wildcard = wildcard;
+  it->wildcard = procname_wildcard;
+  it->user_wildcard = user_wildcard;
+  it->target_uid = 0;
 
   original_enable_threading = enable_threading;
 
-  if (isnumber(wildcard)) {
+  if (isnumber(procname_wildcard)) {
     /* If wildcard is actually a number, then treat it as a PID.  */
-    pid = atoi(wildcard);
+    pid = atoi(procname_wildcard);
     insert_target_process(pid, &it->last);
     it->now = it->last;
 
     /* Disable threading in this case.  */
     enable_threading = false;
     return it->now;
+  }
+
+  /* In case the user wildcard is a number, then treat it as a uid.  */
+  if (isnumber(user_wildcard)) {
+    it->target_uid = strtol(user_wildcard, NULL, 10);
   }
 
   /* Build a list of all processes that have libpulp.so loaded. */
@@ -614,10 +644,15 @@ run_patches(struct arguments *arguments)
   ulp_quiet = arguments->quiet;
   ulp_verbose = arguments->verbose;
   enable_threading = !arguments->disable_threads;
+  const char *process_wildcard = arguments->process_wildcard;
+  const char *user_wildcard = arguments->user_wildcard;
 
   struct ulp_process *p;
 
-  FOR_EACH_ULP_PROCESS(p) { print_process(p, print_build_id); }
+  FOR_EACH_ULP_PROCESS_FROM_USER_WILDCARD(p, process_wildcard, user_wildcard)
+  {
+    print_process(p, print_build_id);
+  }
 
   return 0;
 }

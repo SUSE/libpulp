@@ -592,7 +592,9 @@ TESTS = \
   comments.py \
   nolibpulp.py \
   set_patchable.py \
-  path_disable.py
+  path_disable.py \
+  user_disable.py \
+  group_disable.py
 
 XFAIL_TESTS = \
   blocked.py \

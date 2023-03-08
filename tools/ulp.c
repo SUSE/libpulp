@@ -136,6 +136,7 @@ static struct argp_option options[] = {
   { "quiet", 'q', 0, 0, "Don't produce any output", 0 },
   { 0, 0, 0, 0, "patches, check & trigger commands only:", 0 },
   { "process", 'p', "process", 0, "Target process name, wildcard, or PID", 0 },
+  { "user", 'u', "user", 0, "User name, wildcard, or UID", 0 },
   { "disable-threading", ULP_OP_DISABLE_THREADING, 0, 0,
     "Do not launch additional threads", 0 },
   { 0, 0, 0, 0, "dump & patches command only:", 0 },
@@ -286,8 +287,6 @@ handle_end_of_arguments(const struct argp_state *state)
       break;
 
     case ULP_SET_PATCHABLE:
-      if (arguments->process_wildcard == 0)
-        argp_error(state, "process is mandatory in 'set_patchable' command.");
       if (state->arg_num < 2)
         argp_error(state, "passing 'enable' or 'disable' in ARG1 is mandatory "
                           "in set_patches.");
@@ -352,6 +351,10 @@ parser(int key, char *arg, struct argp_state *state)
 
     case ULP_OP_RECURSIVE:
       arguments->recursive = 1;
+      break;
+
+    case 'u':
+      arguments->user_wildcard = arg;
       break;
 
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK

@@ -423,3 +423,28 @@ def childless_livepatch(wildcard, timeout=10, retries=1,
     tool.check_returncode()
 
     print('Live patch applied/reverted successfully.')
+
+def childless_disable_livepatching(process_wildcard, userid, timeout=10):
+
+    # Build command-line from arguments
+    command = [ulptool, "set_patchable"]
+    if process_wildcard is not None:
+      command.append("-p")
+      command.append(process_wildcard)
+    if userid is not None:
+      command.append("-u")
+      command.append(str(userid))
+
+    command.append('disable')
+
+    # Apply the live patch and check for common errors
+    try:
+      print('Disabling livepatches.')
+      tool = subprocess.run(command, timeout=timeout)
+    except subprocess.TimeoutExpired:
+      print('Command run timed out')
+      raise
+
+    # The trigger tool returns 0 on success, so use check_returncode(),
+    # which asserts that, and raises CalledProcessError otherwise.
+    tool.check_returncode()

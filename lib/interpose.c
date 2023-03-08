@@ -507,6 +507,7 @@ maybe_disable_livepatching_on_user(void)
   for (wildcard = strtok(names, ":"); wildcard != NULL;
        wildcard = strtok(NULL, ":")) {
     if (isnumber(wildcard) && strtoul(wildcard, NULL, 10) == uid) {
+      set_libpulp_error_state(EUSRBLOCKED);
       WARN("Matched uid %s: livepatching disabled by user request.", wildcard);
       break;
     }
@@ -559,6 +560,7 @@ maybe_disable_livepatching_on_group(void)
   for (wildcard = strtok(names, ":"); wildcard != NULL;
        wildcard = strtok(NULL, ":")) {
     if (isnumber(wildcard) && strtoul(wildcard, NULL, 10) == gid) {
+      set_libpulp_error_state(EUSRBLOCKED);
       WARN("Matched gid %s: livepatching disabled by user request.", wildcard);
       break;
     }
