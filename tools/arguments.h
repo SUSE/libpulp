@@ -48,6 +48,7 @@ struct arguments
   const char *library;
   const char *metadata;
   const char *process_wildcard;
+  const char *user_wildcard;
   const char *prefix;
   command_t command;
   int retries;

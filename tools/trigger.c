@@ -612,6 +612,11 @@ run_trigger(struct arguments *arguments)
   pid_t pid = 0;
   int ret;
 
+  if (arguments->user_wildcard) {
+    WARN("error: user wildcard is currently unsupported in trigger");
+    return ENOSYS;
+  }
+
   /* Set global static prefix variable.  */
   prefix = arguments->prefix;
 

@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 
 #   libpulp - User-space Livepatching Library
@@ -21,11 +20,48 @@
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
 import re
-import os
 import testsuite
+import os
 
-# Live patch selection variable
-child = testsuite.spawn('numserv')
+#-- test username --
+# Try to get the current username.
+username = None
+
+if username is None:
+  username = os.getenv('USER')
+if username is None:
+  username = os.getenv('USERNAME')
+if username is None:
+  username = os.getenv('LOGNAME')
+
+# If we can not get username, then skip this part of the test.
+if username is not None:
+  env = { 'LD_PRELOAD': '../lib/.libs/libpulp.so',
+          'LIBPULP_DISABLE_ON_USERS': username }
+
+  child = testsuite.spawn('numserv', env=env)
+
+  child.expect('Waiting for input.')
+
+  child.sendline('dozen')
+  child.expect('12');
+
+  child.sendline('hundred')
+  child.expect('100');
+
+  child.livepatch('.libs/libdozens_livepatch1.so', sanity=False)
+
+  child.sendline('dozen')
+  child.expect('12', reject='13');
+
+  child.close(force=True)
+
+#--Test uid--
+
+env = { 'LD_PRELOAD': '../lib/.libs/libpulp.so',
+        'LIBPULP_DISABLE_ON_USERS': str(os.getuid()) }
+
+child = testsuite.spawn('numserv', env=env)
 
 child.expect('Waiting for input.')
 
@@ -35,45 +71,7 @@ child.expect('12');
 child.sendline('hundred')
 child.expect('100');
 
-child.livepatch('.libs/libdozens_livepatch1.so')
-
-child.sendline('dozen')
-child.expect('13', reject='12');
-
-child.sendline('hundred')
-child.expect('100');
-
-child.disable_livepatching()
-child.livepatch('.libs/libhundreds_livepatch1.so', sanity=False)
-
-child.sendline('dozen')
-child.expect('13', reject='12');
-
-child.sendline('hundred')
-child.expect('100', reject='200');
-
-child.enable_livepatching()
-child.livepatch('.libs/libhundreds_livepatch1.so')
-
-child.sendline('hundred')
-child.expect('200', reject='100');
-
-child.close(force=True)
-
-#-- Test user name and group id mode.
-
-child = testsuite.spawn('numserv')
-
-child.expect('Waiting for input.')
-
-child.sendline('dozen')
-child.expect('12');
-
-child.sendline('hundred')
-child.expect('100');
-
-testsuite.childless_disable_livepatching('numserv', os.getgid())
-child.livepatch('.libs/libhundreds_livepatch1.so', sanity=False)
+child.livepatch('.libs/libdozens_livepatch1.so', sanity=False)
 
 child.sendline('dozen')
 child.expect('12', reject='13');
