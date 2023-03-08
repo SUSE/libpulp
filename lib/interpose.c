@@ -24,7 +24,9 @@
 #include <elf.h>
 #include <err.h>
 #include <fcntl.h>
+#include <fnmatch.h>
 #include <gnu/libc-version.h>
+#include <grp.h>
 #include <limits.h>
 #include <link.h>
 #include <pthread.h>
@@ -33,6 +35,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <pwd.h>
 
 #include "ld_rtld.h"
 #include "msg_queue.h"
@@ -419,6 +422,161 @@ get_ld_global_locks()
   }
 }
 
+// @brief Disable livepatching based on LIBPULP_DISABLE_ON_PATH variable.
+//
+// This function will scan the LIBPULP_DISABLE_ON_PATH variable for wildcards
+// which would match the path to the program's binary.
+//
+// Example: LIBPULP_DISABLE_ON_PATH=/home/*:/tmp/*
+//
+// Would block livepatching any program launched from the /home or /tmp folder.
+static void
+maybe_disable_livepatching_on_path(void)
+{
+  const char *disabled_names = getenv("LIBPULP_DISABLE_ON_PATH");
+  if (disabled_names == NULL) {
+    return;
+  }
+
+  size_t len = strlen(disabled_names);
+
+  char *names = malloc(len + 1);
+  if (names == NULL) {
+    set_libpulp_error_state(errno);
+    return;
+  }
+  memcpy(names, disabled_names, len + 1);
+
+  char process_path[PATH_MAX];
+  ssize_t n = readlink("/proc/self/exe", process_path, sizeof(process_path));
+  if ((size_t)n >= sizeof(process_path)) {
+    WARN("Unable to get path to executable. Livepatching is disabled.");
+    set_libpulp_error_state(EINITFAIL);
+  }
+
+  /* readlink do not append the '\0' character.  Do it now.  */
+  process_path[n] = '\0';
+
+  const char *wildcard;
+  for (wildcard = strtok(names, ":"); wildcard != NULL;
+       wildcard = strtok(NULL, ":")) {
+    if (fnmatch(wildcard, process_path, FNM_EXTMATCH) == 0) {
+      /* Match.  */
+      set_libpulp_error_state(EUSRBLOCKED);
+      WARN("Matched path pattern %s: livepatching disabled by user request.",
+           wildcard);
+      break;
+    }
+  }
+
+  free(names);
+}
+
+/** @brief Disable livepatching based on LIBPULP_DISABLE_ON_USERS variable.
+ *
+ * This function will scan the LIBPULP_DISABLE_ON_USERS variable for wildcards
+ * which would match the path to the user name or uid.
+ *
+ * Example: LIBPULP_DISABLE_ON_USERS=1000:root
+ *
+ * Would block livepatching any program launched from user 'root' or user with
+ * uid = 1000.
+ */
+static void
+maybe_disable_livepatching_on_user(void)
+{
+  const char *disabled_names = getenv("LIBPULP_DISABLE_ON_USERS");
+  if (disabled_names == NULL) {
+    return;
+  }
+
+  size_t len = strlen(disabled_names);
+
+  char *names = malloc(len + 1);
+  if (names == NULL) {
+    set_libpulp_error_state(errno);
+    return;
+  }
+  memcpy(names, disabled_names, len + 1);
+
+  uid_t uid = getuid();
+  struct passwd *pws = getpwuid(uid);
+  const char *uname = pws ? pws->pw_name : NULL;
+
+  const char *wildcard;
+  for (wildcard = strtok(names, ":"); wildcard != NULL;
+       wildcard = strtok(NULL, ":")) {
+    if (isnumber(wildcard) && strtoul(wildcard, NULL, 10) == uid) {
+      WARN("Matched uid %s: livepatching disabled by user request.", wildcard);
+      break;
+    }
+    else if (uname != NULL) {
+      if (fnmatch(wildcard, uname, FNM_EXTMATCH) == 0) {
+        /* Match.  */
+        set_libpulp_error_state(EUSRBLOCKED);
+        WARN("Matched user pattern %s: livepatching disabled by user request.",
+             wildcard);
+        break;
+      }
+    }
+  }
+
+  free(names);
+}
+
+/** @brief Disable livepatching based on LIBPULP_DISABLE_ON_GROUPS variable.
+ *
+ * This function will scan the LIBPULP_DISABLE_ON_GROUPS variable for wildcards
+ * which would match the path to the group name or group id.
+ *
+ * Example: LIBPULP_DISABLE_ON_USERS=1000:root
+ *
+ * Would block livepatching any program launched from user 'root' or user with
+ * uid = 1000.
+ */
+static void
+maybe_disable_livepatching_on_group(void)
+{
+  const char *disabled_names = getenv("LIBPULP_DISABLE_ON_GROUPS");
+  if (disabled_names == NULL) {
+    return;
+  }
+
+  size_t len = strlen(disabled_names);
+
+  char *names = malloc(len + 1);
+  if (names == NULL) {
+    set_libpulp_error_state(errno);
+    return;
+  }
+  memcpy(names, disabled_names, len + 1);
+
+  gid_t gid = getgid();
+  struct group *g = getgrgid(gid);
+  const char *gname = g ? g->gr_name : NULL;
+
+  const char *wildcard;
+  for (wildcard = strtok(names, ":"); wildcard != NULL;
+       wildcard = strtok(NULL, ":")) {
+    if (isnumber(wildcard) && strtoul(wildcard, NULL, 10) == gid) {
+      WARN("Matched gid %s: livepatching disabled by user request.", wildcard);
+      break;
+    }
+    else if (gname != NULL) {
+      if (fnmatch(wildcard, gname, FNM_EXTMATCH) == 0) {
+        /* Match.  */
+        set_libpulp_error_state(EUSRBLOCKED);
+        WARN(
+            "Matched group pattern %s: livepatching disabled by user request.",
+            wildcard);
+        break;
+      }
+    }
+  }
+
+  free(names);
+}
+
 __attribute__((constructor)) void
 __ulp_asunsafe_begin(void)
 {
@@ -468,6 +626,10 @@ __ulp_asunsafe_begin(void)
   libpulp_crash_assert(real_posix_memalign);
 
   get_ld_global_locks();
+
+  maybe_disable_livepatching_on_path();
+  maybe_disable_livepatching_on_user();
+  maybe_disable_livepatching_on_group();
 }
 
 static bool

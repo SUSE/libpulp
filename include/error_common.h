@@ -62,6 +62,7 @@ typedef int ulp_error_t;
 #define EWILDNOMATCH  279 /** No file matched wildcard.  */
 #define EUSRBLOCKED   280 /** Livepatch blocked by user request.  */
 #define EOLDLIBPULP   281 /** Libpulp version too old.  */
+#define EINITFAIL     282 /** Libpulp initialization failure.  */
 
 /** Table used to map error code to message.  Define it here so that it is
  *  easier for it being maintained.
@@ -94,6 +95,7 @@ typedef int ulp_error_t;
     "No file matched wildcard", \
     "Livepatching blocked by user request", \
     "Libpulp version is too old", \
+    "Libpulp initialization failure", \
   }
 /* clang-format on */
 
