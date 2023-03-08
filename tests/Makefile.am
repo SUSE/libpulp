@@ -591,7 +591,8 @@ TESTS = \
   pcqueue.py \
   comments.py \
   nolibpulp.py \
-  set_patchable.py
+  set_patchable.py \
+  path_disable.py
 
 XFAIL_TESTS = \
   blocked.py \
