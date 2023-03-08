@@ -1,7 +1,7 @@
 /*
  *  libpulp - User-space Livepatching Library
  *
- *  Copyright (C) 2017-2021 SUSE Software Solutions GmbH
+ *  Copyright (C) 2020-2023 SUSE Software Solutions GmbH
  *
  *  This file is part of libpulp.
  *
@@ -19,47 +19,11 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef ARGUMENTS_H
-#define ARGUMENTS_H
+#ifndef SET_PATCHABLE_H
+#define SET_PATCHABLE_H
 
-#include "config.h"
+struct arguments;
 
-#define ARGS_MAX 1
-
-typedef enum
-{
-  ULP_NONE,
-  ULP_PATCHES,
-  ULP_CHECK,
-  ULP_DUMP,
-  ULP_PACKER,
-  ULP_TRIGGER,
-  ULP_POST,
-  ULP_MESSAGES,
-  ULP_LIVEPATCHABLE,
-  ULP_EXTRACT,
-  ULP_SET_PATCHABLE,
-} command_t;
-
-struct arguments
-{
-  const char *args[ARGS_MAX];
-  const char *livepatch;
-  const char *library;
-  const char *metadata;
-  const char *process_wildcard;
-  const char *prefix;
-  command_t command;
-  int retries;
-  int quiet;
-  int verbose;
-  int buildid;
-  int revert;
-  int disable_threads;
-  int recursive;
-#if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
-  int check_stack;
-#endif
-};
+int run_set_patchable(struct arguments *);
 
 #endif

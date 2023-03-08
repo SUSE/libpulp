@@ -24,7 +24,8 @@
     __ulp_get_global_universe;
     __ulp_msg_queue;
     __ulp_metadata_buffer;
-    __ulp_dlinfo_cache;
+    __ulp_error_state;
+    __ulp_enable_or_disable_patching;
   local:
     *;
 };

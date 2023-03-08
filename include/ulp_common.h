@@ -24,6 +24,7 @@
 
 #include <elf.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #define OUT_PATCH_NAME "metadata.ulp"

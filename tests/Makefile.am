@@ -590,7 +590,8 @@ TESTS = \
   tempfiles.py \
   pcqueue.py \
   comments.py \
-  nolibpulp.py
+  nolibpulp.py \
+  set_patchable.py
 
 XFAIL_TESTS = \
   blocked.py \

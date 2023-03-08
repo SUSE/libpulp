@@ -1399,6 +1399,45 @@ ulp_revert_all_units(unsigned char *patch_id)
   return 1;
 }
 
+/** @brief Enable or disable livepatching in this process.
+ *
+ * This function enables or disables livepatching according to libpulp's error
+ * state. If libpulp is not in a error state, it sets it to EUSRBLOCKED, which
+ * flags that the user requested this process to not be livepatched anymore.
+ * In case current state is EUSRBLOCKED, it sets to ENONE, thus re-enabling
+ * livepatching.
+ *
+ * If libpulp is in an error state outside of EUSRBLOCKED or ENONE, then
+ * changing this state is blocked as it is in a real error state, thus
+ * patching is blocked.
+ *
+ * @return error state after change.
+ **/
+int
+ulp_enable_or_disable_patching(void)
+{
+  ulp_error_t state = get_libpulp_error_state();
+
+  switch (state) {
+    case ENONE:
+      /* Block livepatching.  */
+      set_libpulp_error_state(EUSRBLOCKED);
+      break;
+
+    case EUSRBLOCKED:
+      /* Unblock livepatching.  */
+      set_libpulp_error_state(ENONE);
+      break;
+
+    default:
+      /* Libpulp is in an error state and we can not continue.  */
+      break;
+  }
+
+  /* Return the current state.  */
+  return get_libpulp_error_state();
+}
+
 /* these are here for debugging reasons :) */
 void
 dump_ulp_patching_state(void)

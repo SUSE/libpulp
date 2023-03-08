@@ -327,6 +327,13 @@ wildcard_clean:
   return ret;
 }
 
+static bool
+skippable_error(ulp_error_t err)
+{
+  return err == EBUILDID || err == ENOTARGETLIB || err == EUSRBLOCKED ||
+         err == EWILDNOMATCH;
+}
+
 static void
 print_patched_unpatched(struct ulp_process *p, bool summarize)
 {
@@ -388,7 +395,7 @@ print_patched_unpatched(struct ulp_process *p, bool summarize)
 
   printf("  %s (pid: %d):", get_process_name(curr_item), pid);
   if (summarized) {
-    if (err == EBUILDID || err == ENOTARGETLIB) {
+    if (skippable_error(err)) {
       change_color(TERM_COLOR_YELLOW);
       printf(" SKIPPED");
       change_color(TERM_COLOR_RESET);
@@ -488,7 +495,7 @@ trigger_many_processes(const char *process_wildcard, int retries,
 
     /* If the livepatch failed because the patch wasn't targeted to the
        proccess, we ignore because we are batch processing.  */
-    if (r == EBUILDID || r == ENOTARGETLIB || r == EWILDNOMATCH) {
+    if (skippable_error(r)) {
       skippes++;
     }
     else {

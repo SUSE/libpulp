@@ -4,10 +4,10 @@
 #include "arguments.h"
 #include "ulp_common.h"
 
+#include <libelf.h>
+#include <link.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <link.h>
-#include <libelf.h>
 
 /** Struct containing useful information for Userspace Livepatching retrieved
  *  from the target .so file.

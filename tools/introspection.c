@@ -149,18 +149,9 @@ debug_ulp_dynobj(struct ulp_dynobj *obj)
   WARN("obj->global = %lx", obj->global);
   WARN("obj->revert_all = %lx", obj->revert_all);
   WARN("obj->metadata_buffer = %lx", obj->metadata_buffer);
-  WARN("obj->dlinfo_cache = %lx", obj->dlinfo_cache);
+  WARN("obj->error_state = %lx", obj->error_state);
+  WARN("obj->enable_disable_patching = %lx", obj->enable_disable_patching);
 }
-
-/** Release `x` if non null, and also set it to `NULL`.  */
-#define FREE_NON_NULL(x) \
-  do { \
-    if (x) { \
-      free(x); \
-      (x) = NULL; \
-    } \
-  } \
-  while (0)
 
 /** @brief Release memory of an ulp_thread `t`
  *
@@ -253,8 +244,8 @@ release_ulp_unit(struct ulp_unit *unit)
   if (!unit)
     return;
 
-  FREE_NON_NULL(unit->old_fname);
-  FREE_NON_NULL(unit->new_fname);
+  FREE_AND_NULLIFY(unit->old_fname);
+  FREE_AND_NULLIFY(unit->new_fname);
   release_ulp_unit(unit->next);
   free(unit);
 }
@@ -272,8 +263,8 @@ release_ulp_object(struct ulp_object *obj)
   if (!obj)
     return;
 
-  FREE_NON_NULL(obj->build_id);
-  FREE_NON_NULL(obj->name);
+  FREE_AND_NULLIFY(obj->build_id);
+  FREE_AND_NULLIFY(obj->name);
 
   release_ulp_unit(obj->units);
   free(obj);
@@ -293,7 +284,7 @@ release_ulp_dependency(struct ulp_dependency *dep)
     return;
 
   release_ulp_dependency(dep->next);
-  FREE_NON_NULL(dep);
+  FREE_AND_NULLIFY(dep);
 }
 
 /** @brief Release memory of an ulp_reference `ref`.
@@ -311,9 +302,9 @@ release_ulp_reference(struct ulp_reference *ref)
 
   release_ulp_reference(ref->next);
 
-  FREE_NON_NULL(ref->target_name);
-  FREE_NON_NULL(ref->reference_name);
-  FREE_NON_NULL(ref);
+  FREE_AND_NULLIFY(ref->target_name);
+  FREE_AND_NULLIFY(ref->reference_name);
+  FREE_AND_NULLIFY(ref);
 }
 
 /** @brief Release memory of the global structure `ulp`.
@@ -326,7 +317,7 @@ release_ulp_global_metadata(void)
 {
   struct ulp_metadata *meta = &ulp;
 
-  FREE_NON_NULL(meta->so_filename);
+  FREE_AND_NULLIFY(meta->so_filename);
   release_ulp_object(meta->objs);
   release_ulp_dependency(meta->deps);
   release_ulp_reference(meta->refs);
@@ -845,15 +836,19 @@ get_libpulp_extern_symbols(struct ulp_dynobj *obj, int pid)
         obj->metadata_buffer = ehdr_addr + sym.st_value;
         bitfield |= (1 << 6);
       }
-      else if (!strcmp(remote_name, "_dlinfo_cache")) {
-        obj->dlinfo_cache = ehdr_addr + sym.st_value;
+      else if (!strcmp(remote_name, "_error_state")) {
+        obj->error_state = ehdr_addr + sym.st_value;
         bitfield |= (1 << 7);
+      }
+      else if (!strcmp(remote_name, "_enable_or_disable_patching")) {
+        obj->enable_disable_patching = ehdr_addr + sym.st_value;
+        bitfield |= (1 << 8);
       }
     }
 
     dynsym_addr += sizeof(sym);
 
-    if (bitfield == 0xff)
+    if (bitfield == 0x1FF)
       break;
   }
 
@@ -2526,4 +2521,43 @@ detach_process:
   }
 
   return ret;
+}
+
+/** @brief Read error state of libpulp in remote process `p`.
+ *
+ * This function reads the error state of libpulp on the remote process `p`.
+ *
+ * @param p    Remote process to read from.
+ *
+ * @return     EINVAL, ENOLIBPULP, EOLDLIBPULP in case of error, or the error
+ *             state of libpulp in the target process.
+ */
+ulp_error_t
+get_libpulp_error_state(struct ulp_process *p)
+{
+  if (!p)
+    return EINVAL;
+
+  if (!p->dynobj_libpulp)
+    return ENOLIBPULP;
+
+  ulp_error_t state = EUNKNOWN;
+  Elf64_Addr err_state_addr = p->dynobj_libpulp->error_state;
+
+  if (err_state_addr) {
+    int ret = read_memory(&state, sizeof(state), p->pid, err_state_addr);
+    if (ret) {
+      WARN("Error reading libpulp error state.");
+      return EUNKNOWN;
+    }
+
+    return state;
+  }
+
+  /* Old libpulp perhaps?  */
+  if (p->dynobj_libpulp->trigger) {
+    return EOLDLIBPULP;
+  }
+
+  return EUNKNOWN;
 }

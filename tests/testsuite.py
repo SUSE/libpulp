@@ -368,6 +368,28 @@ class spawn(pexpect.spawn):
     msgs = tool.stdout.decode()
     return str(msgs)
 
+  def enable_livepatching(self):
+    self.sanity(pid=self.pid)
+    command = [ulptool, 'set_patchable', '-p', str(self.pid), 'enable']
+
+    try:
+      tool = subprocess.run(command, timeout=10, stdout=subprocess.PIPE)
+    except:
+      rai2e
+
+    return tool.returncode
+
+  def disable_livepatching(self):
+    self.sanity(pid=self.pid)
+    command = [ulptool, 'set_patchable', '-p', str(self.pid), 'disable']
+
+    try:
+      tool = subprocess.run(command, timeout=10, stdout=subprocess.PIPE)
+    except:
+      raise
+
+    return tool.returncode
+
 
 def childless_livepatch(wildcard, timeout=10, retries=1,
             verbose=False, quiet=False, revert_lib=None):

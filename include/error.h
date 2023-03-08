@@ -37,6 +37,8 @@ void exit(int);
  **/
 ulp_error_t get_libpulp_error_state(void);
 
+void set_libpulp_error_state(ulp_error_t);
+
 /** @brief Check if libpulp is in an fatal error state.
  *
  * If a fatal error has occured, libpulp cannot continue livepatching processes
