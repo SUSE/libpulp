@@ -60,6 +60,8 @@ typedef int ulp_error_t;
 #define EHOOKNOTRUN   277 /** libpulp.so hook routine not run.  */
 #define ENOPATCHABLE  278 /** Function is not livepatchable.  */
 #define EWILDNOMATCH  279 /** No file matched wildcard.  */
+#define EUSRBLOCKED   280 /** Livepatch blocked by user request.  */
+#define EOLDLIBPULP   281 /** Libpulp version too old.  */
 
 /** Table used to map error code to message.  Define it here so that it is
  *  easier for it being maintained.
@@ -90,6 +92,8 @@ typedef int ulp_error_t;
     "libpulp.so hook routine not run", \
     "Function is not livepatchable", \
     "No file matched wildcard", \
+    "Livepatching blocked by user request", \
+    "Libpulp version is too old", \
   }
 /* clang-format on */
 

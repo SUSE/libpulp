@@ -38,8 +38,10 @@
 #include "introspection.h"
 #include "patches.h"
 #include "pcqueue.h"
+#include "terminal_colors.h"
 
 bool enable_threading = false;
+static bool original_enable_threading;
 
 void insert_target_process(int pid, struct ulp_process **list);
 
@@ -91,6 +93,9 @@ generate_ulp_list_thread(void *args)
 struct ulp_process *
 process_list_next(struct ulp_process_iterator *it)
 {
+  if (!it->slashproc)
+    return (it->now = NULL);
+
   if (enable_threading) {
     it->now = producer_consumer_dequeue(it->pcqueue);
   }
@@ -112,11 +117,16 @@ process_list_begin(struct ulp_process_iterator *it, const char *wildcard)
   pid_t pid;
   it->wildcard = wildcard;
 
+  original_enable_threading = enable_threading;
+
   if (isnumber(wildcard)) {
     /* If wildcard is actually a number, then treat it as a PID.  */
     pid = atoi(wildcard);
     insert_target_process(pid, &it->last);
     it->now = it->last;
+
+    /* Disable threading in this case.  */
+    enable_threading = false;
     return it->now;
   }
 
@@ -144,6 +154,10 @@ process_list_end(struct ulp_process_iterator *it)
     if (enable_threading) {
       pthread_join(process_list_thread, NULL);
     }
+
+    /* In case threads were disabled because of some special case, then enable
+       it now.  */
+    enable_threading = original_enable_threading;
     return 0;
   }
 
@@ -473,13 +487,41 @@ detach_process:
 }
 
 void
+print_remote_err_status(struct ulp_process *p)
+{
+  ulp_error_t state = get_libpulp_error_state(p);
+
+  printf("  Livepatching status: ");
+  switch (state) {
+    case ENONE:
+    case EOLDLIBPULP:
+      /* Report enabled for old libpulp.  */
+      change_color(TERM_COLOR_GREEN);
+      printf("enabled\n");
+      break;
+
+    case EUSRBLOCKED:
+      change_color(TERM_COLOR_YELLOW);
+      printf("disabled by user\n");
+      break;
+
+    default:
+      change_color(TERM_COLOR_RED);
+      printf("disabled (internal error: %s)\n", libpulp_strerror(state));
+      break;
+  }
+
+  change_color(TERM_COLOR_RESET);
+}
+
+void
 print_process(struct ulp_process *process, int print_buildid)
 {
   struct ulp_dynobj *object_item;
   pid_t pid = process->pid;
   struct ulp_applied_patch *patch = ulp_read_state(process);
   printf("PID: %d, name: %s\n", pid, get_process_name(process));
-
+  print_remote_err_status(process);
   printf("  Livepatchable libraries:\n");
   object_item = dynobj_first(process);
   if (!object_item)

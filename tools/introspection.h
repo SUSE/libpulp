@@ -25,6 +25,7 @@
 #include <link.h>
 #include <stdbool.h>
 
+#include "error_common.h"
 #include "ptrace.h"
 #include "ulp_common.h"
 
@@ -111,7 +112,8 @@ struct ulp_dynobj
   Elf64_Addr msg_queue;
   Elf64_Addr revert_all;
   Elf64_Addr metadata_buffer;
-  Elf64_Addr dlinfo_cache;
+  Elf64_Addr error_state;
+  Elf64_Addr enable_disable_patching;
   /* end FIXME.  */
 
   struct thread_state *thread_states;
@@ -194,5 +196,7 @@ get_process_name(struct ulp_process *process)
 {
   return get_basename(process->dynobj_main->filename);
 }
+
+ulp_error_t get_libpulp_error_state(struct ulp_process *);
 
 #endif

@@ -514,5 +514,30 @@ informations into a JSON file specified by
 .PP
 .TP
 .SH EXIT STATUS
-.TP
+.TPut
 exits 0 on success, anything else on error.
+
+.\"-------------------------------------------
+
+.SH SET_PATCHABLE
+.TP
+.SH NAME
+ulp set_patchable \- Enable/disable livepatching on target process
+.TP
+.SH SYNOPSIS
+.TP
+.B ulp set_livepatchable -p process
+.I enable/disable
+.TP
+.SH DESCRIPTION
+.TP
+Enable or disable the livepatching capability of process specified by
+-p
+.I WILDCARD.
+If WILDCARD is a number, then it is assumed to be the PID of the process.
+The program will output which processes were modified.
+.PP
+.TP
+.SH EXIT STATUS
+.TP
+Always returns 0.

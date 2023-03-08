@@ -34,7 +34,8 @@ noinst_HEADERS = \
   livepatchable.h \
   elf-extra.h \
   pcqueue.h \
-  extract.h
+  extract.h \
+  set_patchable.h
 
 ulp_SOURCES = \
   ulp.c \
@@ -51,7 +52,9 @@ ulp_SOURCES = \
   livepatchable.c \
   elf-extra.c \
   pcqueue.c \
-  extract.c
+  extract.c \
+  set_patchable.c
+
 ulp_LDADD = $(top_builddir)/common/libcommon.la -lelf -ljson-c -lpthread -ldl $(LIBUNWIND_LIBS)
 
 # Ensure access to the include directory

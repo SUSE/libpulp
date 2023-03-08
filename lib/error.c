@@ -36,19 +36,25 @@ __libpulp_unique_exit_point()
 #include <stdarg.h>
 #include <stdio.h>
 
-/** Holds the current error state.  */
-static ulp_error_t libpulp_error_state = ENONE;
+/** Holds the current error state.  Externally visible to ulp tool.  */
+ulp_error_t __ulp_error_state = ENONE;
 
 ulp_error_t
 get_libpulp_error_state()
 {
-  return libpulp_error_state;
+  return __ulp_error_state;
 }
 
 bool
 libpulp_is_in_error_state()
 {
   return !(get_libpulp_error_state() == ENONE);
+}
+
+void
+set_libpulp_error_state(ulp_error_t state)
+{
+  __ulp_error_state = state;
 }
 
 void
@@ -60,7 +66,7 @@ libpulp_assert_func(const char *file, const char *func, int line,
 
   msgq_push("In file = %s, function = %s, line = %d: assertion failure: %lu\n",
             file, func, line, expression);
-  libpulp_error_state = EUNKNOWN;
+  set_libpulp_error_state(EUNKNOWN);
 }
 
 void
@@ -74,7 +80,7 @@ libpulp_errx_func(const char *file, const char *func, int line, int eval,
   msgq_push(fmt, args);
   va_end(args);
 
-  libpulp_error_state = EUNKNOWN;
+  set_libpulp_error_state(EUNKNOWN);
 }
 
 void
@@ -83,7 +89,7 @@ libpulp_exit_func(const char *file, const char *func, int line, int val)
   msgq_push("In file = %s, function = %s, line = %d: exit: %d\n", file, func,
             line, val);
 
-  libpulp_error_state = EUNKNOWN;
+  set_libpulp_error_state(EUNKNOWN);
 }
 
 void

@@ -64,3 +64,10 @@ __ulp_get_global_universe:
     nop
     call   __ulp_get_global_universe_value@PLT
     int3
+
+.global __ulp_enable_or_disable_patching
+__ulp_enable_or_disable_patching:
+    nop
+    nop
+    call ulp_enable_or_disable_patching@PLT
+    int3

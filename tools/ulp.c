@@ -38,6 +38,7 @@
 #include "packer.h"
 #include "patches.h"
 #include "post.h"
+#include "set_patchable.h"
 #include "trigger.h"
 
 #include <unistd.h>
@@ -116,7 +117,8 @@ static const char doc[] =
 "                             with PID\n"
 "   post                      Post process patch container (.so file) in ARG1.\n"
 "   messages                  Print livepatch information contained in libpulp.\n"
-"   livepatchable             Check if .so library in ARG1 is livepatchable.\n";
+"   livepatchable             Check if .so library in ARG1 is livepatchable.\n"
+"   set_patchable             Enable/disable livepatching in process given by -p.\n";
 
 /* clang-format on */
 
@@ -139,7 +141,6 @@ static struct argp_option options[] = {
   { 0, 0, 0, 0, "dump & patches command only:", 0 },
   { "buildid", 'b', 0, 0, "Print the build id", 0 },
   { 0, 0, 0, 0, "trigger command only:", 0 },
-  { "retries", 'r', "N", 0, "Retry N times if process busy", 0 },
   { "revert-all", ULP_OP_REVERT_ALL, "LIB", 0,
     "Revert all patches from LIB. If LIB=target, then all patches from the "
     "target library within the passed livepatch will be reverted.",
@@ -152,6 +153,8 @@ static struct argp_option options[] = {
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
   { "check-stack", 'c', 0, 0, "Check the call stack before live patching", 0 },
 #endif
+  { 0, 0, 0, 0, "trigger & set_patchable commands only:", 0 },
+  { "retries", 'r', "N", 0, "Retry N times if process busy", 0 },
   { 0, 0, 0, 0, "trigger & dump commands only:", 0 },
   { "revert", ULP_OP_REVERT, 0, 0,
     "revert livepatch / dump reverse patch info.", 0 },
@@ -191,7 +194,7 @@ command_from_string(const char *str)
     { "dump", ULP_DUMP },         { "packer", ULP_PACKER },
     { "trigger", ULP_TRIGGER },   { "post", ULP_POST },
     { "messages", ULP_MESSAGES }, { "livepatchable", ULP_LIVEPATCHABLE },
-    { "extract", ULP_EXTRACT },
+    { "extract", ULP_EXTRACT },   { "set_patchable", ULP_SET_PATCHABLE },
   };
 
   size_t i;
@@ -280,6 +283,14 @@ handle_end_of_arguments(const struct argp_state *state)
     case ULP_MESSAGES:
       if (arguments->process_wildcard == 0)
         argp_error(state, "process is mandatory in 'messages' command.");
+      break;
+
+    case ULP_SET_PATCHABLE:
+      if (arguments->process_wildcard == 0)
+        argp_error(state, "process is mandatory in 'set_patchable' command.");
+      if (state->arg_num < 2)
+        argp_error(state, "passing 'enable' or 'disable' in ARG1 is mandatory "
+                          "in set_patches.");
       break;
 
     case ULP_LIVEPATCHABLE:
@@ -488,6 +499,10 @@ main(int argc, char **argv, char *envp[] __attribute__((unused)))
 
     case ULP_EXTRACT:
       ret = run_extract(&arguments);
+      break;
+
+    case ULP_SET_PATCHABLE:
+      ret = run_set_patchable(&arguments);
       break;
   }
 
