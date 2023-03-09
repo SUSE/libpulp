@@ -331,7 +331,7 @@ static bool
 skippable_error(ulp_error_t err)
 {
   return err == EBUILDID || err == ENOTARGETLIB || err == EUSRBLOCKED ||
-         err == EWILDNOMATCH;
+         err == EWILDNOMATCH || err == EAPPLIED;
 }
 
 static void
@@ -530,8 +530,14 @@ diagnose_patch_apply(ulp_error_t ret, bool revert, const char *livepatch,
 
   if (ret) {
     if (livepatch) {
-      change_color(TERM_COLOR_RED);
-      printf("error:");
+      if (skippable_error(ret)) {
+        change_color(TERM_COLOR_YELLOW);
+        printf("skipped:");
+      }
+      else {
+        change_color(TERM_COLOR_RED);
+        printf("error:");
+      }
       change_color(TERM_COLOR_RESET);
       printf(" could not %s %s to %s (pid %d): %s\n", apply_rev, livepatch,
              get_process_name(p), pid, libpulp_strerror(ret));
