@@ -114,8 +114,8 @@ ulp_ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data)
 int
 write_bytes(const void *buf, size_t n, int pid, Elf64_Addr addr)
 {
-#ifdef USE_VM_READV_WITEV
-  struct iovec local = { .iov_base = buf, .iov_len = n };
+#ifdef USE_VM_READV_WRITEV
+  struct iovec local = { .iov_base = (void *)buf, .iov_len = n };
   struct iovec remote = { .iov_base = (void *)addr, .iov_len = n };
 
   ssize_t ret;
@@ -133,7 +133,7 @@ write_bytes(const void *buf, size_t n, int pid, Elf64_Addr addr)
 
     acc += ret;
   }
-  while (acc != len);
+  while (acc != n);
 
   return 0;
 
