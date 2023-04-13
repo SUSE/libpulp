@@ -39,7 +39,7 @@ jobs:
       run: zypper -n install autoconf-archive libelf-devel
         python3-pexpect python3-psutil libunwind-devel
         git gcc gcc-c++ clang libtool make dash valgrind gzip
-        findutils libjson-c-devel
+        findutils libjson-c-devel libseccomp-devel
     - uses: actions/checkout@v2
     - name: bootstrap
       run: ./bootstrap

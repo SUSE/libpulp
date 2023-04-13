@@ -1233,11 +1233,11 @@ ulp_patch_addr(void *old_faddr, void *new_faddr, int enable)
   /* Set the writable bit on affected pages. */
   if (mprotect((void *)page1, page_size, prot1 | PROT_WRITE)) {
     WARN("Memory protection set error (1st page)");
-    return errno;
+    return MPROTFAIL;
   }
   if (mprotect((void *)page2, page_size, prot2 | PROT_WRITE)) {
     WARN("Memory protection set error (2nd page)");
-    return errno;
+    return MPROTFAIL;
   }
 
   /* Actually patch the prologue. */

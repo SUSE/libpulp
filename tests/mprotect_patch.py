@@ -20,31 +20,27 @@
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
 import testsuite
+import sys
+import os
 
-child = testsuite.spawn('contract')
+if os.geteuid() == 0:
+    child = testsuite.spawn('block_mprotect ./parameters')
+else:
+    print("Test not running as root.", file=sys.stdout)
+    exit(77) # Skip test
 
 child.expect('Waiting for input.')
 
-errors = 0
 child.sendline('')
-child.sendline('')
-child.expect('TYPE A data 128');
-child.sendline('')
-child.expect('TYPE B data 256.000000');
+child.expect('1-2-3-4-5-6-7-8');
+child.expect('1.0-2.0-3.0-4.0-5.0-6.0-7.0-8.0-9.0-10.0');
 
-# Send the test program into the library.
-child.sendline('')
+child.livepatch('.libs/libparameters_livepatch1.so')
 
-# Apply live patch while inside library
-child.livepatch('.libs/libcontract_livepatch1.so')
-
-# Let the process resume and check fna behavior
 child.sendline('')
-child.expect('TYPE A data 128', reject='Invalid type.')
-
-# Let the process resume and check fnb behavior
-child.sendline('')
-child.expect('TYPE B data 1024.000000', reject='Invalid type.')
+child.expect('8-7-6-5-4-3-2-1', reject='1-2-3-4-5-6-7-8');
+child.expect('10.0-9.0-8.0-7.0-6.0-5.0-4.0-3.0-2.0-1.0',
+             reject='1.0-2.0-3.0-4.0-5.0-6.0-7.0-8.0-9.0-10.0');
 
 child.close(force=True)
-exit(errors)
+exit(0)

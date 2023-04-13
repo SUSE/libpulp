@@ -54,8 +54,6 @@
   } \
   while (0);
 
-extern __thread int __ulp_pending;
-
 /** Used on __tls_get_addr(tls_index *).  */
 typedef struct
 {

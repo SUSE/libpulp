@@ -75,10 +75,6 @@ struct ulp_detour
   struct ulp_detour *next;
 };
 
-/* libpulp TLS variables */
-
-__thread int __ulp_pending = 0;
-
 /* libpulp livepatching interfaces */
 int __ulp_apply_patch();
 
@@ -149,3 +145,5 @@ struct ulp_detour_root *get_detour_root_by_index(unsigned int idx);
 void dump_ulp_patching_state(void);
 
 void dump_ulp_detours(void);
+
+int memory_protection_get(uintptr_t addr);

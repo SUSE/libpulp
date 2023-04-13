@@ -63,6 +63,7 @@ typedef int ulp_error_t;
 #define EUSRBLOCKED   280 /** Livepatch blocked by user request.  */
 #define EOLDLIBPULP   281 /** Libpulp version too old.  */
 #define EINITFAIL     282 /** Libpulp initialization failure.  */
+#define MPROTFAIL     283 /** Page permission error.  */
 
 /** Table used to map error code to message.  Define it here so that it is
  *  easier for it being maintained.
@@ -96,6 +97,7 @@ typedef int ulp_error_t;
     "Livepatching blocked by user request", \
     "Libpulp version is too old", \
     "Libpulp initialization failure", \
+    "Page permission error", \
   }
 /* clang-format on */
 
