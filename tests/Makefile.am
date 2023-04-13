@@ -419,7 +419,8 @@ check_PROGRAMS = \
   dlsym \
   stress \
   pcqueue \
-  comments
+  comments \
+  block_mprotect
 
 numserv_SOURCES = numserv.c
 numserv_LDADD = libdozens.la libhundreds.la
@@ -547,6 +548,12 @@ comments_SOURCES = comments.c
 comments_CFLAGS = -fpatchable-function-entry=16,14 $(AM_CFLAGS)
 comments_LDADD =
 
+# block_mprotect is a auxiliary program to block page flags change through
+# mprotect.
+block_mprotect_SOURCES = block_mprotect.c
+block_mprotect_CFLAGS = $(AM_CFLAGS) -I/usr/include/libseccomp/
+block_mprotect_LDADD = -lseccomp
+
 TESTS = \
   numserv.py \
   numserv_bsymbolic.py \
@@ -594,11 +601,14 @@ TESTS = \
   set_patchable.py \
   path_disable.py \
   user_disable.py \
-  group_disable.py
+  group_disable.py \
+  mprotect.py \
+  mprotect_patch.py
 
 XFAIL_TESTS = \
   blocked.py \
-  contract.py
+  contract.py \
+  mprotect_patch.py
 
 # Some tests must run serially because they may interfere with other
 # tests. We use *.log because automake rule that runs the tests are
@@ -621,7 +631,7 @@ SERIAL_TESTS = \
 # Remove the test itself from the dependency list.
 MANYPROCESSES_DEPS = $(filter-out $(SERIAL_TESTS),$(TEST_LOGS))
 STRESS_DEPS = $(MANYPROCESSES_DEPS) manyprocesses.log
-TEMPFILES_DEPS = $(STRESS_DEPS) manyprocesses.log stress.log
+TEMPFILES_DEPS = $(STRESS_DEPS) mprotect.log
 
 manyprocesses.log: $(MANYPROCESSES_DEPS)
 

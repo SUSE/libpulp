@@ -153,6 +153,11 @@ AC_SUBST([LIBUNWIND_LIBS], ["-lunwind-generic -lunwind-ptrace -lunwind"])
 AC_DEFINE(ENABLE_STACK_CHECK, 1, [Enable stack checking routines]),
 AC_DEFINE(ENABLE_STACK_CHECK, 0, [Disable stack checking routines]))
 
+# Check if libseccomp is present.  This is required for testing.
+CFLAGS="$CFLAGS -I/usr/include/libseccomp/"
+AC_CHECK_HEADER([seccomp.h],,
+AC_MSG_ERROR([libseccomp required for testing.]))
+
 # Check if Doxygen is present.
 AC_CHECK_PROGS([DOXYGEN], [doxygen])
 AC_CHECK_PROGS([DOT], [dot])
