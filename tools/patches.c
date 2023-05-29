@@ -401,7 +401,9 @@ check_preamble(ElfW(Addr) sym_address, pid_t pid)
   unsigned char bytes[2];
 
   if (read_memory((char *)bytes, 2, pid, sym_address)) {
-    WARN("Unable to read symbol preable.");
+    /* In case it was unable to read the symbol due to permission error, just
+     * warn in debug output.  */
+    DEBUG("Unable to read symbol preamble at address %lx in process %d", sym_address, pid);
     return false;
   }
 
