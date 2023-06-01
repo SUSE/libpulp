@@ -391,6 +391,14 @@ library of the livepatch will be removed.
 Disable output summarization. This avoids suppression of output 'irrelevant output'
 with regard to skipped livepatches.
 .TP
+.B --timeout N
+Wait N seconds for a reply from libpulp. Default is 100s. In cases where the
+system is busy running multiple tasks it may be worth increasing this number,
+once ulp will bail out to not hang a system update.
+.TP
+.B --recursive
+Look for livepatches recursively when a wildcard is passed.
+.TP
 .B -q, --quiet
 Do not produce any output.
 .TP
