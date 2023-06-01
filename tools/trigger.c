@@ -44,7 +44,23 @@
 #include "ulp_common.h"
 
 static bool recursive_mode;
+static bool disable_summarization;
 static const char *prefix = NULL;
+
+static bool
+skippable_error(ulp_error_t err)
+{
+  return err == EBUILDID || err == ENOTARGETLIB || err == EUSRBLOCKED ||
+         err == EWILDNOMATCH || err == EAPPLIED;
+}
+
+enum
+{
+  PROCESS_OTHER_ERROR = 0,
+  PROCESS_PATCH_SUCCESS = 1 << 0,
+  PROCESS_PATCH_SKIPPED = 1 << 1,
+  PROCESS_PATCH_ERROR = 1 << 2,
+};
 
 /** @brief Apply a single live patch to one process.
  *
@@ -239,14 +255,14 @@ trigger_many_ulps(struct ulp_process *p, int retries,
   struct dirent *entry;
   char buffer[ULP_PATH_LEN];
 
-  int ret = EWILDNOMATCH, r;
+  int ret = PROCESS_OTHER_ERROR, r = 0;
   int ulp_folder_path_len = strlen(ulp_folder_path);
 
   int wildcard_len = wildcard ? strlen(wildcard) : 0;
 
   if (!directory) {
     FATAL("Unable to open directory: %s", ulp_folder_path);
-    ret = 1;
+    ret = PROCESS_OTHER_ERROR;
     goto wildcard_clean;
   }
 
@@ -254,6 +270,7 @@ trigger_many_ulps(struct ulp_process *p, int retries,
   strcat(buffer, "/");
   ulp_folder_path_len += 1;
 
+  /* Iterate on each file of directory.  */
   while ((entry = readdir(directory)) != NULL) {
     int bytes;
 
@@ -313,11 +330,17 @@ trigger_many_ulps(struct ulp_process *p, int retries,
       /* Skip if file does not match wildcard.  */
       continue;
     }
-    r = 0;
 
     r = trigger_one_process(p, retries, buffer, library, check_stack, revert);
-    if (!(ret == EBUILDID || ret == ENOTARGETLIB))
-      ret |= r;
+    if (r == 0) {
+      ret |= PROCESS_PATCH_SUCCESS;
+    }
+    else if (skippable_error(r)) {
+      ret |= PROCESS_PATCH_SKIPPED;
+    }
+    else {
+      ret |= PROCESS_PATCH_ERROR;
+    }
   }
 
   closedir(directory);
@@ -325,13 +348,6 @@ trigger_many_ulps(struct ulp_process *p, int retries,
 wildcard_clean:
   free(wildcard_path_dup);
   return ret;
-}
-
-static bool
-skippable_error(ulp_error_t err)
-{
-  return err == EBUILDID || err == ENOTARGETLIB || err == EUSRBLOCKED ||
-         err == EWILDNOMATCH || err == EAPPLIED;
 }
 
 static void
@@ -477,44 +493,57 @@ trigger_many_processes(const char *process_wildcard, int retries,
   {
     int r;
 
+    /* FIXME: trigger_many_ulps and trigger_one_process should not return
+       very distinct error values.  */
+
     if (is_wildcard) {
       /* If a wildcard is provided, trigger all files that matches it.  */
       r = trigger_many_ulps(p, retries, ulp_folder_path, library, check_stack,
                             revert);
+
+      /* In the case the process was patched, then do not count 'skipped'
+       * patches as it is irrelevant.  */
+      if (r & PROCESS_PATCH_SUCCESS) {
+        successes++;
+      }
+      else if (r & PROCESS_PATCH_SKIPPED) {
+        skippes++;
+      }
+
+      /* Count the processes that got an error even if one of the patches
+       * successes.  */
+      if (r & PROCESS_PATCH_ERROR) {
+        failures++;
+      }
     }
-    else if (ulp_folder_path) {
+    else {
       /* This may simply be a file.  Patch it. */
       r = trigger_one_process(p, retries, ulp_folder_path, library,
                               check_stack, revert);
-    }
-    else {
-      /* No path or wildcard provided.  The user may have requested to
-         revert-all.  */
-      r = trigger_one_process(p, retries, NULL, library, check_stack, revert);
-    }
 
-    /* If the livepatch failed because the patch wasn't targeted to the
-       proccess, we ignore because we are batch processing.  */
-    if (skippable_error(r)) {
-      skippes++;
-    }
-    else {
-      ret |= r;
-      if (r == 0) {
-        successes++;
+      /* If the livepatch failed because the patch wasn't targeted to the
+         proccess, we ignore because we are batch processing.  */
+      if (skippable_error(r)) {
+        skippes++;
       }
       else {
-        failures++;
+        ret |= r;
+        if (r == 0) {
+          successes++;
+        }
+        else {
+          failures++;
+        }
       }
     }
 
     if (!ulp_quiet)
-      print_patched_unpatched(p, !ulp_verbose);
+      print_patched_unpatched(p, !disable_summarization);
   }
 
   if (successes + skippes + failures > 0) {
-    WARN("Processes patched: %d, Skipped: %d, Failed: %d.", successes, skippes,
-         failures);
+    printf("ulp: Processes patched: %d, Skipped: %d, Failed: %d.\n", successes,
+           skippes, failures);
   }
 
   return ret;
@@ -607,6 +636,7 @@ run_trigger(struct arguments *arguments)
   ulp_quiet = arguments->quiet;
   enable_threading = !arguments->disable_threads;
   recursive_mode = arguments->recursive;
+  disable_summarization = arguments->no_summarization;
 
   bool check_stack = false;
   const char *livepatch = arguments->args[0];

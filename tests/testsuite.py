@@ -392,7 +392,7 @@ class spawn(pexpect.spawn):
 
 
 def childless_livepatch(wildcard, timeout=10, retries=1,
-            verbose=False, quiet=False, revert_lib=None):
+            verbose=False, quiet=False, revert_lib=None, capture_output=False):
 
     # Build command-line from arguments
     command = [ulptool, "trigger"]
@@ -413,7 +413,10 @@ def childless_livepatch(wildcard, timeout=10, retries=1,
     # Apply the live patch and check for common errors
     try:
       print('Applying/reverting live patch.')
-      tool = subprocess.run(command, timeout=timeout)
+      if capture_output == True:
+        tool = subprocess.run(command, timeout=timeout, stdout=subprocess.PIPE)
+      else:
+        tool = subprocess.run(command, timeout=timeout)
     except subprocess.TimeoutExpired:
       print('Live patching timed out.')
       raise
@@ -423,6 +426,10 @@ def childless_livepatch(wildcard, timeout=10, retries=1,
     tool.check_returncode()
 
     print('Live patch applied/reverted successfully.')
+    if tool.stdout is not None:
+      return tool.stdout.decode()
+    else:
+      return None
 
 def childless_disable_livepatching(process_wildcard, userid, timeout=10):
 

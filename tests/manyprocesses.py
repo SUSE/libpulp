@@ -23,8 +23,6 @@ childs = [testsuite.spawn('manyprocesses'),
           testsuite.spawn('manyprocesses'),
           testsuite.spawn('manyprocesses')]
 
-
-
 for child in childs:
     child.expect('Waiting for input.')
 
@@ -32,7 +30,16 @@ for child in childs:
     child.expect('1-2-3-4-5-6-7-8');
     child.expect('1.0-2.0-3.0-4.0-5.0-6.0-7.0-8.0-9.0-10.0');
 
-testsuite.childless_livepatch(wildcard='.libs/libmanyprocesses_livepatch1.so', verbose=True, revert_lib='libmanyprocesses.so.0')
+# Try to livepatch everything into the manyprocesses.
+output = testsuite.childless_livepatch(wildcard='.libs/*_livepatch1.so',
+                                       verbose=True,
+                                       revert_lib='libmanyprocesses.so.0',
+                                       capture_output=True)
+
+# Check if the patched counter is correct.
+if output.find("Processes patched: 3, Skipped: 0, Failed: 0") == -1:
+    exit(1)
+
 
 for child in childs:
     child.sendline('')

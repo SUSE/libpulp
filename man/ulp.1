@@ -387,6 +387,10 @@ Before applying the live patch to the target process, revert all livepatches
 applied to the library LIB. If LIB=target, then all patches to the target
 library of the livepatch will be removed.
 .TP
+.B --disable-summarization
+Disable output summarization. This avoids suppression of output 'irrelevant output'
+with regard to skipped livepatches.
+.TP
 .B -q, --quiet
 Do not produce any output.
 .TP
