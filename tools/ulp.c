@@ -129,6 +129,7 @@ static const char doc[] =
 #define ULP_OP_TIMEOUT 259
 #define ULP_OP_DISABLE_THREADING 260
 #define ULP_OP_RECURSIVE 261
+#define ULP_OP_DISABLE_SUMMARIZATION 262
 
 static struct argp_option options[] = {
   { 0, 0, 0, 0, "Options:", 0 },
@@ -148,6 +149,8 @@ static struct argp_option options[] = {
     0 },
   { "timeout", ULP_OP_TIMEOUT, "t", 0,
     "Set trigger timeout to t seconds (default 200s)", 0 },
+  { "disable-summarization", ULP_OP_DISABLE_SUMMARIZATION, 0, 0,
+    "Disable trigger ouput summarization", 0 },
   { "recursive", ULP_OP_RECURSIVE, 0, 0, "Search for patches recursively", 0 },
   { "root", 'R', "PREFIX", 0,
     "Append prefix to livepatch path when passing it to target process", 0 },
@@ -351,6 +354,10 @@ parser(int key, char *arg, struct argp_state *state)
 
     case ULP_OP_RECURSIVE:
       arguments->recursive = 1;
+      break;
+
+    case ULP_OP_DISABLE_SUMMARIZATION:
+      arguments->no_summarization = 1;
       break;
 
     case 'u':

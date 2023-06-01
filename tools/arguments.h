@@ -58,6 +58,7 @@ struct arguments
   int revert;
   int disable_threads;
   int recursive;
+  int no_summarization;
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
   int check_stack;
 #endif
