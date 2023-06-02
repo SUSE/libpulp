@@ -51,7 +51,7 @@ static bool
 skippable_error(ulp_error_t err)
 {
   return err == EBUILDID || err == ENOTARGETLIB || err == EUSRBLOCKED ||
-         err == EWILDNOMATCH || err == EAPPLIED;
+         err == EWILDNOMATCH || err == EAPPLIED || err == ENOPATCH;
 }
 
 enum
@@ -155,10 +155,10 @@ trigger_one_process(struct ulp_process *target, int retries,
         FATAL("fatal error reverting livepatches (hijacked execution).");
         retry = 0;
       }
-      /* In case we received a `No Target Lib` error, ignore it because we are
-         doing atomic patching and it may be the first patch we are trying to
-         apply.  */
-      if (livepatch && result == ENOTARGETLIB) {
+      /* In case we received a `No Target Lib` or `No patches reverted` error,
+         ignore it because we are doing atomic patching and it may be the
+         first patch we are trying to apply.  */
+      if (livepatch && (result == ENOTARGETLIB || result == ENOPATCH)) {
         result = 0;
       }
 

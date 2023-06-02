@@ -126,6 +126,13 @@ revert_all_patches_from_lib(const char *lib_name)
     patch = next;
   }
 
+  /* In case there is no patch, then check if the target library is indeed
+     loaded.  */
+  if (ret == ENOTARGETLIB &&
+      get_loaded_library_base_addr(lib_basename) != (void *)0xFF) {
+    return ENOPATCH;
+  }
+
   return ret;
 }
 

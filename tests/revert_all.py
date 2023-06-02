@@ -25,6 +25,14 @@ child = testsuite.spawn('numserv')
 
 child.expect('Waiting for input.')
 
+# Reverting all patches from a library that currently have no patches installed
+# should fail for a single process.
+try:
+  child.livepatch(revert_lib="libhundreds.so.0")
+  exit(1)
+except:
+  pass
+
 child.sendline('hundred')
 child.expect('100')
 
