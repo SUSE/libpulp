@@ -1673,11 +1673,11 @@ revert_patches_from_lib(struct ulp_process *process, const char *lib_name)
 
   if (context.rax != 0) {
     if (context.rax == EAGAIN)
-      WARN("patches reverse-all failed in libpulp.so: libc/libdl locks were "
-           "busy");
+      DEBUG("patches reverse-all failed in libpulp.so: libc/libdl locks were "
+            "busy");
     else
-      WARN("patches reverse-all failed in libpulp.so: %s",
-           libpulp_strerror(context.rax));
+      DEBUG("patches reverse-all failed in libpulp.so: %s",
+          libpulp_strerror(context.rax));
   }
 
   return context.rax;

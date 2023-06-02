@@ -64,6 +64,7 @@ typedef int ulp_error_t;
 #define EOLDLIBPULP   281 /** Libpulp version too old.  */
 #define EINITFAIL     282 /** Libpulp initialization failure.  */
 #define MPROTFAIL     283 /** Page permission error.  */
+#define ENOPATCH      284 /** No patches installed.  */
 
 /** Table used to map error code to message.  Define it here so that it is
  *  easier for it being maintained.
@@ -98,6 +99,7 @@ typedef int ulp_error_t;
     "Libpulp version is too old", \
     "Libpulp initialization failure", \
     "Page permission error", \
+    "No patches installed", \
   }
 /* clang-format on */
 
