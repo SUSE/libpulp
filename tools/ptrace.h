@@ -31,6 +31,8 @@
 
 /* Memory read/write helper functions */
 
+int write_bytes_ptrace(const void *buf, size_t n, int pid, Elf64_Addr addr);
+
 int write_bytes(const void *buf, size_t n, int pid, Elf64_Addr addr);
 
 int write_string(const char *buffer, int pid, Elf64_Addr addr);
@@ -58,4 +60,4 @@ int set_regs(int pid, struct user_regs_struct *regs);
 void set_run_and_redirect_timeout(long t);
 
 int run_and_redirect(int pid, struct user_regs_struct *regs,
-                     ElfW(Addr) routine);
+                     Elf64_Addr routine);

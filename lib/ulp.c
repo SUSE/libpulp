@@ -36,6 +36,7 @@
 
 #include "config.h"
 #include "error.h"
+#include "insn_queue_lib.h"
 #include "interpose.h"
 #include "msg_queue.h"
 #include "ulp.h"
@@ -149,6 +150,14 @@ __ulp_revert_patches_from_lib()
 {
   int result;
 
+  /* If libpulp is in an error state, we cannot continue.  */
+  if (libpulp_is_in_error_state())
+    return get_libpulp_error_state();
+
+  /* If the instruction queue is in an weird state, we cannot continue.  */
+  if (insnq_ensure_emptiness())
+    return get_libpulp_error_state();
+
   /*
    * If the target process is busy within functions from the malloc or
    * dlopen implementations, applying a live patch could lead to a
@@ -177,6 +186,10 @@ __ulp_apply_patch()
 
   /* If libpulp is in an error state, we cannot continue.  */
   if (libpulp_is_in_error_state())
+    return get_libpulp_error_state();
+
+  /* If the instruction queue is in an weird state, we cannot continue.  */
+  if (insnq_ensure_emptiness())
     return get_libpulp_error_state();
 
   /*
@@ -1037,7 +1050,7 @@ check_build_id(struct ulp_metadata *ulp)
 static void
 ulp_patch_prologue_layout(void *old_fentry, const char *prologue, int len)
 {
-  memcpy(old_fentry, prologue, len);
+  insnq_insert_write(old_fentry, len, prologue);
 }
 
 /** @brief skip the ulp prologue.
@@ -1063,7 +1076,7 @@ ulp_skip_prologue(void *fentry)
     bias += sizeof(insn_endbr64);
 
   /* Do not jump backwards on function entry (0x6690 is a nop on x86). */
-  memcpy(fentry + bias, insn_nop2, sizeof(insn_nop2));
+  insnq_insert_write((char *)fentry + bias, sizeof(insn_nop2), insn_nop2);
 }
 
 /** @brief Get patched address of function with universe index = idx.
@@ -1165,19 +1178,26 @@ push_new_detour(unsigned long universe, unsigned char *patch_id,
 void
 ulp_patch_addr_absolute(void *old_fentry, void *manager)
 {
-  memcpy(old_fentry + ULP_DATA_OFFSET, &manager, sizeof(void *));
+  char *dst = (char *)old_fentry + ULP_DATA_OFFSET;
+  insnq_insert_write(dst, sizeof(void *), &manager);
 }
 
+/** @brief Actually patch the old function with the new function
+ *
+ * This function will finally patch the old function pointed by `old_faddr`
+ * with the one pointed by `new_faddr`, replacing the ulp NOP prologue with
+ * the intended content to redirect to the new function.
+ *
+ * @param old_faddr     Address of the old function.
+ * @param new_faddr     Address of the new function.
+ * @param enable        False to disable the redirection to the new function.
+ *
+ * @return              0 if success, error code otherwise.
+ */
 int
 ulp_patch_addr(void *old_faddr, void *new_faddr, int enable)
 {
   void *addr;
-  unsigned long page_size;
-  uintptr_t page_mask;
-  uintptr_t page1;
-  uintptr_t page2;
-  int prot1;
-  int prot2;
 
   int ulp_nops_len;
   const char *prologue;
@@ -1207,45 +1227,8 @@ ulp_patch_addr(void *old_faddr, void *new_faddr, int enable)
     return ENOPATCHABLE;
   }
 
-  /*
-   * The size of the nop padding area is supposed to be a lot smaller
-   * than the typical size of a memory page. Even so, when the entry
-   * point to the target function is at an address close to a page
-   * boundary, the padding area may span two pages. This function is
-   * able to handle at most one page cross.
-   */
-  page_size = getpagesize();
-  page_mask = ~(page_size - 1);
-  if ((unsigned long)ulp_nops_len > page_size) {
-    WARN("Nop padding area unexpectedly large.");
-    return 0;
-  }
-
   /* Find the starting address of the pages containing the nops. */
   addr = old_faddr - PRE_NOPS_LEN;
-
-  page1 = (uintptr_t)addr;
-  page2 = (uintptr_t)(addr + ulp_nops_len - 1);
-  page1 = page1 & page_mask;
-  page2 = page2 & page_mask;
-
-  /* Retrieve the current set of protection bits. */
-  prot1 = memory_protection_get(page1);
-  prot2 = memory_protection_get(page2);
-  if (prot1 == -1 || prot2 == -1) {
-    WARN("Memory protection read error");
-    return ENOADDRESS;
-  }
-
-  /* Set the writable bit on affected pages. */
-  if (mprotect((void *)page1, page_size, prot1 | PROT_WRITE)) {
-    WARN("Memory protection set error (1st page)");
-    return MPROTFAIL;
-  }
-  if (mprotect((void *)page2, page_size, prot2 | PROT_WRITE)) {
-    WARN("Memory protection set error (2nd page)");
-    return MPROTFAIL;
-  }
 
   /* Actually patch the prologue. */
   if (enable) {
@@ -1254,16 +1237,6 @@ ulp_patch_addr(void *old_faddr, void *new_faddr, int enable)
   }
   else {
     ulp_skip_prologue(old_faddr);
-  }
-
-  /* Restore the previous access protection. */
-  if (mprotect((void *)page1, page_size, prot1)) {
-    WARN("Memory protection restore error (1st page)");
-    return errno;
-  }
-  if (mprotect((void *)page2, page_size, prot2)) {
-    WARN("Memory protection restore error (2nd page)");
-    return errno;
   }
 
   return 0;
