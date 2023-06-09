@@ -30,17 +30,17 @@
 #include <limits.h>
 #include <link.h>
 #include <pthread.h>
+#include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <pwd.h>
 
 #include "ld_rtld.h"
 #include "msg_queue.h"
-#include "ulp_common.h"
 #include "ulp.h"
+#include "ulp_common.h"
 
 /* This header should be included last, as it poisons some symbols.  */
 #include "error.h"
@@ -580,37 +580,6 @@ maybe_disable_livepatching_on_group(void)
   free(names);
 }
 
-/** @brief Check if we can change the page protection flags on .text segment.
- *
- * Depending of the security options the application was launched with (example
- * systemd's MemoryDenyWriteExecute=yes), we can't change any page flags to
- * executable.  This function will check if we can change the page protection
- * and set libpulp to an error state if otherwise.
- */
-static void
-check_page_protection(void)
-{
-  void *function = real_malloc;
-  uintptr_t page, page_mask;
-  int prot;
-  unsigned long page_size = getpagesize();
-
-  page_mask = ~(page_size - 1);
-  page = ((uintptr_t)function) & page_mask;
-  prot = memory_protection_get(page);
-
-  /* Check if the memory protection actually makes sense.  */
-  libpulp_crash_assert(prot & (PROT_READ | PROT_EXEC));
-
-  /* Check if we can set the memory protection of this page.  */
-  if (mprotect((void *)page, page_size, prot)) {
-    /* We can't set the page.  Probably MemoryWriteExecute is set to yes.  */
-    set_libpulp_error_state(MPROTFAIL);
-    WARN("Livepatch disabled: unable to set memory protection, most likely due" \
-         " to security configuration.");
-  }
-}
-
 __attribute__((constructor)) void
 __ulp_asunsafe_begin(void)
 {
@@ -664,8 +633,6 @@ __ulp_asunsafe_begin(void)
   maybe_disable_livepatching_on_path();
   maybe_disable_livepatching_on_user();
   maybe_disable_livepatching_on_group();
-
-  check_page_protection();
 }
 
 static bool

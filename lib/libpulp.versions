@@ -26,6 +26,7 @@
     __ulp_metadata_buffer;
     __ulp_error_state;
     __ulp_enable_or_disable_patching;
+    __ulp_insn_queue;
   local:
     *;
 };

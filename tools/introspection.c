@@ -64,6 +64,7 @@
 #include "config.h"
 #include "elf-extra.h"
 #include "error_common.h"
+#include "insn_queue_tools.h"
 #include "introspection.h"
 #include "packer.h"
 #include "ulp_common.h"
@@ -151,6 +152,7 @@ debug_ulp_dynobj(struct ulp_dynobj *obj)
   WARN("obj->metadata_buffer = %lx", obj->metadata_buffer);
   WARN("obj->error_state = %lx", obj->error_state);
   WARN("obj->enable_disable_patching = %lx", obj->enable_disable_patching);
+  WARN("obj->insn_queue = %lx", obj->insn_queue);
 }
 
 /** @brief Release memory of an ulp_thread `t`
@@ -844,11 +846,16 @@ get_libpulp_extern_symbols(struct ulp_dynobj *obj, int pid)
         obj->enable_disable_patching = ehdr_addr + sym.st_value;
         bitfield |= (1 << 8);
       }
+
+      else if (!strcmp(remote_name, "_insn_queue")) {
+        obj->insn_queue = ehdr_addr + sym.st_value;
+        bitfield |= (1 << 9);
+      }
     }
 
     dynsym_addr += sizeof(sym);
 
-    if (bitfield == 0x1FF)
+    if (bitfield == 0x3FF)
       break;
   }
 
@@ -1627,6 +1634,13 @@ apply_patch(struct ulp_process *process, void *metadata, size_t metadata_size)
             libpulp_strerror(context.rax));
   }
 
+  /* Interpret now any code that libpulp send to us.  */
+  ret = insnq_interpret_from_process(process);
+  /* In case libpulp is old, the queue may not be present.  */
+  if (ret != 0 && ret != EOLDLIBPULP) {
+    return ret;
+  }
+
   return context.rax;
 }
 
@@ -1677,7 +1691,14 @@ revert_patches_from_lib(struct ulp_process *process, const char *lib_name)
             "busy");
     else
       DEBUG("patches reverse-all failed in libpulp.so: %s",
-          libpulp_strerror(context.rax));
+            libpulp_strerror(context.rax));
+  }
+
+  /* Interpret now any code that libpulp send to us.  */
+  ret = insnq_interpret_from_process(process);
+  /* In case libpulp is old, the queue may not be present.  */
+  if (ret != 0 && ret != EOLDLIBPULP) {
+    return ret;
   }
 
   return context.rax;

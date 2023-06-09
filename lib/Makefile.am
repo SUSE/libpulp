@@ -23,6 +23,7 @@ libpulp_la_SOURCES = \
   ulp.c \
   interpose.c \
   msg_queue.c \
+  insn_queue.c \
   error.c \
   ulp_prologue.S \
   ulp_interface.S

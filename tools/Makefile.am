@@ -35,7 +35,8 @@ noinst_HEADERS = \
   elf-extra.h \
   pcqueue.h \
   extract.h \
-  set_patchable.h
+  set_patchable.h \
+  insn_queue_tools.h
 
 ulp_SOURCES = \
   ulp.c \
@@ -53,7 +54,8 @@ ulp_SOURCES = \
   elf-extra.c \
   pcqueue.c \
   extract.c \
-  set_patchable.c
+  set_patchable.c \
+  insn_queue.c
 
 ulp_LDADD = $(top_builddir)/common/libcommon.la -lelf -ljson-c -lpthread -ldl $(LIBUNWIND_LIBS)
 

@@ -602,14 +602,13 @@ TESTS = \
   path_disable.py \
   user_disable.py \
   group_disable.py \
-  mprotect.py \
   mprotect_patch.py \
-  patches.py
+  patches.py \
+  mprotect_patch.py
 
 XFAIL_TESTS = \
   blocked.py \
-  contract.py \
-  mprotect_patch.py
+  contract.py
 
 # Some tests must run serially because they may interfere with other
 # tests. We use *.log because automake rule that runs the tests are
@@ -632,7 +631,7 @@ SERIAL_TESTS = \
 # Remove the test itself from the dependency list.
 MANYPROCESSES_DEPS = $(filter-out $(SERIAL_TESTS),$(TEST_LOGS))
 STRESS_DEPS = $(MANYPROCESSES_DEPS) manyprocesses.log
-TEMPFILES_DEPS = $(STRESS_DEPS) mprotect.log
+TEMPFILES_DEPS = $(STRESS_DEPS)
 
 manyprocesses.log: $(MANYPROCESSES_DEPS)
 

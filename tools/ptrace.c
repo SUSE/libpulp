@@ -112,32 +112,8 @@ ulp_ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data)
 #pragma GCC poison ptrace
 
 int
-write_bytes(const void *buf, size_t n, int pid, Elf64_Addr addr)
+write_bytes_ptrace(const void *buf, size_t n, int pid, Elf64_Addr addr)
 {
-#ifdef USE_VM_READV_WRITEV
-  struct iovec local = { .iov_base = (void *)buf, .iov_len = n };
-  struct iovec remote = { .iov_base = (void *)addr, .iov_len = n };
-
-  ssize_t ret;
-  size_t acc = 0;
-
-  do {
-    ret = process_vm_writev(pid, &local, 1, &remote, 1, 0);
-
-    if (ret < 0) {
-      DEBUG("Unable to write byte at address %lx: %s\n", addr,
-            strerror(errno));
-      /* Error in process_vm_readv.  */
-      return errno;
-    }
-
-    acc += ret;
-  }
-  while (acc != n);
-
-  return 0;
-
-#else
   unsigned long *lbuf = (unsigned long *)buf;
   size_t num_longs = n / sizeof(long);
   size_t num_remainders = n % sizeof(long);
@@ -168,6 +144,36 @@ write_bytes(const void *buf, size_t n, int pid, Elf64_Addr addr)
     }
   }
   return 0;
+}
+
+int
+write_bytes(const void *buf, size_t n, int pid, Elf64_Addr addr)
+{
+#ifdef USE_VM_READV_WRITEV
+  struct iovec local = { .iov_base = (void *)buf, .iov_len = n };
+  struct iovec remote = { .iov_base = (void *)addr, .iov_len = n };
+
+  ssize_t ret;
+  size_t acc = 0;
+
+  do {
+    ret = process_vm_writev(pid, &local, 1, &remote, 1, 0);
+
+    if (ret < 0) {
+      DEBUG("Unable to write byte at address %lx: %s\n", addr,
+            strerror(errno));
+      /* Error in process_vm_readv.  */
+      return errno;
+    }
+
+    acc += ret;
+  }
+  while (acc != n);
+
+  return 0;
+
+#else
+  return write_bytes_ptrace(buf, n, pid, addr);
 #endif
 }
 

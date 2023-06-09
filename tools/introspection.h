@@ -114,6 +114,7 @@ struct ulp_dynobj
   Elf64_Addr metadata_buffer;
   Elf64_Addr error_state;
   Elf64_Addr enable_disable_patching;
+  Elf64_Addr insn_queue;
   /* end FIXME.  */
 
   struct thread_state *thread_states;
