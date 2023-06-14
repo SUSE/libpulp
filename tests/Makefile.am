@@ -603,7 +603,8 @@ TESTS = \
   user_disable.py \
   group_disable.py \
   mprotect.py \
-  mprotect_patch.py
+  mprotect_patch.py \
+  patches.py
 
 XFAIL_TESTS = \
   blocked.py \
