@@ -610,14 +610,12 @@ insert_target_process(int pid, struct ulp_process **list)
   struct ulp_process *new = NULL;
   int ret;
 
-  new = malloc(sizeof(struct ulp_process));
-  memset(new, 0, sizeof(struct ulp_process));
+  new = calloc(1, sizeof(struct ulp_process));
 
   new->pid = pid;
   ret = initialize_data_structures(new);
   if (ret) {
-    WARN("Failed to parse data for live-patchable process %d: %s", pid,
-         libpulp_strerror(ret));
+    WARN("error gathering target process information.");
     free(new);
     return;
   }
