@@ -616,7 +616,7 @@ insert_target_process(int pid, struct ulp_process **list)
   ret = initialize_data_structures(new);
   if (ret) {
     WARN("error gathering target process information.");
-    free(new);
+    release_ulp_process(new);
     return;
   }
   else {

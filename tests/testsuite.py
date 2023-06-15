@@ -234,7 +234,7 @@ class spawn(pexpect.spawn):
   # output for more information).
   def livepatch(self, filename=None, timeout=10, retries=1,
                 verbose=True, quiet=False, revert=False, revert_lib=None,
-                sanity=True, prefix=None):
+                sanity=True, prefix=None, capture_tool_output=False):
 
     # Check sanity of command-line arguments
     if sanity is True:
@@ -266,7 +266,11 @@ class spawn(pexpect.spawn):
     # Apply the live patch and check for common errors
     try:
       self.print('Applying/reverting live patch.')
-      tool = subprocess.run(command, timeout=timeout)
+      if capture_tool_output == True:
+          tool = subprocess.run(command, timeout=timeout,
+                                stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
+      else:
+          tool = subprocess.run(command, timeout=timeout)
     except subprocess.TimeoutExpired:
       self.print('Live patching timed out.')
       raise
@@ -282,6 +286,11 @@ class spawn(pexpect.spawn):
       self.print('Live patch reverted successfully.')
     else:
       self.print('Live patch applied successfully.')
+
+    if tool.stdout is not None:
+      return tool.stdout.decode()
+    else:
+      return None
 
   # Check if a live patch is already applied. The path to the live patch
   # metadata must be passed through 'filename'. The remaining parameters, which

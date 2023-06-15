@@ -549,81 +549,6 @@ trigger_many_processes(const char *process_wildcard, int retries,
   return ret;
 }
 
-static void
-diagnose_patch_apply(ulp_error_t ret, bool revert, const char *livepatch,
-                     const char *library, struct ulp_process *p)
-{
-  const char *apply_rev = (revert) ? "revert" : "apply";
-  const char *applied_rev = (revert) ? "reverted" : "applied";
-  pid_t pid = p->pid;
-
-  if (ret) {
-    if (livepatch) {
-      if (skippable_error(ret)) {
-        change_color(TERM_COLOR_YELLOW);
-        printf("skipped:");
-      }
-      else {
-        change_color(TERM_COLOR_RED);
-        printf("error:");
-      }
-      change_color(TERM_COLOR_RESET);
-      printf(" could not %s %s to %s (pid %d): %s\n", apply_rev, livepatch,
-             get_process_name(p), pid, libpulp_strerror(ret));
-      if (ret == EBUILDID && !ulp_quiet) {
-        change_color(TERM_COLOR_CYAN);
-        printf("note:");
-        change_color(TERM_COLOR_RESET);
-        printf(" run `ulp patches -b` to retrieve all "
-               "build ids from patchable processes.\n");
-      }
-    }
-    else if (library) {
-      change_color(TERM_COLOR_RED);
-      printf("error:");
-      change_color(TERM_COLOR_RESET);
-      printf(" could not revert all patches to library %s in "
-             "process %s (pid %d): %s\n",
-             library, get_process_name(p), pid, libpulp_strerror(ret));
-      change_color(TERM_COLOR_CYAN);
-      printf("note:");
-      change_color(TERM_COLOR_RESET);
-      printf(" run `ulp patches` to retrieve all "
-             "libraries in process.\n");
-    }
-    else {
-      change_color(TERM_COLOR_RED);
-      printf("error:");
-      change_color(TERM_COLOR_RESET);
-      printf(" no input\n");
-    }
-  }
-  else {
-    if (!ulp_quiet) {
-      if (livepatch) {
-        change_color(TERM_COLOR_GREEN);
-        printf("success:");
-        change_color(TERM_COLOR_RESET);
-        printf(" patch %s %s to %d\n", livepatch, applied_rev, pid);
-      }
-      else if (library) {
-        change_color(TERM_COLOR_GREEN);
-        printf("success:");
-        change_color(TERM_COLOR_RESET);
-        printf(" reverted all patches to library %s in "
-               "process %s (pid %d)\n",
-               library, get_process_name(p), pid);
-      }
-      else {
-        change_color(TERM_COLOR_RED);
-        printf("error:");
-        change_color(TERM_COLOR_RESET);
-        printf(" no input\n");
-      }
-    }
-  }
-}
-
 extern bool enable_threading;
 
 /** @brief Trigger command entry point.
@@ -639,13 +564,11 @@ run_trigger(struct arguments *arguments)
   disable_summarization = arguments->no_summarization;
 
   bool check_stack = false;
-  const char *livepatch = arguments->args[0];
   const char *library = arguments->library;
   const char *ulp_folder_path = arguments->args[0];
   int retry = arguments->retries;
   const char *process_wildcard = arguments->process_wildcard;
   bool revert = (arguments->revert > 0);
-  pid_t pid = 0;
   int ret;
 
   if (arguments->user_wildcard) {
@@ -656,32 +579,11 @@ run_trigger(struct arguments *arguments)
   /* Set global static prefix variable.  */
   prefix = arguments->prefix;
 
-  if (isnumber(process_wildcard))
-    pid = atoi(process_wildcard);
-
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
   check_stack = arguments->check_stack;
 #endif
-
-  if (pid > 0) {
-    struct ulp_process *target = calloc(1, sizeof(struct ulp_process));
-    target->pid = pid;
-    ret = initialize_data_structures(target);
-    if (ret) {
-      WARN("error gathering target process information.");
-      return 1;
-    }
-
-    ret = trigger_one_process(target, retry, livepatch, library, check_stack,
-                              revert);
-
-    diagnose_patch_apply(ret, revert, livepatch, library, target);
-    release_ulp_process(target);
-  }
-  else {
-    ret = trigger_many_processes(process_wildcard, retry, ulp_folder_path,
-                                 library, check_stack, revert);
-  }
+  ret = trigger_many_processes(process_wildcard, retry, ulp_folder_path,
+                               library, check_stack, revert);
 
   return ret;
 }

@@ -26,7 +26,7 @@ import time
 import testsuite
 from testsuite import ulptool
 
-errorcode = 1
+errorcode = 0
 child = testsuite.spawn('parameters', env=None)
 
 child.expect('Waiting for input.')
@@ -35,10 +35,9 @@ child.sendline('')
 child.expect('1-2-3-4-5-6-7-8');
 child.expect('1.0-2.0-3.0-4.0-5.0-6.0-7.0-8.0-9.0-10.0');
 
-try:
-    child.livepatch('.libs/libparameters_livepatch1.so')
-except subprocess.CalledProcessError:
-    errorcode = 0
+out = child.livepatch('.libs/libparameters_livepatch1.so', capture_tool_output=True)
+if out.find("Libpulp not found in target process") == -1:
+  errorcode = 1
 
 child.sendline('')
 child.expect('1-2-3-4-5-6-7-8', reject='8-7-6-5-4-3-2-1');
