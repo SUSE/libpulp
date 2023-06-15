@@ -35,10 +35,11 @@ child.expect('Waiting for input.')
 child.sendline('')
 child.expect('1338');
 
-try:
-    child.livepatch('.libs/libbuildid_livepatch1.so')
-except subprocess.CalledProcessError:
-    errorcode = 0
+out = child.livepatch('.libs/libbuildid_livepatch1.so', capture_tool_output=True)
+if out.find("buildid mismatch") == -1:
+  errorcode = 1
+else:
+  errorcode = 0
 
 child.close(force=True)
 exit(errorcode)
