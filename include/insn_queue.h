@@ -28,6 +28,9 @@
 /** Define a 2Mb buffer for holding the instructions list.  */
 #define INSN_BUFFER_MAX (2 * 1024 * 1024)
 
+/** Define the current version of the instruction queue.  */
+#define INSNQ_CURR_VERSION  1
+
 /** The ULP instruction queue.  This works as follows:
  * 1- Libpulp write instructions that should be executed on the `ulp` tool
  * side. The main reason why this exists is because some processes are launched
@@ -39,6 +42,9 @@
  */
 struct insn_queue
 {
+  /** Version of the queue running.  */
+  int version;
+
   /** Number of instructions in this queue.  */
   int num_insns;
 
@@ -98,7 +104,7 @@ struct ulp_insn_write
   struct ulp_insn base;
 
   /** Number of bytes.  */
-  int n;
+  uint32_t n;
 
   /** Address to patch.  */
   uintptr_t address;

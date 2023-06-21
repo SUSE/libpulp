@@ -98,9 +98,11 @@ void libpulp_crash_assert_func(const char *file, const char *func, int line,
   libpulp_crash_assert_func(__FILE__, __func__, __LINE__, (unsigned long)expr)
 
 /** Poison any function that makes the process to abort.  */
-#ifdef assert
-#undef assert
+#ifndef DISABLE_ERR_POISON
+# ifdef assert
+#  undef assert
+# endif
+# pragma GCC poison errx exit assert abort
 #endif
-#pragma GCC poison errx exit assert abort
 
 #endif /* ERROR_H  */

@@ -62,7 +62,7 @@ run_enable_disable_patching(struct ulp_process *p)
 static ulp_error_t
 enable_or_disable_patching(struct ulp_process *p, bool enable, int retries)
 {
-  ulp_error_t state = get_libpulp_error_state(p);
+  ulp_error_t state = get_libpulp_error_state_remote(p);
   int ret;
 
   if ((state == ENONE && enable == false) ||

@@ -522,7 +522,7 @@ detach_process:
 void
 print_remote_err_status(struct ulp_process *p)
 {
-  ulp_error_t state = get_libpulp_error_state(p);
+  ulp_error_t state = get_libpulp_error_state_remote(p);
 
   printf("  Livepatching status: ");
   switch (state) {

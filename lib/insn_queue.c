@@ -22,14 +22,21 @@
 #include "insn_queue.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "error.h"
 #include "ulp_common.h"
 
 /** Global instruction queue object.  */
-insn_queue_t __ulp_insn_queue;
+insn_queue_t __ulp_insn_queue = { .version = INSNQ_CURR_VERSION };
+
+static int
+align_to(int val, int bytes)
+{
+  int mask = bytes - 1;
+  return (val + mask) & (~mask);
+}
 
 /** @brief Get memory area to write an instruction to in the queue.
  *
@@ -61,11 +68,12 @@ insnq_get_writable_area(struct insn_queue *queue, size_t msg_size)
 
   /* In case the instruction won't fit the queue, then quickly return with
      NULL as answer.  */
-  if (msg_size + size >= INSN_BUFFER_MAX) {
+  if (msg_size + size > INSN_BUFFER_MAX) {
     return NULL;
   }
 
-  /* Reserve area for write.  */
+  /* Reserve area for write.  This breaks strict aliasing rules, so this file
+     must be compiled with -fno-strict-aliasing.  */
   void *ret = &buffer[size];
 
   /* Update number of bytes.  */
@@ -85,20 +93,25 @@ insnq_get_writable_area(struct insn_queue *queue, size_t msg_size)
  * @param queue    The instruction queue object.
  * @param string   String to print.
  */
-void
+ulp_error_t
 insnq_insert_print(const char *string)
 {
   insn_queue_t *queue = &__ulp_insn_queue;
 
   int string_size = strlen(string) + 1;
-  int insn_size = sizeof(struct ulp_insn_print) + string_size;
+  int insn_size = align_to(sizeof(struct ulp_insn_print) + string_size, 4);
   struct ulp_insn_print *insn = insnq_get_writable_area(queue, insn_size);
 
-  libpulp_assert(insn);
+  if (insn == NULL) {
+    set_libpulp_error_state(EINSNQ);
+    return EINSNQ;
+  }
 
   insn->base.type = ULP_INSN_PRINT;
   insn->base.size = insn_size;
   memcpy(insn->bytes, string, string_size);
+
+  return ENONE;
 }
 
 /** @brief Insert write instruction into the queue.
@@ -108,21 +121,26 @@ insnq_insert_print(const char *string)
  * @param n        Number of bytes to patch.
  * @param bytes    Bytes to patch with.
  */
-void
+ulp_error_t
 insnq_insert_write(void *addr, int n, const void *bytes)
 {
   insn_queue_t *queue = &__ulp_insn_queue;
 
-  int insn_size = sizeof(struct ulp_insn_write) + n;
+  int insn_size = align_to(sizeof(struct ulp_insn_write) + n, 8);
   struct ulp_insn_write *insn = insnq_get_writable_area(queue, insn_size);
 
-  libpulp_assert(insn);
+  if (insn == NULL) {
+    set_libpulp_error_state(EINSNQ);
+    return EINSNQ;
+  }
 
   insn->base.type = ULP_INSN_WRITE;
   insn->base.size = insn_size;
   insn->n = n;
   insn->address = (uintptr_t)addr;
   memcpy(insn->bytes, bytes, n);
+
+  return ENONE;
 }
 
 /** @brief Ensure that the instruction queue is empty.
