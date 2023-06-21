@@ -62,6 +62,9 @@ ulp_LDADD = $(top_builddir)/common/libcommon.la -lelf -ljson-c -lpthread -ldl $(
 # Ensure access to the include directory
 AM_CFLAGS += -I$(abs_top_srcdir)/include
 
+# Add -fno-strict-alias to the insn_queue code.
+insn_queue.$(OBJEXT) : CFLAGS += -fno-strict-aliasing
+
 if ENABLE_ADDRSAN
 # Add address sanitizer
 AM_CFLAGS += -fsanitize=address,undefined

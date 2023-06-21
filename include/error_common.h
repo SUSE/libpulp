@@ -66,6 +66,7 @@ typedef int ulp_error_t;
 #define MPROTFAIL     283 /** Page permission error.  */
 #define ENOPATCH      284 /** No patches installed.  */
 #define EINSNQ        285 /** Instruction queue in inconsistent state.  */
+#define EOLDULP       286 /** ULP tool is too old.  */
 
 /** Table used to map error code to message.  Define it here so that it is
  *  easier for it being maintained.
@@ -102,6 +103,7 @@ typedef int ulp_error_t;
     "Page permission error", \
     "No patches installed", \
     "Instruction queue in inconsistent state", \
+    "ULP tool is too old", \
   }
 /* clang-format on */
 

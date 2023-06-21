@@ -26,9 +26,9 @@
 
 void *insnq_get_writable_area(insn_queue_t *, size_t insn_size);
 
-void insnq_insert_print(const char *string);
+ulp_error_t insnq_insert_print(const char *string);
 
-void insnq_insert_write(void *addr, int n, const void *bytes);
+ulp_error_t insnq_insert_write(void *addr, int n, const void *bytes);
 
 int insnq_ensure_emptiness(void);
 

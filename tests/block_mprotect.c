@@ -23,14 +23,14 @@
 
 #define _GNU_SOURCE
 
-#include <unistd.h>
-#include <seccomp.h>
 #include <errno.h>
+#include <seccomp.h>
 #include <stdio.h>
+#include <unistd.h>
 
-#include <sys/wait.h>
 #include <sys/mman.h>
 #include <sys/un.h>
+#include <sys/wait.h>
 
 static int
 block_mprotect(void)
@@ -42,21 +42,14 @@ block_mprotect(void)
   if (!seccomp)
     return -ENOMEM;
 
-  r = seccomp_rule_add(
-                  seccomp,
-                  SCMP_ACT_ERRNO(EPERM),
-                  SCMP_SYS(mmap),
-                  1,
-                  SCMP_A2(SCMP_CMP_MASKED_EQ, PROT_EXEC|PROT_WRITE, PROT_EXEC|PROT_WRITE));
+  r = seccomp_rule_add(seccomp, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(mmap), 1,
+                       SCMP_A2(SCMP_CMP_MASKED_EQ, PROT_EXEC | PROT_WRITE,
+                               PROT_EXEC | PROT_WRITE));
   if (r < 0)
     goto finish;
 
-  r = seccomp_rule_add(
-                  seccomp,
-                  SCMP_ACT_ERRNO(EPERM),
-                  SCMP_SYS(mprotect),
-                  1,
-                  SCMP_A2(SCMP_CMP_MASKED_EQ, PROT_EXEC, PROT_EXEC));
+  r = seccomp_rule_add(seccomp, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(mprotect), 1,
+                       SCMP_A2(SCMP_CMP_MASKED_EQ, PROT_EXEC, PROT_EXEC));
   if (r < 0)
     goto finish;
 
@@ -94,7 +87,8 @@ check_args(int argc, char *argv[])
   return 0;
 }
 
-int main(int argc, char *argv[])
+int
+main(int argc, char *argv[])
 {
   if (check_args(argc, argv)) {
     return 1;

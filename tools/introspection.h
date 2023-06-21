@@ -115,6 +115,9 @@ struct ulp_dynobj
   Elf64_Addr error_state;
   Elf64_Addr enable_disable_patching;
   Elf64_Addr insn_queue;
+
+  /* Version of the insn_queue on target process.  */
+  int insn_queue_version;
   /* end FIXME.  */
 
   struct thread_state *thread_states;
@@ -198,6 +201,6 @@ get_process_name(struct ulp_process *process)
   return get_basename(process->dynobj_main->filename);
 }
 
-ulp_error_t get_libpulp_error_state(struct ulp_process *);
+ulp_error_t get_libpulp_error_state_remote(struct ulp_process *);
 
 #endif

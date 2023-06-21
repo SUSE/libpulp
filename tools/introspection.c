@@ -2554,7 +2554,7 @@ detach_process:
  *             state of libpulp in the target process.
  */
 ulp_error_t
-get_libpulp_error_state(struct ulp_process *p)
+get_libpulp_error_state_remote(struct ulp_process *p)
 {
   if (!p)
     return EINVAL;

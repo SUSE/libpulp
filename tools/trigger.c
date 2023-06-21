@@ -37,6 +37,7 @@
 #include "arguments.h"
 #include "config.h"
 #include "error_common.h"
+#include "insn_queue_tools.h"
 #include "introspection.h"
 #include "patches.h"
 #include "terminal_colors.h"
@@ -89,6 +90,13 @@ trigger_one_process(struct ulp_process *target, int retries,
   int ret;
 
   struct trigger_results *entry = NULL;
+
+  /* Check if instruction queue in target process is compatible with current
+     version of `ulp` tool.  */
+  if (insnq_check_compatibility(target) == false) {
+    ret = EOLDULP;
+    goto metadata_clean;
+  }
 
   /* Extract the livepatch metadata from .so file.  */
   if (container_path) {

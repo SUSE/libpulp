@@ -121,8 +121,8 @@ write_bytes_ptrace(const void *buf, size_t n, int pid, Elf64_Addr addr)
   while (num_longs-- > 0) {
     ulp_ptrace(PTRACE_POKEDATA, pid, (void *)addr, (void *)*lbuf++);
     if (errno) {
-      DEBUG("Unable to write long at address %lx: %s\n", addr,
-            strerror(errno));
+      DEBUG("Unable to write long to process %d at address %lx: %s\n", pid,
+            addr, strerror(errno));
       return 1;
     }
     addr += sizeof(long);
@@ -138,8 +138,8 @@ write_bytes_ptrace(const void *buf, size_t n, int pid, Elf64_Addr addr)
     memcpy(&remainder, lbuf, num_remainders);
     ulp_ptrace(PTRACE_POKEDATA, pid, (void *)addr, (void *)remainder);
     if (errno) {
-      DEBUG("Unable to write long at address %lx: %s\n", addr,
-            strerror(errno));
+      DEBUG("Unable to write long to process %d at address %lx: %s\n", pid,
+            addr, strerror(errno));
       return 1;
     }
   }
@@ -160,8 +160,8 @@ write_bytes(const void *buf, size_t n, int pid, Elf64_Addr addr)
     ret = process_vm_writev(pid, &local, 1, &remote, 1, 0);
 
     if (ret < 0) {
-      DEBUG("Unable to write byte at address %lx: %s\n", addr,
-            strerror(errno));
+      DEBUG("Unable to write byte to process %d at address %lx: %s\n", pid,
+            addr, strerror(errno));
       /* Error in process_vm_readv.  */
       return errno;
     }

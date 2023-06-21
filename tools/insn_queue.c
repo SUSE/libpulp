@@ -53,8 +53,7 @@ insn_interpret_print(struct ulp_insn *insn)
 static int
 insn_interpret_nop(struct ulp_insn *insn)
 {
-  (void)insn;
-  return 1;
+  return sizeof(*insn);
 }
 
 /** @brief Interpret NOP instruction.
@@ -69,7 +68,6 @@ insn_interpret_write(struct ulp_insn *insn)
   int pid = remote_pid; // Pass process pid.
   struct ulp_insn_write *winsn = (struct ulp_insn_write *)insn;
   if (write_bytes_ptrace(winsn->bytes, winsn->n, pid, winsn->address)) {
-    abort();
     return -1;
   }
 
@@ -77,7 +75,7 @@ insn_interpret_write(struct ulp_insn *insn)
 }
 
 /** Table of decoders.  Index must match the `enum ulp_insn_table` object.  */
-int (*decoders[ULP_NUM_INSNS])(struct ulp_insn *insn) = {
+static int (*decoders[ULP_NUM_INSNS])(struct ulp_insn *insn) = {
   insn_interpret_nop,
   insn_interpret_print,
   insn_interpret_write,
@@ -95,7 +93,6 @@ int
 insn_interpret(struct ulp_insn *insn)
 {
   int index = (int)insn->type;
-  assert(ulp_insn_valid(insn));
   return (decoders[index])(insn);
 }
 
@@ -117,8 +114,17 @@ insnq_interpret(insn_queue_t *queue)
 
   while (num_insns_executed < num_insns) {
     struct ulp_insn *insn = (struct ulp_insn *)&buffer[pc];
-    pc += insn_interpret(insn);
-    num_insns_executed++;
+    if (ulp_insn_valid(insn)) {
+      pc += insn_interpret(insn);
+      num_insns_executed++;
+    }
+    else {
+      /* Abort if an invalid insn is received.  */
+      WARN("on pid: %d invalid insn with opcode %d. Further insns will be "
+           "ignored.",
+           remote_pid, (int)insn->type);
+      return EINSNQ;
+    }
   }
 
   /* The pc should stop at the size of the queue.  */
@@ -157,12 +163,27 @@ insnq_get_from_remote_process(insn_queue_t *queue, Elf64_Addr queue_addr,
   uintptr_t bias = offsetof(insn_queue_t, buffer);
 
   /* Read first variables first.  */
-  read_memory(queue, bias, pid, queue_addr);
+
+  if (read_memory(queue, bias, pid, queue_addr)) {
+    WARN("pid %d: unable to read remote queue.", pid);
+    return EINSNQ;
+  }
+
+  /* Check queue version.  */
+  if (queue->version > INSNQ_CURR_VERSION) {
+    DEBUG("pid %d: ULP tool is too old, queue version is %d\n", pid,
+          queue->version);
+    return EOLDULP;
+  }
 
   /* Then read just enough bytes of the queue to reduce ptrace band.  */
-  int size = queue->size;
+  uint32_t size = queue->size;
   if (size == 0) {
     return 0;
+  }
+  if (size > INSN_BUFFER_MAX) {
+    WARN("pid %d: invalid insn queue size.", pid);
+    return EINSNQ;
   }
   return read_memory((char *)queue + bias, size, pid, queue_addr + bias);
 }
@@ -201,6 +222,88 @@ insnq_update_remote(insn_queue_t *queue, Elf64_Addr queue_address, int pid)
   return 0;
 }
 
+int
+insnq_get_version(struct ulp_process *process)
+{
+  struct ulp_dynobj *libpulp_dynobj = process->dynobj_libpulp;
+  int version = libpulp_dynobj->insn_queue_version;
+
+  /* Check if we already have a version.  */
+  if (version > 0) {
+    return version;
+  }
+
+  /* Read remote process to get it.  */
+  Elf64_Addr queue_addr = libpulp_dynobj->insn_queue;
+
+  if (queue_addr == 0) {
+    return 0;
+  }
+
+  if (read_memory(&version, sizeof(int), process->pid, queue_addr)) {
+    return 0;
+  }
+
+  libpulp_dynobj->insn_queue_version = version;
+  return version;
+}
+
+bool
+insnq_check_compatibility(struct ulp_process *process)
+{
+  Elf64_Addr queue_addr = process->dynobj_libpulp->insn_queue;
+  if (queue_addr == 0) {
+    /* No queue means old libpulp, which we currently support.  */
+    return true;
+  }
+
+  int version = insnq_get_version(process);
+  if (version > INSNQ_CURR_VERSION) {
+    return false;
+  }
+
+  return true;
+}
+
+static int
+insnq_interpret_from_process_(int pid, Elf64_Addr queue_addr)
+{
+  static insn_queue_t queue;
+
+  if (queue_addr == 0) {
+    /* Libpulp is old and do not have a instruction queue.  */
+    return EOLDLIBPULP;
+  }
+
+  /* Set global pid variable for this module.  */
+  remote_pid = pid;
+
+  ulp_error_t ret = insnq_get_from_remote_process(&queue, queue_addr, pid);
+  if (ret) {
+    WARN("pid %d: unable to retrieve instruction queue from process.", pid);
+    return ret;
+  }
+
+  /* Make sure that the queue we got makes sense.  */
+  if (queue.size > INSN_BUFFER_MAX) {
+    WARN("pid %d: invalid insn queue size.", pid);
+    return EINSNQ;
+  }
+
+  if (insnq_interpret(&queue)) {
+    WARN("pid %d: interpret failure.", pid);
+    return EINSNQ;
+  }
+
+  if (insnq_update_remote(&queue, queue_addr, pid)) {
+    WARN("pid %d: unable to reset queue.", pid);
+    return EINSNQ;
+  }
+
+  remote_pid = 0;
+  return 0;
+}
+
 /** @brief Retrieve instruction queue from remote process and interpret them.
  *
  * This function will retrieve the remote instruction queue in the process
@@ -215,37 +318,8 @@ insnq_update_remote(insn_queue_t *queue, Elf64_Addr queue_address, int pid)
 int
 insnq_interpret_from_process(struct ulp_process *process)
 {
-  static insn_queue_t queue;
-
   int pid = process->pid;
   Elf64_Addr queue_addr = process->dynobj_libpulp->insn_queue;
 
-  if (queue_addr == 0) {
-    /* Libpulp is old and do not have a instruction queue.  */
-    return EOLDLIBPULP;
-  }
-
-  /* Set global pid variable for this module.  */
-  remote_pid = pid;
-
-  if (insnq_get_from_remote_process(&queue, queue_addr, pid)) {
-    WARN("pid %d: unable to retrieve instruction queue from process.", pid);
-    return EINSNQ;
-  }
-
-  /* Make sure that the queue we got makes sense.  */
-  if (queue.size > INSN_BUFFER_MAX) {
-    return EINSNQ;
-  }
-
-  if (insnq_interpret(&queue)) {
-    return EINSNQ;
-  }
-
-  if (insnq_update_remote(&queue, queue_addr, pid)) {
-    return EINSNQ;
-  }
-
-  remote_pid = 0;
-  return 0;
+  return insnq_interpret_from_process_(pid, queue_addr);
 }

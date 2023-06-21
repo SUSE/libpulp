@@ -25,6 +25,11 @@
 struct ulp_process;
 
 #include "insn_queue.h"
+#include <stdbool.h>
+
+int insnq_get_version(struct ulp_process *process);
+
+bool insnq_check_compatibility(struct ulp_process *process);
 
 int insnq_interpret_from_process(struct ulp_process *);
 
