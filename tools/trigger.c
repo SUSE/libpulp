@@ -98,10 +98,15 @@ trigger_one_process(struct ulp_process *target, int retries,
     goto metadata_clean;
   }
 
+  /* Adjust the prefix to support processes that chrooted into /proc.  */
+  const char *final_prefix;
+  if (container_path || livepatch)
+    final_prefix = adjust_prefix_for_chroot(target, prefix);
+
   /* Extract the livepatch metadata from .so file.  */
   if (container_path) {
-    livepatch_size =
-        extract_ulp_from_so_to_mem(container_path, revert, &livepatch, prefix);
+    livepatch_size = extract_ulp_from_so_to_mem(container_path, revert,
+                                                &livepatch, final_prefix);
     if (livepatch == NULL || livepatch_size == 0) {
       ret = ENOMETA;
       goto metadata_clean;
@@ -117,7 +122,7 @@ trigger_one_process(struct ulp_process *target, int retries,
   }
 
   if (livepatch) {
-    ret = check_patch_sanity(target, prefix);
+    ret = check_patch_sanity(target, final_prefix);
     if (ret) {
       /* Sanity may fail because the patch should not be applied to this
          process.  */
