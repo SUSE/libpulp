@@ -60,6 +60,7 @@
 #include <string.h>
 #include <sys/user.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 #include "config.h"
 #include "elf-extra.h"
@@ -2581,4 +2582,64 @@ get_libpulp_error_state_remote(struct ulp_process *p)
   }
 
   return EUNKNOWN;
+}
+
+/** @brief Check if process is running on a chroot into /proc
+ *
+ * Some processes in SLE (rtkit-daemon) runs chrooted into /proc and we must
+ * handle it differently.
+ *
+ * @param process     Target process to analyze.
+ *
+ * @return            true if running in such chroot, false otherwise.A
+ */
+static bool
+is_proc_chroot(struct ulp_process *process)
+{
+  char path1[64];
+  pid_t pid = process->pid;
+
+  /* Check if /proc/PID/root is /proc.  */
+  struct stat stat1, stat2;
+  snprintf(path1, 64, "/proc/%d/root", pid);
+
+  if (stat(path1, &stat1) != 0 || stat("/proc", &stat2) != 0)
+    return false;
+
+  /* Check if the path internal structures (inode, device ids) matches so we
+     declare equal.  */
+  if (stat1.st_dev == stat2.st_dev && stat1.st_ino == stat2.st_ino &&
+      stat1.st_blocks == stat2.st_blocks) {
+    return true;
+  }
+
+  return false;
+}
+
+/** @brief Adjust the prefix for process chrooted into /proc
+ *
+ * Some processes in SLE (rtkit-daemon) runs chrooted into /proc and we must
+ * handle it differently.  This function will return a prefix to handle this
+ * accordingly.
+ *
+ * NOTE: This function is not thread-safe.
+ *
+ * @param process     Target process to analyze.
+ * @param user_prefix Prefix input by the user.
+ *
+ * @return            Adjusted prefix as a string.
+ */
+const char *
+adjust_prefix_for_chroot(struct ulp_process *p, const char *user_prefix)
+{
+  static char buffer_path[PATH_MAX];
+
+  if (is_proc_chroot(p)) {
+    strcpy(buffer_path, "/1/root/");
+    if (user_prefix)
+      strncat(buffer_path, user_prefix, PATH_MAX - 1);
+    return buffer_path;
+  }
+
+  return user_prefix;
 }

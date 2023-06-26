@@ -203,4 +203,7 @@ get_process_name(struct ulp_process *process)
 
 ulp_error_t get_libpulp_error_state_remote(struct ulp_process *);
 
+const char *adjust_prefix_for_chroot(struct ulp_process *,
+                                     const char *user_prefix);
+
 #endif
