@@ -46,28 +46,34 @@ static int is_child = false;
 static void
 send(char c)
 {
+  int r;
   if (is_child) {
-    write(fd[0][1], &c, 1);
+    r = write(fd[0][1], &c, 1);
   }
   else {
-    write(fd[1][1], &c, 1);
+    r = write(fd[1][1], &c, 1);
   }
+
+  assert(r == 1);
 }
 
 /* Wait for message.  */
 static void
 wait_for(char x)
 {
+  int r;
   char c;
   do {
     if (is_child) {
-      read(fd[1][0], &c, 1);
+      r = read(fd[1][0], &c, 1);
     }
     else {
-      read(fd[0][0], &c, 1);
+      r = read(fd[0][0], &c, 1);
     }
   }
   while (c != x);
+
+  assert(r == 1);
 }
 
 /* Test1: Fill the queue with print messages.  All messages should be inserted
@@ -250,8 +256,8 @@ int
 main(void)
 {
   pid_t pid;
-  pipe(fd[0]);
-  pipe(fd[1]);
+  assert(pipe(fd[0]) == 0);
+  assert(pipe(fd[1]) == 0);
 
   pid = fork();
   if (pid == 0) {
