@@ -29,7 +29,7 @@
 #define INSN_BUFFER_MAX (2 * 1024 * 1024)
 
 /** Define the current version of the instruction queue.  */
-#define INSNQ_CURR_VERSION  1
+#define INSNQ_CURR_VERSION 1
 
 /** The ULP instruction queue.  This works as follows:
  * 1- Libpulp write instructions that should be executed on the `ulp` tool
@@ -50,6 +50,9 @@ struct insn_queue
 
   /** Size in bytes of content.  Must not be larger than INSN_BUFFER_MAX.  */
   int size;
+
+  /** Here to force 8-byte alignment on the buffer.*/
+  int _align;
 
   /** Buffer holding the instructions.  */
   char buffer[INSN_BUFFER_MAX];

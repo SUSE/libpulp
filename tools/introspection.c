@@ -58,13 +58,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/user.h>
 #include <unistd.h>
-#include <sys/stat.h>
 
 #include "config.h"
 #include "elf-extra.h"
 #include "error_common.h"
+#include "extract.h"
 #include "insn_queue_tools.h"
 #include "introspection.h"
 #include "packer.h"
@@ -2138,10 +2139,6 @@ static int
 check_livepatch_functions_matches_metadata(const char *prefix)
 {
   const char *so_filename = ulp.so_filename;
-  const struct ulp_unit *curr_unit;
-  void *container_handle;
-
-  int ret = 0;
 
   /* If a prefix has been passed to trigger then we should remove it from the
      path, as it is only intended to get libpulp.so to find the correct path
@@ -2150,39 +2147,35 @@ check_livepatch_functions_matches_metadata(const char *prefix)
     int prefix_len = strlen(prefix);
 
     /* Check that the prefix is there in the string.  */
-    assert(strncmp(prefix, so_filename, prefix_len) == 0);
+    if (strncmp(prefix, so_filename, prefix_len) != 0) {
+      DEBUG("Prefix error: %s %s", prefix, so_filename);
+      return EINVAL;
+    }
 
     so_filename += prefix_len;
   }
 
-  /* Open livepatch container .so file temporarly.  */
-  container_handle = dlopen(so_filename, RTLD_LOCAL | RTLD_LAZY);
-
-  if (!container_handle) {
+  struct ulp_so_info *so_info = parse_so_elf(so_filename);
+  if (so_info == NULL) {
     WARN("failed to load container livepatch file in %s: %s.", so_filename,
          dlerror());
     return EINVAL;
   }
 
-  /* Iterate over all unit objects in the metadata file.  */
-  for (curr_unit = ulp.objs->units; curr_unit != NULL;
-       curr_unit = curr_unit->next) {
-    const char *new_fname = curr_unit->new_fname;
-    void *symbol;
-
-    /* Check if symbol exists.  If not, return error.  */
-    symbol = dlsym(container_handle, new_fname);
-
-    if (!symbol) {
-      WARN("symbol %s is not present in the livepatch container: %s",
-           new_fname, dlerror());
-      ret = EINVAL;
-      break;
+  /* Check all symbols.  */
+  struct ulp_unit *unit;
+  for (unit = ulp.objs->units; unit != NULL; unit = unit->next) {
+    struct symbol *s = get_symbol_with_name(so_info, unit->new_fname);
+    if (s == NULL) {
+      WARN("Symbol %s not found in livepatch container %s", unit->new_fname,
+           so_filename);
+      release_so_info(so_info);
+      return 1;
     }
   }
 
-  dlclose(container_handle);
-  return ret;
+  release_so_info(so_info);
+  return 0;
 }
 
 /*

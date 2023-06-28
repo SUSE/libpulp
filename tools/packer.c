@@ -149,17 +149,17 @@ get_object_metadata(Elf *elf, struct ulp_object *obj)
   return 0;
 }
 
-/** @brief Get offsets of symbols in target library
+/** @brief Check if all symbols in obj is in the info object.
  *
  * This function gather the address of all to-be-patched functions in the
  * target library.
  *
- * @param elf     The target library elf object.
+ * @param info    info object containing the information from elf.
  * @param obj     Chain of objects.
  * @param st1     Symbol table 1, usually .dymsym.
  * @param st2     Symbol table 2, usually .symtab if present.
  *
- * @return 1
+ * @return 1 if success, 0 otherwise.
  */
 int
 get_target_addrs(struct ulp_so_info *info, struct ulp_object *obj)
