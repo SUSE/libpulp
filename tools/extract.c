@@ -334,34 +334,42 @@ build_symbols_list(Elf *elf)
 struct ulp_so_info *
 parse_so_elf(const char *target_path)
 {
-  /* Ensure that we are never called with NULL argument.  */
-  assert(target_path != NULL && "Provide a proper string.");
+  if (target_path == NULL)
+    return NULL;
 
   /* Load ELF.  */
   int fd;
   Elf *elf = load_elf(target_path, &fd);
+  struct ulp_so_info *so_info = NULL;
 
   /* Create the ulp_so_info object.  */
-  struct ulp_so_info *so_info = calloc(1, sizeof(struct ulp_so_info));
-  assert(so_info && "Error calling calloc.");
-
-  /* Get library name.  */
-  so_info->name = strdup(get_basename(target_path));
+  so_info = calloc(1, sizeof(struct ulp_so_info));
+  if (so_info == NULL) {
+    WARN("Memory allocation error\n");
+    goto clean_elf;
+  }
 
   /* Load the build id of elf object.  */
   unsigned buildid_len = 0;
   if (get_elf_buildid(elf, (char *)so_info->buildid, &buildid_len)) {
     WARN("Elf in %s do not have a build id.", target_path);
-    unload_elf(&elf, &fd);
-    return NULL;
+    FREE_AND_NULLIFY(so_info);
+    goto clean_elf;
   }
 
-  assert(buildid_len == BUILDID_LEN &&
-         "Build ID len doesn't match BUILDID_LEN macro");
+  if (buildid_len != BUILDID_LEN) {
+    WARN("Build ID len doesn't match BUILDID_LEN macro");
+    FREE_AND_NULLIFY(so_info);
+    goto clean_elf;
+  }
+
+  /* Get library name.  */
+  so_info->name = strdup(get_basename(target_path));
 
   /* Build list of symbols.  */
   so_info->symbols = build_symbols_list(elf);
 
+clean_elf:
   unload_elf(&elf, &fd);
   return so_info;
 }
