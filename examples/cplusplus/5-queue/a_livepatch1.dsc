@@ -1,0 +1,4 @@
+a_livepatch1.so
+@./test
+_ZN5QueueILi32ElE4PushEl:_ZN5QueueILi32ElE7Push_LPEl
+_ZN5QueueILi32EdE4PushEd:_ZN5QueueILi32EdE7Push_LPEd
