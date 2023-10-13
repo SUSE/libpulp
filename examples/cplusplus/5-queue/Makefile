@@ -1,7 +1,11 @@
 CXX=g++
 CXXFLAGS=-fpatchable-function-entry=16,14 -fdump-ipa-clones -fPIC -g3 -Wno-terminate -O2
-ULP=/usr/bin/ulp
+ULP=$(shell which ulp 2>/dev/null)
 LDFLAGS=
+
+ifeq ($(ULP),)
+$(error Not found ulp, please make install first)
+endif
 
 all: test a_livepatch1.so
 
