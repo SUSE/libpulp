@@ -547,12 +547,13 @@ print_remote_err_status(struct ulp_process *p)
   change_color(TERM_COLOR_RESET);
 }
 
-void
+static void
 print_process(struct ulp_process *process, int print_buildid)
 {
   struct ulp_dynobj *object_item;
   pid_t pid = process->pid;
   struct ulp_applied_patch *patch = ulp_read_state(process);
+
   printf("PID: %d, name: %s\n", pid, get_process_name(process));
   print_remote_err_status(process);
   printf("  Livepatchable libraries:\n");
@@ -564,6 +565,9 @@ print_process(struct ulp_process *process, int print_buildid)
       printf("    in %s", object_item->filename);
       if (print_buildid)
         printf(" (%s)", buildid_to_string(object_item->build_id));
+      if (object_item->libpulp_version) {
+        printf(" (version %s)", object_item->libpulp_version);
+      }
       printf(":\n");
 
       print_lib_patches(patch, object_item->filename);

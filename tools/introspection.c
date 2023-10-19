@@ -189,12 +189,9 @@ release_ulp_dynobj(struct ulp_dynobj *obj)
 
   for (; obj != NULL; obj = nexto) {
     nexto = obj->next;
-
-    if (obj->filename) {
-      free(obj->filename);
-    }
-    if (obj->thread_states)
-      free(obj->thread_states);
+    FREE_AND_NULLIFY(obj->filename);
+    FREE_AND_NULLIFY(obj->thread_states);
+    FREE_AND_NULLIFY(obj->libpulp_version);
     free(obj);
   }
 }
@@ -848,16 +845,19 @@ get_libpulp_extern_symbols(struct ulp_dynobj *obj, int pid)
         obj->enable_disable_patching = ehdr_addr + sym.st_value;
         bitfield |= (1 << 8);
       }
-
       else if (!strcmp(remote_name, "_insn_queue")) {
         obj->insn_queue = ehdr_addr + sym.st_value;
         bitfield |= (1 << 9);
+      }
+      else if (!strcmp(remote_name, "_version")) {
+        read_string((char**)&obj->libpulp_version, pid, ehdr_addr + sym.st_value);
+        bitfield |= (1 << 10);
       }
     }
 
     dynsym_addr += sizeof(sym);
 
-    if (bitfield == 0x3FF)
+    if (bitfield == 0x7FF)
       break;
   }
 

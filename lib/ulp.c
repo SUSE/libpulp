@@ -47,6 +47,9 @@ char __ulp_metadata_buffer[ULP_METADATA_BUF_LEN] = { 0 };
 struct ulp_metadata *__ulp_metadata_ref = NULL;
 struct ulp_detour_root *__ulp_root = NULL;
 
+/* current libpulp version.  */
+const char __ulp_version[] = VERSION;
+
 /* clang-format off */
 
 /** Intel endbr64 instruction optcode.  */
