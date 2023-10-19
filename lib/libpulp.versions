@@ -27,6 +27,7 @@
     __ulp_error_state;
     __ulp_enable_or_disable_patching;
     __ulp_insn_queue;
+    __ulp_version;
   local:
     *;
 };
