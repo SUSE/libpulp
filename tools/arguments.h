@@ -59,6 +59,7 @@ struct arguments
   int disable_threads;
   int recursive;
   int no_summarization;
+  int only_livepatched;
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
   int check_stack;
 #endif
