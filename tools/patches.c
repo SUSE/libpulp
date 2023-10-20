@@ -378,7 +378,11 @@ print_lib_patches(struct ulp_applied_patch *patch, const char *libname)
 
   while (patch) {
     if (!strcmp(libname, patch->lib_name)) {
-      printf("      livepatch: %s\n", get_basename(patch->container_name));
+      struct tm *timeinfo = localtime(&patch->timestamp);
+      printf("      livepatch: %s", get_basename(patch->container_name));
+      if (patch->timestamp != 0) {
+        printf(" loaded on %s", asctime(timeinfo));
+      }
       print_relevant_labels(patch->container_name);
     }
     patch = patch->next;
@@ -566,7 +570,8 @@ print_process(struct ulp_process *process, int print_buildid)
       if (print_buildid)
         printf(" (%s)", buildid_to_string(object_item->build_id));
       if (object_item->libpulp_version) {
-        printf(" (version %s)", object_item->libpulp_version);
+        const char *version = ulp_version_as_string(object_item->libpulp_version);
+        printf(" (version %s)", version);
       }
       printf(":\n");
 

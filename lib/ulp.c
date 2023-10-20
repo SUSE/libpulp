@@ -831,6 +831,11 @@ ulp_state_update(struct ulp_metadata *ulp)
     unit = unit->next;
   }
 
+  /* Insert timestamp.  */
+  struct timespec t;
+  clock_gettime(CLOCK_REALTIME, &t);
+  a_patch->timestamp = t.tv_sec;
+
   /* leave last on top of list to optmize revert */
   prev_patch = __ulp_state.patches;
   __ulp_state.patches = a_patch;

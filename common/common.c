@@ -576,3 +576,40 @@ get_process_owner(pid_t pid)
 
   return info.st_uid;
 }
+
+ulp_version_t
+ulp_version_from_string(char *str)
+{
+  ulp_version_t ver[3];
+  char *number;
+
+  for (int i = 0; i < 3; i++) {
+    number = strtok(str, ".");
+    str = NULL;
+    if (!isnumber(number)) {
+      /* Not a number??  */
+      return 0;
+    }
+
+    ver[i] = atoi(number);
+    if (ver[i] > 0xFFFF) {
+      /* Out of bound.  */
+      return 0;
+    }
+  }
+
+  return ULP_VERSION_TRIPLET(ver[0], ver[1], ver[2]);
+}
+
+const char *
+ulp_version_as_string(ulp_version_t ver)
+{
+  static char str[18]; // 65535.65535.65535\0 has 18 bytes;
+  uint16_t a, b, c;
+  a = (ver & 0x0000FFFF00000000) >> 32;
+  b = (ver & 0x00000000FFFF0000) >> 16;
+  c = (ver & 0x000000000000FFFF);
+
+  sprintf(str, "%hu.%hu.%hu", a, b, c);
+  return str;
+}

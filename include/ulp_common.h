@@ -26,6 +26,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <time.h>
 
 #define OUT_PATCH_NAME "metadata.ulp"
 #define OUT_REVERSE_NAME "reverse.ulp"
@@ -201,6 +202,9 @@ struct ulp_applied_patch
 
   /** Patch dependency.  Not used but kept for backwards compatibility.  */
   struct ulp_dependency *deps;
+
+  /** Timestamp of when patch was loaded.  */
+  time_t timestamp;
 };
 
 struct ulp_applied_unit
@@ -221,6 +225,20 @@ struct ulp_applied_unit
   /** Next in the chain.  */
   struct ulp_applied_unit *next;
 };
+
+/** Libpulp version type.  The tripplet is incoded here, with a maximum value
+    of 65535.65535.65535.  */
+typedef uint64_t ulp_version_t;
+
+/** @brief Construct ulp_version object from string.  Modifies the string
+    content.  */
+ulp_version_t ulp_version_from_string(char *str);
+
+/** Build ulp_version_t from three shorts.  */
+#define ULP_VERSION_TRIPLET(a, b, c) ((c) + ((b) << 16) + ((a) << 32))
+
+/** @brief Construct string from ulp_version object.  */
+const char *ulp_version_as_string(ulp_version_t ver);
 
 /* Functions present in libcommon, linked agaist both libpulp.so and tools.  */
 const char *get_basename(const char *);
