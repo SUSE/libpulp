@@ -130,6 +130,7 @@ static const char doc[] =
 #define ULP_OP_DISABLE_THREADING 260
 #define ULP_OP_RECURSIVE 261
 #define ULP_OP_DISABLE_SUMMARIZATION 262
+#define ULP_OP_ONLY_LIVEPATCHED 263
 
 static struct argp_option options[] = {
   { 0, 0, 0, 0, "Options:", 0 },
@@ -142,6 +143,7 @@ static struct argp_option options[] = {
     "Do not launch additional threads", 0 },
   { 0, 0, 0, 0, "dump & patches command only:", 0 },
   { "buildid", 'b', 0, 0, "Print the build id", 0 },
+  { "only-livepatched", ULP_OP_ONLY_LIVEPATCHED, 0, 0, "Print only processes that were livepatched", 0 },
   { 0, 0, 0, 0, "trigger command only:", 0 },
   { "revert-all", ULP_OP_REVERT_ALL, "LIB", 0,
     "Revert all patches from LIB. If LIB=target, then all patches from the "
@@ -358,6 +360,10 @@ parser(int key, char *arg, struct argp_state *state)
 
     case ULP_OP_DISABLE_SUMMARIZATION:
       arguments->no_summarization = 1;
+      break;
+
+    case ULP_OP_ONLY_LIVEPATCHED:
+      arguments->only_livepatched = 1;
       break;
 
     case 'u':

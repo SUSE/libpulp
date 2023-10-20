@@ -552,11 +552,16 @@ print_remote_err_status(struct ulp_process *p)
 }
 
 static void
-print_process(struct ulp_process *process, int print_buildid)
+print_process(struct ulp_process *process, int print_buildid, bool only_livepatched)
 {
   struct ulp_dynobj *object_item;
   pid_t pid = process->pid;
   struct ulp_applied_patch *patch = ulp_read_state(process);
+
+  /* In case the flag `only_patched` is NULL, then skip process.  */
+  if (only_livepatched && patch == NULL) {
+    return;
+  }
 
   printf("PID: %d, name: %s\n", pid, get_process_name(process));
   print_remote_err_status(process);
@@ -646,7 +651,7 @@ print_process_list(struct ulp_process *process_list, int print_buildid)
 
   process_item = process_list;
   while (process_item) {
-    print_process(process_item, print_buildid);
+    print_process(process_item, print_buildid, false);
     process_item = process_item->next;
   }
 }
@@ -655,6 +660,7 @@ int
 run_patches(struct arguments *arguments)
 {
   bool print_build_id = arguments->buildid;
+  bool only_livepatched = arguments->only_livepatched;
   ulp_quiet = arguments->quiet;
   ulp_verbose = arguments->verbose;
   enable_threading = !arguments->disable_threads;
@@ -665,7 +671,7 @@ run_patches(struct arguments *arguments)
 
   FOR_EACH_ULP_PROCESS_FROM_USER_WILDCARD(p, process_wildcard, user_wildcard)
   {
-    print_process(p, print_build_id);
+    print_process(p, print_build_id, only_livepatched);
   }
 
   return 0;
