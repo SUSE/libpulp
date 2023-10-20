@@ -191,7 +191,6 @@ release_ulp_dynobj(struct ulp_dynobj *obj)
     nexto = obj->next;
     FREE_AND_NULLIFY(obj->filename);
     FREE_AND_NULLIFY(obj->thread_states);
-    FREE_AND_NULLIFY(obj->libpulp_version);
     free(obj);
   }
 }
@@ -850,7 +849,9 @@ get_libpulp_extern_symbols(struct ulp_dynobj *obj, int pid)
         bitfield |= (1 << 9);
       }
       else if (!strcmp(remote_name, "_version")) {
-        read_string((char**)&obj->libpulp_version, pid, ehdr_addr + sym.st_value);
+        char str[32];
+        read_string_allocated(str, sizeof(str), pid, ehdr_addr + sym.st_value);
+        obj->libpulp_version = ulp_version_from_string(str);
         bitfield |= (1 << 10);
       }
     }
@@ -2432,7 +2433,7 @@ error_path_context:
  * @return A `ulp_applied_patch` linked list.
  */
 static struct ulp_applied_patch *
-read_ulp_applied_patch(Elf64_Addr addr, pid_t pid)
+read_ulp_applied_patch(Elf64_Addr addr, pid_t pid, ulp_version_t version)
 {
   struct ulp_applied_patch *a_state;
 
@@ -2445,7 +2446,14 @@ read_ulp_applied_patch(Elf64_Addr addr, pid_t pid)
     return NULL;
   }
 
-  if (read_memory((char *)a_state, sizeof(*a_state), pid, addr)) {
+  size_t a_patch_size = sizeof(*a_state);
+
+  /* In pre 0.3.1 versions of libpulp, there was no timestamp.  */
+  if (version < ULP_VERSION_TRIPLET(0ULL, 3ULL, 1ULL)) {
+    a_patch_size -= sizeof(a_state->timestamp);
+  }
+
+  if (read_memory((char *)a_state, a_patch_size, pid, addr)) {
     WARN("error reading patch state.");
     free(a_state);
     return NULL;
@@ -2461,13 +2469,14 @@ read_ulp_applied_patch(Elf64_Addr addr, pid_t pid)
                 (Elf64_Addr)a_state->container_name);
   }
 
+
   /* ulp_applied_unit and ulp_applied_patch is not used, so don't read it. But
      set it to NULL to avoid dangling pointers.  */
 
   a_state->units = NULL;
   a_state->deps = NULL;
 
-  a_state->next = read_ulp_applied_patch((Elf64_Addr)a_state->next, pid);
+  a_state->next = read_ulp_applied_patch((Elf64_Addr)a_state->next, pid, version);
 
   return a_state;
 }
@@ -2527,7 +2536,8 @@ ulp_read_state(struct ulp_process *process)
     goto detach_process;
   }
 
-  ret = read_ulp_applied_patch((Elf64_Addr)state.patches, pid);
+  ret = read_ulp_applied_patch((Elf64_Addr)state.patches, pid,
+                               process->dynobj_libpulp->libpulp_version);
 
 detach_process:
   if (detach(process->pid)) {

@@ -117,7 +117,7 @@ struct ulp_dynobj
   Elf64_Addr insn_queue;
 
   /* Version of the libpulp tool running on the target process.  */
-  const char *libpulp_version;
+  ulp_version_t libpulp_version;
 
   /* Version of the insn_queue on target process.  */
   int insn_queue_version;
