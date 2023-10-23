@@ -1250,29 +1250,22 @@ initialize_data_structures(struct ulp_process *process)
   ulp_error_t ret = 0;
 
   if (!process)
-    return 1;
+    return EINVAL;
 
   DEBUG("getting in-memory information about process %d.", process->pid);
 
   if (attach(process->pid)) {
-    DEBUG("Unable to attach to %d to read data.\n", process->pid);
-    ret = 1;
+    ret = ETARGETHOOK;
     goto detach_process;
   }
 
   ret = parse_main_dynobj(process);
   if (ret) {
-    WARN("unable to get in-memory information about the main executable: %s\n",
-         libpulp_strerror(ret));
-    ret = 1;
     goto detach_process;
   }
 
   ret = parse_libs_dynobj(process);
   if (ret) {
-    WARN("unable to get in-memory information about shared libraries: %s\n",
-         libpulp_strerror(ret));
-    ret = 1;
     goto detach_process;
   }
 
@@ -1281,7 +1274,7 @@ initialize_data_structures(struct ulp_process *process)
   if (read_memory((char *)&ulp_state, sizeof(ulp_state), process->pid,
                   process->dynobj_libpulp->state) ||
       ulp_state.load_state == 0) {
-    WARN("libpulp not ready (constructors not yet run). Try again later.");
+    DEBUG("libpulp not ready (constructors not yet run). Try again later.");
     ret = EAGAIN;
     goto detach_process;
   }

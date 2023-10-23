@@ -45,7 +45,7 @@
 bool enable_threading = false;
 static bool original_enable_threading;
 
-void insert_target_process(int pid, struct ulp_process **list);
+static int insert_target_process(int pid, struct ulp_process **list);
 
 static void *
 generate_ulp_list_thread(void *args)
@@ -131,6 +131,10 @@ process_list_next(struct ulp_process_iterator *it)
     symbols.  */
 static pthread_t process_list_thread;
 
+/** In case of `ulp patches -p <pid>`, we want to return an error for the
+    caller if something went wrong.  */
+static error_t any_error = ENONE;
+
 struct ulp_process *
 process_list_begin(struct ulp_process_iterator *it,
                    const char *procname_wildcard, const char *user_wildcard)
@@ -147,7 +151,7 @@ process_list_begin(struct ulp_process_iterator *it,
   if (isnumber(procname_wildcard)) {
     /* If wildcard is actually a number, then treat it as a PID.  */
     pid = atoi(procname_wildcard);
-    insert_target_process(pid, &it->last);
+    any_error = insert_target_process(pid, &it->last);
     it->now = it->last;
 
     /* Disable threading in this case.  */
@@ -552,7 +556,8 @@ print_remote_err_status(struct ulp_process *p)
 }
 
 static void
-print_process(struct ulp_process *process, int print_buildid, bool only_livepatched)
+print_process(struct ulp_process *process, int print_buildid,
+              bool only_livepatched)
 {
   struct ulp_dynobj *object_item;
   pid_t pid = process->pid;
@@ -575,7 +580,8 @@ print_process(struct ulp_process *process, int print_buildid, bool only_livepatc
       if (print_buildid)
         printf(" (%s)", buildid_to_string(object_item->build_id));
       if (object_item->libpulp_version) {
-        const char *version = ulp_version_as_string(object_item->libpulp_version);
+        const char *version =
+            ulp_version_as_string(object_item->libpulp_version);
         printf(" (version %s)", version);
       }
       printf(":\n");
@@ -618,7 +624,7 @@ has_libpulp_loaded(pid_t pid)
 /* Inserts a new process structure into LIST if the process identified
  * by PID is live-patchable.
  */
-void
+static int
 insert_target_process(int pid, struct ulp_process **list)
 {
   struct ulp_process *new = NULL;
@@ -629,14 +635,16 @@ insert_target_process(int pid, struct ulp_process **list)
   new->pid = pid;
   ret = initialize_data_structures(new);
   if (ret) {
-    WARN("error gathering target process information.");
+    WARN("error gathering target process information: %s",
+         libpulp_strerror(ret));
     release_ulp_process(new);
-    return;
+    return ret;
   }
   else {
     new->next = *list;
     *list = new;
   }
+  return 0;
 }
 
 /** @brief Prints all the info collected about the processes in `process_list`.
@@ -668,11 +676,12 @@ run_patches(struct arguments *arguments)
   const char *user_wildcard = arguments->user_wildcard;
 
   struct ulp_process *p;
+  any_error = ENONE;
 
   FOR_EACH_ULP_PROCESS_FROM_USER_WILDCARD(p, process_wildcard, user_wildcard)
   {
     print_process(p, print_build_id, only_livepatched);
   }
 
-  return 0;
+  return any_error == 0 ? 0 : 1;
 }

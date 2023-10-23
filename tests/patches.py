@@ -33,7 +33,9 @@ try:
 except:
     exit(1)
 
-if tool.returncode != 0:
+# It should actually return an error because we explicitly trieed to retrieve
+# information of a non-running process.
+if tool.returncode == 0:
     exit(1)
 
 exit(0)
