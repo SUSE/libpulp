@@ -55,7 +55,8 @@ ulp_SOURCES = \
   pcqueue.c \
   extract.c \
   set_patchable.c \
-  insn_queue.c
+  insn_queue.c \
+  arch/$(target_cpu)/post-arch.c
 
 ulp_LDADD = $(top_builddir)/common/libcommon.la -lelf -ljson-c -lpthread -ldl $(LIBUNWIND_LIBS)
 

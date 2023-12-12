@@ -75,6 +75,8 @@ struct ulp_detour
   struct ulp_detour *next;
 };
 
+struct dl_phdr_info;
+
 /* libpulp livepatching interfaces */
 int __ulp_apply_patch();
 
@@ -147,3 +149,5 @@ void dump_ulp_patching_state(void);
 void dump_ulp_detours(void);
 
 int memory_protection_get(uintptr_t addr);
+
+void save_to_register(void *);

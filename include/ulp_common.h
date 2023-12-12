@@ -42,9 +42,6 @@
 /** Length of build id, in bytes.  */
 #define BUILDID_LEN 20
 
-/** Intel endbr64 instruction optcode.  */
-#define INSN_ENDBR64 0xf3, 0x0f, 0x1e, 0xfa
-
 /** Free whatever pointer given and set it to NULL.  */
 #define FREE_AND_NULLIFY(x) \
   do { \

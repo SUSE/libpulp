@@ -23,6 +23,9 @@ AC_INIT([libpulp],[0.3.1],[noreply@suse.com])
 AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_MACRO_DIRS([config])
 
+# For multiarch builds.
+AC_CANONICAL_TARGET
+
 # Check for the availability of macros from autoconf-archive.
 AC_MSG_CHECKING([autoconf-archive availability])
 m4_ifndef([AX_CHECK_COMPILE_FLAG], [ax_available="no"])
@@ -136,7 +139,7 @@ AC_SUBST([AM_CCASFLAGS], ["-Wa,--fatal-warnings"])
 # Use the glibc versions installed on path
 AC_ARG_WITH([glibc],
 AS_HELP_STRING([--with-glibc=GLIBC_PATH],[Use the glibc installed on GLIBC_PATH, where the .so file is present]),
-[AC_SUBST([AM_LDFLAGS], ["-Wl,--dynamic-linker=$with_glibc/ld-linux-x86-64.so.2 -Wl,--rpath=$with_glibc/"])],
+[AC_SUBST([AM_LDFLAGS], ["-Wl,--dynamic-linker=$with_glibc/ld-linux-${target_cpu//_/-}.so.2 -Wl,--rpath=$with_glibc/"])],
 [])
 
 # Checking the call stack of all threads enables libpulp to only apply a live
@@ -223,15 +226,10 @@ AC_SUBST([PAGE_SIZE], [$($GETCONF PAGE_SIZE)]))
 AC_SUBST([ULP_NOPS_LEN], [16])
 AC_SUBST([PRE_NOPS_LEN], [14])
 
-AC_SUBST([ULP_NOPS_LEN_ENDBR64], [$(expr $ULP_NOPS_LEN + 4)])
-AC_SUBST([PRE_NOPS_LEN_ENDBR64], [$(expr $PRE_NOPS_LEN + 4)])
-
 AC_DEFINE_UNQUOTED([ULP_NOPS_LEN], [$ULP_NOPS_LEN],
 [Total number of padding nops])
 AC_DEFINE_UNQUOTED([PRE_NOPS_LEN], [$PRE_NOPS_LEN],
 [Padding nops before the entry point of functions])
-AC_DEFINE_UNQUOTED([ULP_NOPS_LEN_ENDBR64], [$ULP_NOPS_LEN_ENDBR64],
-[Total number of padding nops when endbr64 is issued])
 
 AC_CONFIG_FILES([Makefile
 		 include/Makefile

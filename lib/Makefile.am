@@ -25,12 +25,13 @@ libpulp_la_SOURCES = \
   msg_queue.c \
   insn_queue.c \
   error.c \
-  ulp_prologue.S \
-  ulp_interface.S
+  arch/$(target_cpu)/ulp_prologue.S \
+  arch/$(target_cpu)/ulp_interface.S \
+  arch/$(target_cpu)/patch.c
 libpulp_la_DEPENDENCIES= libpulp.versions
 libpulp_la_LDFLAGS = \
   -ldl \
-  -l:ld-linux-x86-64.so.2 \
+  -l:ld-linux-$(subst _,-,$(target_cpu)).so.2 \
   -Wl,--version-script=$(srcdir)/libpulp.versions \
   -Wl,--hash-style=sysv \ # Ubuntu seems to default to gnu, so be clear we ...
   $(AM_LDFLAGS) # ... want old style hash sections, else DT_HASH is empty.
