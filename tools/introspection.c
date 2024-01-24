@@ -1533,7 +1533,7 @@ patch_applied(struct ulp_process *process, unsigned char *id, int *result)
 {
   int ret;
   struct ulp_thread *thread;
-  struct user_regs_struct context;
+  registers_t context;
   ElfW(Addr) routine;
 
   DEBUG("checking if live patch is already applied.");
@@ -1581,7 +1581,7 @@ apply_patch(struct ulp_process *process, void *metadata, size_t metadata_size)
 {
   int ret;
   struct ulp_thread *thread;
-  struct user_regs_struct context;
+  registers_t context;
   ElfW(Addr) routine;
 
   struct ulp_dynobj *dynobj_libpulp = process->dynobj_libpulp;
@@ -1645,7 +1645,7 @@ revert_patches_from_lib(struct ulp_process *process, const char *lib_name)
 {
   int ret;
   struct ulp_thread *thread;
-  struct user_regs_struct context;
+  registers_t context;
   ElfW(Addr) routine;
 
   DEBUG("beginning patches removal.");
@@ -1707,7 +1707,7 @@ int
 read_global_universe(struct ulp_process *process)
 {
   struct ulp_thread *thread;
-  struct user_regs_struct context;
+  registers_t context;
   ElfW(Addr) routine;
 
   if (!process->all_threads_hijacked) {

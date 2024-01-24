@@ -280,7 +280,7 @@ dump_interesting_info_from_elfs()
 
 sanitize_platform()
 {
-  local platforms="15-SP3 15-SP4"
+  local platforms="15-SP3 15-SP4 15-SP5"
 
   for platform in ${platforms}; do
     if [ "$PLATFORM" = "$platform" ]; then

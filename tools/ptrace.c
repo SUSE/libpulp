@@ -451,7 +451,7 @@ detach(int pid)
 }
 
 int
-get_regs(int pid, struct user_regs_struct *regs)
+get_regs(int pid, registers_t *regs)
 {
   if (ulp_ptrace(PTRACE_GETREGS, pid, NULL, regs)) {
     DEBUG("PTRACE_GETREGS error: %s.\n", strerror(errno));
@@ -461,7 +461,7 @@ get_regs(int pid, struct user_regs_struct *regs)
 }
 
 int
-set_regs(int pid, struct user_regs_struct *regs)
+set_regs(int pid, registers_t *regs)
 {
   if (ulp_ptrace(PTRACE_SETREGS, pid, NULL, regs)) {
     DEBUG("PTRACE_SETREGS error: %s.\n", strerror(errno));
@@ -487,7 +487,7 @@ set_run_and_redirect_timeout(long t)
 }
 
 int
-run_and_redirect(int pid, struct user_regs_struct *regs, ElfW(Addr) routine)
+run_and_redirect(int pid, registers_t *regs, ElfW(Addr) routine)
 {
   int status;
   time_t t0, t1;
