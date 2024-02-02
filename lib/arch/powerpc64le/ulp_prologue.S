@@ -29,10 +29,10 @@
     addi    %r1, %r1, 16
 .endm
 
-.data
-
-msg:    .string "__ulp_prologue called\n"
-        length = . - msg
+#.data
+#
+#msg:    .string "__ulp_prologue called\n"
+#        length = . - msg
 
 .section .text,"ax"
 
@@ -40,18 +40,18 @@ msg:    .string "__ulp_prologue called\n"
 .type   __ulp_prologue,@function
 __ulp_prologue:
     .cfi_startproc
-    li      %r3, 1                # stdout file descriptor
-    lis     %r4, msg@highest      # load 64-bit buffer address
-    ori     %r4, %r4, msg@higher
-    rldicr  %r4, %r4, 32, 31
-    oris    %r4, %r4, msg@h
-    ori     %r4, %r4, msg@l
-    li      %r5, length           # buffer length
-    sc
-
-    li      %r0, 1                # _exit(2)
-    li      %r3, 0                # return success
-    sc
+#    li      %r3, 1                # stdout file descriptor
+#    lis     %r4, msg@highest      # load 64-bit buffer address
+#    ori     %r4, %r4, msg@higher
+#    rldicr  %r4, %r4, 32, 31
+#    oris    %r4, %r4, msg@h
+#    ori     %r4, %r4, msg@l
+#    li      %r5, length           # buffer length
+#    sc
+#
+#    li      %r0, 1                # _exit(2)
+#    li      %r3, 0                # return success
+#    sc
 
     ## Save parameters registers.
     #push      %r4

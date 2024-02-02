@@ -170,10 +170,13 @@ ulp_patch_addr(void *old_faddr, void *new_faddr, int enable)
 
 void save_to_register(void *target)
 {
+  (void) target;
+/*
   asm (
-    "mr %0, %%f0;"
+    "mr %0, %%r31;"
     :
     : "r" (target)
     :
   );
+*/
 }

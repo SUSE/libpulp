@@ -45,7 +45,7 @@ run_enable_disable_patching(struct ulp_process *p)
     return ret;
   }
 
-  return context.rax;
+  return FUNCTION_RETURN_REG(context);
 }
 
 /** @brief Enable or disable livepatching on remote process.

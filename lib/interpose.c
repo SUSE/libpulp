@@ -394,9 +394,9 @@ get_ld_global_locks()
   int major, minor;
 
   void *rtld_global =
-      get_loaded_symbol_addr("ld-linux-x86-64.so.2", "_rtld_global", NULL);
+      get_loaded_symbol_addr("ld64.so.2", "_rtld_global", NULL);
   if (!rtld_global) {
-    libpulp_crash("symbol _rtld_global not found in ld-linux-x86_64.so\n");
+    libpulp_crash("symbol _rtld_global not found in ld64.so.2\n");
   }
 
   strcpy(libc_ver, gnu_get_libc_version());

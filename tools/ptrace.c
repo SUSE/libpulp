@@ -510,7 +510,7 @@ run_and_redirect(int pid, registers_t *regs, ElfW(Addr) routine)
    * as from a few bytes before it. As such, they start with a few
    * nops, which are skipped below.
    */
-  regs->rip = routine + RESTART_SYSCALL_SIZE;
+  PROGRAM_COUNTER_REG(*regs) = routine + RESTART_SYSCALL_SIZE;
 
   /*
    * Even though libpulp does not register signal handlers with the
@@ -527,7 +527,7 @@ run_and_redirect(int pid, registers_t *regs, ElfW(Addr) routine)
    * handler registering, it cannot rely on this kernel feature, so it
    * must adjust the stack on its own.
    */
-  regs->rsp -= RED_ZONE_LEN;
+  STACK_TOP_REG(*regs) -= RED_ZONE_LEN;
 
   /*
    * The ABI for AMD64 requires that the stack pointer be aligned on a
@@ -544,7 +544,7 @@ run_and_redirect(int pid, registers_t *regs, ElfW(Addr) routine)
    * highest boundary, before transfering control to the live patching
    * routines in ulp_interface.S.
    */
-  regs->rsp &= 0xFFFFFFFFFFFFFFC0;
+  STACK_TOP_REG(*regs) &= 0xFFFFFFFFFFFFFFC0;
 
   if (ulp_ptrace(PTRACE_SETREGS, pid, NULL, regs)) {
     WARN("PTRACE_SETREGS error (pid %d).\n", pid);

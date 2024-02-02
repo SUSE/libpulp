@@ -29,6 +29,16 @@
 
 #ifdef __x86_64__
 typedef struct user_regs_struct registers_t;
+#define FUNCTION_RETURN_REG(reg) ((reg).rax)
+#define PROGRAM_COUNTER_REG(reg) ((reg).rip)
+#define STACK_TOP_REG(reg)       ((reg).rsp)
+#elif __powerpc64__
+typedef struct pt_regs registers_t;
+#define FUNCTION_RETURN_REG(reg) ((reg).gpr[3])
+#define PROGRAM_COUNTER_REG(reg) ((reg).nip)
+#define STACK_TOP_REG(reg)       ((reg).gpr[1])
+#else
+#error "Unsupported or unknown architecture"
 #endif
 
 #include "ulp_common.h"

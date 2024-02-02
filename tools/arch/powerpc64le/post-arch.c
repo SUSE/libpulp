@@ -1,7 +1,7 @@
 /*
  *  libpulp - User-space Livepatching Library
  *
- *  Copyright (C) 2020-2021 SUSE Software Solutions GmbH
+ *  Copyright (C) 2021-2023 SUSE Software Solutions GmbH
  *
  *  This file is part of libpulp.
  *
@@ -19,12 +19,21 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+
+#include <libelf.h>
+#include <assert.h>
+#include <string.h>
+
+#include "ulp_common.h"
+#include "post.h"
+
 /*
- * From the start of a page (.align <PAGE_SIZE>), fill the memory with
- * garbage up to the end of the page less 16 bytes (.fill <FILL_SIZE>),
- * so that the prologue of the to-be-patched function (in libpage.c)
- * crosses a page boundary.
+ * On POWER all instructions are 4 bytes long, so there is no need
+ * to do anything in the `ulp post` command.
  */
-.set FILL_SIZE, PAGE_SIZE-16
-.section .text
-.fill FILL_SIZE, 1, 0xCC
+void
+merge_nops_at_addr(Elf64_Addr addr, size_t amount)
+{
+  (void) addr;
+  (void) amount;
+}

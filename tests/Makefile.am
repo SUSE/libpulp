@@ -536,7 +536,7 @@ manyprocesses_LDADD = libmanyprocesses.la
 manyprocesses_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
 dlsym_SOURCES = dlsym.c
-dlsym_LDADD = -lpthread -ldl -lrt -l:ld-linux-x86-64.so.2
+dlsym_LDADD = -lpthread -ldl -lrt -l:ld64.so.2
 dlsym_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
 stress_SOURCES = stress.c

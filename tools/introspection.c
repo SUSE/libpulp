@@ -1561,7 +1561,7 @@ patch_applied(struct ulp_process *process, unsigned char *id, int *result)
   if (ret)
     return ret;
 
-  *result = context.rax;
+  *result = FUNCTION_RETURN_REG(context);
   return 0;
 }
 
@@ -1603,22 +1603,22 @@ apply_patch(struct ulp_process *process, void *metadata, size_t metadata_size)
   context = thread->context;
   routine = dynobj_libpulp->trigger;
 
-  rax = context.rax;
+  rax = FUNCTION_RETURN_REG(context);
 
   DEBUG(">>> running libpulp functions within target process...");
   ret = run_and_redirect(thread->tid, &context, routine);
   if (ret) {
     WARN("error during live patch application: %s",
-         libpulp_strerror(context.rax));
+         libpulp_strerror(FUNCTION_RETURN_REG(context)));
   }
   DEBUG(">>> done.");
   if (ret)
     return ret;
 
-  if (context.rax != 0) {
-    if (context.rax == EAGAIN)
+  if (FUNCTION_RETURN_REG(context) != 0) {
+    if (FUNCTION_RETURN_REG(context) == EAGAIN)
       DEBUG("patching failed in libpulp.so: libc/libdl locks were busy");
-    else if (context.rax == rax) {
+    else if (FUNCTION_RETURN_REG(context) == rax) {
       /* If rax register is not changed in this process, it is evidence that
          the routine in libpulp.so wasn't executed by some reason.  */
       DEBUG("patching failed in libpulp.so: %s",
@@ -1627,7 +1627,7 @@ apply_patch(struct ulp_process *process, void *metadata, size_t metadata_size)
     }
     else
       DEBUG("patching failed in libpulp.so: %s",
-            libpulp_strerror(context.rax));
+            libpulp_strerror(FUNCTION_RETURN_REG(context)));
   }
 
   /* Interpret now any code that libpulp send to us.  */
@@ -1637,7 +1637,7 @@ apply_patch(struct ulp_process *process, void *metadata, size_t metadata_size)
     return ret;
   }
 
-  return context.rax;
+  return FUNCTION_RETURN_REG(context);
 }
 
 int
@@ -1681,13 +1681,13 @@ revert_patches_from_lib(struct ulp_process *process, const char *lib_name)
   if (ret)
     return ret;
 
-  if (context.rax != 0) {
-    if (context.rax == EAGAIN)
+  if (FUNCTION_RETURN_REG(context) != 0) {
+    if (FUNCTION_RETURN_REG(context) == EAGAIN)
       DEBUG("patches reverse-all failed in libpulp.so: libc/libdl locks were "
             "busy");
     else
       DEBUG("patches reverse-all failed in libpulp.so: %s",
-            libpulp_strerror(context.rax));
+            libpulp_strerror(FUNCTION_RETURN_REG(context)));
   }
 
   /* Interpret now any code that libpulp send to us.  */
@@ -1697,7 +1697,7 @@ revert_patches_from_lib(struct ulp_process *process, const char *lib_name)
     return ret;
   }
 
-  return context.rax;
+  return FUNCTION_RETURN_REG(context);
 }
 
 /* Reads the global universe counter in PROCESS. Returns the
@@ -1724,7 +1724,7 @@ read_global_universe(struct ulp_process *process)
     return -1;
   };
 
-  process->global_universe = context.rax;
+  process->global_universe = FUNCTION_RETURN_REG(context);
   return 0;
 }
 
