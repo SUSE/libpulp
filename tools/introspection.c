@@ -544,7 +544,7 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
   if (ehdr_addr == 0) {
     /* If l_addr is zero, it means that there is no load bias.  In that case,
      * the elf address is on address 0x400000 on x86_64.  */
-    ret = read_memory((char *)&ehdr, sizeof(ehdr), pid, 0x400000UL);
+    ret = read_memory((char *)&ehdr, sizeof(ehdr), pid, EXECUTABLE_START);
   }
   else {
     ret = read_memory((char *)&ehdr, sizeof(ehdr), pid, ehdr_addr);
@@ -563,7 +563,7 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
   /* Get first process header address.  */
   phdr_addr = ehdr_addr + ehdr.e_phoff;
   if (ehdr_addr == 0)
-    phdr_addr += 0x400000UL;
+    phdr_addr += EXECUTABLE_START;
 
   /* Iterate over each process header.  */
   for (i = 0; i < ehdr.e_phnum; i++) {
@@ -1129,8 +1129,10 @@ parse_lib_dynobj(struct ulp_dynobj *obj, struct ulp_process *process)
     return 0;
 
   /* Pointers to linux-vdso.so are invalid, so skip this library.  */
-  if (strcmp(obj->filename, "linux-vdso.so.1"))
+  if (strcmp(obj->filename, "linux-vdso.so.1") &&
+      strcmp(obj->filename, "linux-vdso64.so.1")) {
     parse_dynobj_elf_headers(pid, obj);
+  }
 
   /* Only libpulp.so should have those symbols exported.  */
   if (strstr(libname, "libpulp.so")) {

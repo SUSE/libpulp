@@ -35,7 +35,11 @@
  * scenarios.  */
 #define ULP_METADATA_BUF_LEN (512 * 1024)
 #define ULP_PATH_LEN 256
+#if defined(__x86_64__)
 #define RED_ZONE_LEN 128
+#elif defined(__powerpc64__)
+#define RED_ZONE_LEN 512
+#endif
 
 #define ARRAY_LENGTH(v) (sizeof(v) / sizeof(*(v)))
 

@@ -527,6 +527,7 @@ run_and_redirect(int pid, registers_t *regs, ElfW(Addr) routine)
    * handler registering, it cannot rely on this kernel feature, so it
    * must adjust the stack on its own.
    */
+  printf("Stack top before: 0x%lx\n", STACK_TOP_REG(*regs));
   STACK_TOP_REG(*regs) -= RED_ZONE_LEN;
 
   /*
@@ -544,7 +545,8 @@ run_and_redirect(int pid, registers_t *regs, ElfW(Addr) routine)
    * highest boundary, before transfering control to the live patching
    * routines in ulp_interface.S.
    */
-  STACK_TOP_REG(*regs) &= 0xFFFFFFFFFFFFFFC0;
+  STACK_TOP_REG(*regs) &= 0xFFFFFFFFFFFFFF00;
+  printf("Stack top after: 0x%lx\n", STACK_TOP_REG(*regs));
 
   if (ulp_ptrace(PTRACE_SETREGS, pid, NULL, regs)) {
     WARN("PTRACE_SETREGS error (pid %d).\n", pid);

@@ -45,13 +45,24 @@ __ulp_revert_all:
     ori     %r0, %r0, 0
     tw      0, %r0, %r0
 
-.global __ulp_trigger
+
+.globl __ulp_trigger
+.type  __ulp_trigger, @function
 __ulp_trigger:
     nop
     nop
+    addis   2, 12, .TOC.-__ulp_trigger@ha
+    addi    2, 2,  .TOC.-__ulp_trigger@l
+    #.localentry     __ulp_trigger,.-__ulp_trigger
+    mflr    %r0
+    std     %r0,16(%r1)
+    stdu    %r1,-32(%r1)
     bl      __ulp_apply_patch
-    ori     %r0, %r0, 0
-    tw      0, %r0, %r0
+    nop
+    addi    %r1,%r1,32
+    ld      %r0,16(%r1)
+    mtlr    %r0
+    trap
 
 .global __ulp_check_patched
 __ulp_check_patched:
