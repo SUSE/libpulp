@@ -53,7 +53,11 @@
  * Number of bytes that the kernel subtracts from the program counter,
  * when an ongoing syscall gets interrupted and must be restarted.
  */
-#define RESTART_SYSCALL_SIZE 2
+#if defined(__x86_64__)
+# define RESTART_SYSCALL_SIZE 2
+#elif defined(__powerpc64__)
+# define RESTART_SYSCALL_SIZE 0
+#endif
 
 /** Timeout for run_and_redirect function.  Set default to 200s.  */
 static long rr_timeout = 200;
@@ -512,6 +516,10 @@ run_and_redirect(int pid, registers_t *regs, ElfW(Addr) routine)
    */
   PROGRAM_COUNTER_REG(*regs) = routine + RESTART_SYSCALL_SIZE;
 
+  /* Machines with global entrypoint register must set it to the function we
+     are going to call.  */
+  regs->gpr[12] = PROGRAM_COUNTER_REG(*regs);
+
   /*
    * Even though libpulp does not register signal handlers with the
    * kernel, it uses ptrace to hijack all threads in a process, then
@@ -527,7 +535,6 @@ run_and_redirect(int pid, registers_t *regs, ElfW(Addr) routine)
    * handler registering, it cannot rely on this kernel feature, so it
    * must adjust the stack on its own.
    */
-  printf("Stack top before: 0x%lx\n", STACK_TOP_REG(*regs));
   STACK_TOP_REG(*regs) -= RED_ZONE_LEN;
 
   /*
@@ -545,8 +552,7 @@ run_and_redirect(int pid, registers_t *regs, ElfW(Addr) routine)
    * highest boundary, before transfering control to the live patching
    * routines in ulp_interface.S.
    */
-  STACK_TOP_REG(*regs) &= 0xFFFFFFFFFFFFFF00;
-  printf("Stack top after: 0x%lx\n", STACK_TOP_REG(*regs));
+  STACK_TOP_REG(*regs) &= 0xFFFFFFFFFFFFFFC0;
 
   if (ulp_ptrace(PTRACE_SETREGS, pid, NULL, regs)) {
     WARN("PTRACE_SETREGS error (pid %d).\n", pid);

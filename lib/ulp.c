@@ -157,17 +157,14 @@ int
 __ulp_apply_patch()
 {
   int result;
-  printf("called\n");
 
   /* If libpulp is in an error state, we cannot continue.  */
   if (libpulp_is_in_error_state()) {
-    WARN("error state");
     return get_libpulp_error_state();
   }
 
   /* If the instruction queue is in an weird state, we cannot continue.  */
   if (insnq_ensure_emptiness()) {
-    WARN("queue fail");
     return get_libpulp_error_state();
   }
 
@@ -177,12 +174,9 @@ __ulp_apply_patch()
    * deadlock, thus give up.
    */
   if (__ulp_asunsafe_trylock()) {
-    WARN("lock held");
     return EAGAIN;
   }
   __ulp_asunsafe_unlock();
-
-  WARN("apply patch called");
 
   /* Otherwise, try to apply the live patch. */
   result = load_patch();

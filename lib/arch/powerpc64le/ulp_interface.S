@@ -38,16 +38,27 @@
  */
 
 .global __ulp_revert_all
+    nop
+    nop
 __ulp_revert_all:
     nop
     nop
+    addis   2, 12, .TOC.-__ulp_revert_all@ha
+    addi    2, 2,  .TOC.-__ulp_revert_all@l
+    mflr    %r0
+    std     %r0,16(%r1)
+    stdu    %r1,-32(%r1)
     bl      __ulp_revert_patches_from_lib
-    ori     %r0, %r0, 0
-    tw      0, %r0, %r0
-
+    nop
+    addi    %r1,%r1,32
+    ld      %r0,16(%r1)
+    mtlr    %r0
+    trap
 
 .globl __ulp_trigger
 .type  __ulp_trigger, @function
+    nop
+    nop
 __ulp_trigger:
     nop
     nop
@@ -65,25 +76,56 @@ __ulp_trigger:
     trap
 
 .global __ulp_check_patched
+    nop
+    nop
 __ulp_check_patched:
     nop
     nop
+    addis   2, 12, .TOC.-__ulp_check_patched@ha
+    addi    2, 2,  .TOC.-__ulp_check_patched@l
+    mflr    %r0
+    std     %r0,16(%r1)
+    stdu    %r1,-32(%r1)
     bl      __ulp_check_applied_patch
-    ori     %r0, %r0, 0
-    tw      0, %r0, %r0
+    nop
+    addi    %r1,%r1,32
+    ld      %r0,16(%r1)
+    mtlr    %r0
+    trap
 
 .global __ulp_get_global_universe
+    nop
+    nop
 __ulp_get_global_universe:
     nop
     nop
+    addis   2, 12, .TOC.-__ulp_get_global_universe@ha
+    addi    2, 2,  .TOC.-__ulp_get_global_universe@l
+    mflr    %r0
+    std     %r0,16(%r1)
+    stdu    %r1,-32(%r1)
     bl      __ulp_get_global_universe_value
-    ori     %r0, %r0, 0
-    tw      0, %r0, %r0
+    nop
+    addi    %r1,%r1,32
+    ld      %r0,16(%r1)
+    mtlr    %r0
+    trap
+
 
 .global __ulp_enable_or_disable_patching
+    nop
+    nop
 __ulp_enable_or_disable_patching:
     nop
     nop
+    addis   2, 12, .TOC.-__ulp_enable_or_disable_patching@ha
+    addi    2, 2,  .TOC.-__ulp_enable_or_disable_patching@l
+    mflr    %r0
+    std     %r0,16(%r1)
+    stdu    %r1,-32(%r1)
     bl      ulp_enable_or_disable_patching
-    ori     %r0, %r0, 0
-    tw      0, %r0, %r0
+    nop
+    addi    %r1,%r1,32
+    ld      %r0,16(%r1)
+    mtlr    %r0
+    trap

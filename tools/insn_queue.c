@@ -67,6 +67,7 @@ insn_interpret_write(struct ulp_insn *insn)
 {
   int pid = remote_pid; // Pass process pid.
   struct ulp_insn_write *winsn = (struct ulp_insn_write *)insn;
+
   if (write_bytes_ptrace(winsn->bytes, winsn->n, pid, winsn->address)) {
     return -1;
   }
