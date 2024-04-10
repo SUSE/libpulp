@@ -38,6 +38,7 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+#include <assert.h>
 
 #include "error_common.h"
 #include "introspection.h"
@@ -401,7 +402,7 @@ attach(int pid)
 
   if (ulp_ptrace(PTRACE_ATTACH, pid, NULL, NULL)) {
     DEBUG("PTRACE_ATTACH error: %s.\n", strerror(errno));
-    return 1;
+    return errno;
   }
 
   while (true) {
@@ -409,7 +410,7 @@ attach(int pid)
 
     if (ret == -1) {
       DEBUG("waitpid error (pid %d): %s.\n", pid, strerror(errno));
-      return 1;
+      return errno;
     }
     else if (ret == pid) {
 
@@ -607,4 +608,34 @@ run_and_redirect(int pid, struct user_regs_struct *regs, ElfW(Addr) routine)
   }
 
   return 0;
+}
+
+
+/** @brief Check ptrace scope security option.
+ *
+ * In some systems, ptracing a simbling process is disalowed with a permission
+ * error.  This function will check if we are in such case, which we should
+ * error out and instruct the user what to do.
+ *
+ * @return:      true if ptrace of simblings works.
+ **/
+bool
+check_ptrace_scope(void)
+{
+  if (geteuid() == 0) {
+    /* Running as root.  No problem.  */
+    return true;
+  }
+
+  FILE *f = fopen("/proc/sys/kernel/yama/ptrace_scope", "r");
+  if (f == NULL) {
+    /* YAMA is not running.  */
+    return true;
+  }
+
+  unsigned char buf[4] = {0};
+  size_t n = fread(buf, sizeof(unsigned char), 4, f);
+  assert(n == 2 && "What is in the ptrace_scope?");
+  fclose(f);
+  return buf[0] == '0' ? true : false;
 }

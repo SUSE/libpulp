@@ -26,8 +26,12 @@
 #include <sys/ptrace.h>
 #include <sys/user.h>
 #include <sys/wait.h>
+#include <stdbool.h>
 
 #include "ulp_common.h"
+
+/* System configuration options.  */
+bool check_ptrace_scope(void);
 
 /* Memory read/write helper functions */
 

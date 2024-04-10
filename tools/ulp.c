@@ -450,6 +450,28 @@ change_color(const char *ansi_escape)
   }
 }
 
+static bool
+requires_ptrace(command_t command)
+{
+  switch(command) {
+    case ULP_NONE:
+    case ULP_DUMP:
+    case ULP_POST:
+    case ULP_EXTRACT:
+    case ULP_PACKER:
+    case ULP_LIVEPATCHABLE:
+      return false;
+
+    case ULP_PATCHES:
+    case ULP_TRIGGER:
+    case ULP_CHECK:
+    case ULP_MESSAGES:
+    case ULP_SET_PATCHABLE:
+      return true;
+  }
+  return false;
+}
+
 int
 main(int argc, char **argv, char *envp[] __attribute__((unused)))
 {
@@ -475,6 +497,17 @@ main(int argc, char **argv, char *envp[] __attribute__((unused)))
   arguments.retries = 1;
 
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
+
+
+  /* Check if command requires ptrace.  */
+  if (requires_ptrace(arguments.command) &&
+        check_ptrace_scope() == false) {
+    WARN("System has 'ptrace_scope' enabled. Please become root or disable it"
+         "by setting:\n\n"
+         "$ sudo echo 0 > /proc/sys/kernel/yama/ptrace_scope\n\n"
+         "and try again.");
+    return EPERM;
+  }
 
   switch (arguments.command) {
     case ULP_NONE:
