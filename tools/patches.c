@@ -184,10 +184,11 @@ process_list_end(struct ulp_process_iterator *it)
 {
   if (it->now == NULL) {
     release_ulp_process(it->last);
-    producer_consumer_delete(it->pcqueue);
     if (enable_threading) {
+      /* Make sure the threads stopped before destroying the queue.  */
       pthread_join(process_list_thread, NULL);
     }
+    producer_consumer_delete(it->pcqueue);
 
     /* In case threads were disabled because of some special case, then enable
        it now.  */
