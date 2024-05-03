@@ -265,7 +265,6 @@ get_list_of_symbols_in_section(Elf *elf, Elf_Scn *s)
   nsyms = sh.sh_size / sh.sh_entsize;
   data = elf_getdata(s, NULL);
   if (!data) {
-    WARN("Unable to get section data.");
     return NULL;
   }
 
