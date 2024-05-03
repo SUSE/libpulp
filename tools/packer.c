@@ -948,33 +948,6 @@ parse_build_id(Elf_Scn *s, char **result, int *length)
   return 0;
 }
 
-void *
-get_symbol_addr(Elf *elf, Elf_Scn *s, const char *search)
-{
-  int nsyms, i;
-  char *sym_name;
-  Elf_Data *data;
-  GElf_Shdr sh;
-  GElf_Sym sym;
-
-  gelf_getshdr(s, &sh);
-
-  nsyms = sh.sh_size / sh.sh_entsize;
-  data = elf_getdata(s, NULL);
-  if (!data) {
-    WARN("Unable to get section data.");
-    return 0;
-  }
-
-  for (i = 0; i < nsyms; i++) {
-    gelf_getsym(data, i, &sym);
-    sym_name = elf_strptr(elf, sh.sh_link, sym.st_name);
-    if (strcmp(sym_name, search) == 0)
-      return (void *)sym.st_value;
-  }
-  return 0;
-}
-
 int
 write_patch_id(struct ulp_metadata *ulp, const char *description,
                const char *livepatch)
