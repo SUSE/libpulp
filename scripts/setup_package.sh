@@ -34,6 +34,9 @@ NO_SRC_DOWNLOAD=0
 # If this flag is enabled, then download of ipa clones tarballs will be blocked.
 NO_IPA_CLONES_DOWNLOAD=0
 
+# If this flag is enabled, then download of debuginfo packages will be blocked.
+NO_DEBUGINFO_DOWNLOAD=0
+
 set_url_platform()
 {
   PLATFORM=$1
@@ -74,7 +77,7 @@ get_name_from_package_name()
 get_sle_version_from_package_name()
 {
   local package=$1
-  # Dechare a hash table mapping version number to a label used in
+  # Declare a hash table mapping version number to a label used in
   # download.suse.de
 
   declare -A sle_hash=( ["150000"]="15"
@@ -198,6 +201,40 @@ get_list_of_src_packages()
 
 }
 
+# Get list of debuginfo packages
+get_list_of_debuginfo_packages()
+{
+  local packages="$*"
+  local src_package_list=""
+
+  for package in $packages; do
+    local package_name=$(get_name_from_package_name $package)
+    local version=$(get_version_from_package_name $package)
+
+    # libopenssl1_1 src comes from openssl.
+    if [ "$package_name" = "libopenssl1_1" ]; then
+      package_name="openssl-1_1"
+    fi
+
+    src_package_list="$src_package_list $package_name-debuginfo-$version.x86_64.rpm"
+  done
+
+  echo $src_package_list
+}
+
+download_debuginfo_packages()
+{
+  local packages=$(get_list_of_debuginfo_packages "$*")
+  local old_url=$URL
+
+  echo $packages
+
+  URL="https://download.suse.de/updates/SUSE/Updates/SLE-Module-Basesystem/$PLATFORM/x86_64/update_debug/x86_64/"
+  parallel_download_packages "$packages"
+
+  URL=$old_url
+}
+
 download_src_packages()
 {
   local packages=$(get_list_of_src_packages "$*")
@@ -230,31 +267,47 @@ extract_libs_from_package()
   local name=$(get_name_from_package_name $package)
   local ipa_clones=$(get_list_of_ipa_clones $package)
   local src_package=$(get_list_of_src_packages $package)
+  local debuginfo_package=$(get_list_of_debuginfo_packages $package)
 
   mkdir -p $PLATFORM/$name/$version
 
   cp $package $PLATFORM/$name/$version/$package
   cp $src_package $PLATFORM/$name/$version/$src_package
   cp $ipa_clones $PLATFORM/$name/$version/$ipa_clones
+  cp $debuginfo_package $PLATFORM/$name/$version/$debuginfo_package
 
   cd $PLATFORM/$name/$version
     mkdir -p binaries
     cd binaries
-      rpm2cpio ../$package | cpio -idmv --quiet
+      if [ -f ../$package ]; then
+        rpm2cpio ../$package | cpio -idmv --quiet
+      fi
     cd ..
 
     mkdir -p src
     cd src
-      rpm2cpio ../$src_package | cpio -idmv --quiet
-      tar xf $(ls | grep -E "(\.tar\.xz$|\.tar\.gz$)")
+      if [ -f ../$src_package ]; then
+        rpm2cpio ../$src_package | cpio -idmv --quiet
+        tar xf $(ls | grep -E "(\.tar\.xz$|\.tar\.gz$)")
+      fi
+    cd ..
+
+    mkdir -p debuginfo
+    cd debuginfo
+      if [ -f ../$debuginfo_package ]; then
+        echo "Extracting $debuginfo_package"
+        rpm2cpio ../$debuginfo_package | cpio -idmv --quiet
+      fi
     cd ..
 
     # Extract tar file and get rid of the version directory.
-    echo "Extracting IPA clones package $ipa_clones"
-    local extracted_tar_dir=$(tar tf $ipa_clones | sed -e 's@/.*@@' | uniq)
-    tar -xf $ipa_clones
-    mv $extracted_tar_dir/* ipa-clones
-    rm -rf $extracted_tar_dir
+    if [ -f $ipa_clones ]; then
+      echo "Extracting IPA clones package $ipa_clones"
+      local extracted_tar_dir=$(tar tf $ipa_clones | sed -e 's@/.*@@' | uniq)
+      tar -xf $ipa_clones
+      mv $extracted_tar_dir/* ipa-clones
+      rm -rf $extracted_tar_dir
+    fi
 
     # delete anything we don't need.
     rm -f *.rpm *.tar.xz
@@ -361,6 +414,10 @@ parse_program_argv()
         NO_IPA_CLONES_DOWNLOAD=1
         shift
         ;;
+      --no-debuginfo-download)
+        NO_DEBUGINFO_DOWNLOAD=1
+        shift
+        ;;
       --help)
         print_help_message
         exit 0
@@ -403,6 +460,9 @@ main()
   fi
   if [ $NO_IPA_CLONES_DOWNLOAD -eq 0 ]; then
     download_ipa_clones "$names"
+  fi
+  if [ $NO_DEBUGINFO_DOWNLOAD -eq 0 ]; then
+    download_debuginfo_packages "$names"
   fi
 
   for package in $names; do
