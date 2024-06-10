@@ -252,6 +252,10 @@ write_ulp_so_info_json(FILE *stream, const struct ulp_so_info *info)
 static struct symbol *
 get_list_of_symbols_in_section(Elf *elf, Elf_Scn *s)
 {
+  if (elf == NULL || s == NULL) {
+    return NULL;
+  }
+
   struct symbol *symbol_head = NULL;
 
   int nsyms, i;
@@ -638,11 +642,56 @@ get_symbol_with_name(struct ulp_so_info *info, const char *sym)
   return symbol;
 }
 
+struct ulp_so_info *merge_ulp_so_infos(struct ulp_so_info *a,
+                                       struct ulp_so_info *b)
+{
+  /* Sanity check.  */
+  if (memcmp(a->buildid, b->buildid, sizeof(a->buildid)) != 0) {
+    char a_buildid[2 * BUILDID_LEN + 1];
+    char b_buildid[2 * BUILDID_LEN + 1];
+    memcpy(a_buildid, buildid_to_string(a->buildid), sizeof(a_buildid));
+    memcpy(b_buildid, buildid_to_string(b->buildid), sizeof(b_buildid));
+
+    WARN("Attempt to merge symbol lists with distinct buildids\n"
+         "            lib: %s\n"
+         "      debuginfo: %s", a_buildid, b_buildid);
+  }
+
+  /* Merge both lists.  */
+  struct symbol **it = &(a->symbols);
+  for (; *it != NULL; it = &(*it)->next)
+    ;
+
+  /* Duplicate the list for the sake of avoiding silly memory errors.  */
+  struct symbol *it2 = b->symbols;
+  for (; it2 != NULL; it2 = it2->next) {
+    struct symbol *new = calloc(1, sizeof(struct symbol));
+    assert(new && "Error allocating a new symbol element.");
+
+    new->name     = strdup(it2->name);
+    new->offset   = it2->offset;
+    new->size     = it2->size;
+    new->st_info  = it2->st_info;
+    new->st_other = it2->st_other;
+    new->next     = NULL;
+
+    /* Insert into the list.  */
+    *it = new;
+    it = &(new->next);
+  }
+
+  return a;
+}
+
 int
 run_extract(struct arguments *arguments)
 {
   /* Path to input livepatch library target.  */
   const char *input_file = arguments->args[0];
+
+  /* Path to the debuginfo file, which can be used to extract more
+     information.  */
+  const char *debuginfo_file = arguments->with_debuginfo;
 
   /* arguments->metadata is what is captured by the -o option.  */
   const char *output_file = arguments->metadata;
@@ -652,6 +701,18 @@ run_extract(struct arguments *arguments)
     output_file = "out.json";
 
   struct ulp_so_info *info = parse_so_elf(input_file);
+  struct ulp_so_info *debuginfo = NULL;
+
+  if (info == NULL) {
+    WARN("error reading elf file %s", input_file);
+    return 1;
+  }
+
+  if (debuginfo_file) {
+    debuginfo = parse_so_elf(debuginfo_file);
+    info = merge_ulp_so_infos(info, debuginfo);
+  }
+
   FILE *out;
 
   if (!strcmp(output_file, "-"))
@@ -666,5 +727,6 @@ run_extract(struct arguments *arguments)
     fclose(out);
 
   release_so_info(info);
+  release_so_info(debuginfo);
   return 0;
 }

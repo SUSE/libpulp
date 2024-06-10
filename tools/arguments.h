@@ -50,6 +50,7 @@ struct arguments
   const char *process_wildcard;
   const char *user_wildcard;
   const char *prefix;
+  const char *with_debuginfo;
   command_t command;
   int retries;
   int quiet;

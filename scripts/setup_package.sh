@@ -24,6 +24,7 @@ PROGNAME=`basename "$0"`
 SLE_VERSION_REGEX="[0-9]{6}"
 VERSION_REGEX="([0-9\.a-zA-Z]+-$SLE_VERSION_REGEX\.[0-9\.]+[0-9])"
 PLATFORM=
+PRODUCT=
 URL=
 PACKAGE=
 NO_CLEANUP=0
@@ -37,10 +38,29 @@ NO_IPA_CLONES_DOWNLOAD=0
 # If this flag is enabled, then download of debuginfo packages will be blocked.
 NO_DEBUGINFO_DOWNLOAD=0
 
+# Pushd and popd are not silent. Silence them.
+pushd ()
+{
+  command pushd "$@" > /dev/null
+}
+popd ()
+{
+  command popd "$@" > /dev/null
+}
+
 set_url_platform()
 {
   PLATFORM=$1
-  URL="https://download.suse.de/updates/SUSE/Updates/SLE-Module-Basesystem/$PLATFORM/x86_64/update/x86_64"
+  PRODUCT=$2
+  local element=$3
+
+  URL="https://download.suse.de/download/ibs/SUSE:/SLE-$PLATFORM:/$PRODUCT/standard"
+
+  if [ "$element" == "src" ]; then
+    URL="$URL/src"
+  elif [ "$element" != "ipa-clones" ]; then
+    URL="$URL/x86_64"
+  fi
 }
 
 web_get()
@@ -89,6 +109,7 @@ get_sle_version_from_package_name()
 
 
   local version=$(echo "$1" | grep -Eo "($SLE_VERSION_REGEX)")
+
   local sle_version=${sle_hash[$version]}
 
   if [ "x$sle_version" = "x" ]; then
@@ -120,6 +141,7 @@ download_package_list()
   local url="$URL"
   local list_path=$1
 
+  echo downloading package list: "$url"
   web_get "$url" "$list_path"
 }
 
@@ -211,11 +233,6 @@ get_list_of_debuginfo_packages()
     local package_name=$(get_name_from_package_name $package)
     local version=$(get_version_from_package_name $package)
 
-    # libopenssl1_1 src comes from openssl.
-    if [ "$package_name" = "libopenssl1_1" ]; then
-      package_name="openssl-1_1"
-    fi
-
     src_package_list="$src_package_list $package_name-debuginfo-$version.x86_64.rpm"
   done
 
@@ -229,10 +246,8 @@ download_debuginfo_packages()
 
   echo $packages
 
-  URL="https://download.suse.de/updates/SUSE/Updates/SLE-Module-Basesystem/$PLATFORM/x86_64/update_debug/x86_64/"
+  set_url_platform $PLATFORM $PRODUCT "debuginfo"
   parallel_download_packages "$packages"
-
-  URL=$old_url
 }
 
 download_src_packages()
@@ -240,10 +255,8 @@ download_src_packages()
   local packages=$(get_list_of_src_packages "$*")
   local old_url=$URL
 
-  URL="https://download.suse.de/updates/SUSE/Updates/SLE-Module-Basesystem/$PLATFORM/x86_64/update/src/"
+  set_url_platform $PLATFORM $PRODUCT "src"
   parallel_download_packages "$packages"
-
-  URL=$old_url
 }
 
 download_ipa_clones()
@@ -254,10 +267,8 @@ download_ipa_clones()
 
   local sle_ver=$(get_sle_version_from_package_name $1)
 
-  URL="https://download.suse.de/download/ibs/SUSE:/SLE-$sle_ver:/Update/standard/"
+  set_url_platform $PLATFORM $PRODUCT "ipa-clones"
   parallel_download_packages "$ipa_clones_list"
-
-  URL=$old_url
 }
 
 extract_libs_from_package()
@@ -272,22 +283,47 @@ extract_libs_from_package()
   mkdir -p $PLATFORM/$name/$version
 
   cp $package $PLATFORM/$name/$version/$package
-  cp $src_package $PLATFORM/$name/$version/$src_package
-  cp $ipa_clones $PLATFORM/$name/$version/$ipa_clones
-  cp $debuginfo_package $PLATFORM/$name/$version/$debuginfo_package
+  if [ $? -ne 0 ]; then
+    echo "error: $package not downloaded."
+    exit 1
+  fi
+
+  if [ $NO_SRC_DOWNLOAD -eq 0 ]; then
+    cp $src_package $PLATFORM/$name/$version/$src_package
+    if [ $? -ne 0 ]; then
+      echo "error: $src_package not downloaded."
+      exit 1
+    fi
+  fi
+
+  if [ $NO_IPA_CLONES_DOWNLOAD -eq 0 ]; then
+    cp $ipa_clones $PLATFORM/$name/$version/$ipa_clones
+    if [ $? -ne 0 ]; then
+      echo "error: $ipa_clones not downloaded."
+      exit 1
+    fi
+  fi
+
+  if [ $NO_DEBUGINFO_DOWNLOAD -eq 0 ]; then
+    cp $debuginfo_package $PLATFORM/$name/$version/$debuginfo_package
+    if [ $? -ne 0 ]; then
+      echo "error: $debuginfo not downloaded."
+      exit 1
+    fi
+  fi
 
   cd $PLATFORM/$name/$version
     mkdir -p binaries
     cd binaries
       if [ -f ../$package ]; then
-        rpm2cpio ../$package | cpio -idmv --quiet
+        rpm2cpio ../$package | cpio -idm --quiet
       fi
     cd ..
 
     mkdir -p src
     cd src
       if [ -f ../$src_package ]; then
-        rpm2cpio ../$src_package | cpio -idmv --quiet
+        rpm2cpio ../$src_package | cpio -idm --quiet
         tar xf $(ls | grep -E "(\.tar\.xz$|\.tar\.gz$)")
       fi
     cd ..
@@ -296,7 +332,7 @@ extract_libs_from_package()
     cd debuginfo
       if [ -f ../$debuginfo_package ]; then
         echo "Extracting $debuginfo_package"
-        rpm2cpio ../$debuginfo_package | cpio -idmv --quiet
+        rpm2cpio ../$debuginfo_package | cpio -idm --quiet
       fi
     cd ..
 
@@ -314,26 +350,98 @@ extract_libs_from_package()
   cd ../../../
 }
 
-dump_interesting_info_from_elfs()
-{
-  local list_of_sos=$(find $PLATFORM | grep -E "*.so[\.0-9]*$")
+# List of .debug files in folder.  Stored here for cache reasons.
+_LIST_OF_DEBUG=""
 
-  # Extract the relevant so information needed for livepatching.
-  for so in $list_of_sos; do
-    ulp extract $so -o $so.json
+match_so_to_debuginfo()
+{
+  local so=$1
+  local base_so=$(basename $so)
+
+  local list_of_debug=$(echo $_LIST_OF_DEBUG | xargs -n1 | grep -E "$base_so.*\.debug$")
+
+  let num=0
+
+  # Count how many files we got.
+  for dbg in $list_of_debug; do
+    let "num=num+1"
   done
 
-  echo $list_of_sos
+  # Assert that we got only one file
+  if [ $num -ne 1 ]; then
+    echo "Expected only 1 file matching $base_so, got $num: $list_of_debug" > /dev/stderr
+    exit 1
+  fi
+
+  # Return the file we got.
+  echo $list_of_debug
+}
+
+dump_interesting_info_from_elfs()
+{
+  pushd $1
+  local list_of_sos=$(find . | grep -E ".*\.so[\.0-9]*$")
+
+  # Populate cache of list of .debug
+  _LIST_OF_DEBUG=$(find . -name "*.debug")
+
+  # Iterate on every so in the folder.
+  for so in $list_of_sos; do
+    if [ $NO_DEBUGINFO_DOWNLOAD -eq 0 ]; then
+      # Get the debuginfo that matches this library.
+      local debug=$(match_so_to_debuginfo $so)
+
+      if [ "$debug" == "" ]; then
+        exit 1
+      fi
+
+      # Run the ulp extract command on both the library and debuginfo.
+      echo ulp extract $so -d $debug -o $so.json
+      ulp extract $so -d $debug -o $so.json
+    else
+      # Run the ulp extract command only on the library.
+      echo ulp extract $so -o $so.json
+      ulp extract $so -o $so.json
+    fi
+  done
 
   # Delete all .so we don't need.
   for so in $list_of_sos; do
     rm -f $so
   done
+
+  # Delete all .debug we we don't need.
+  for debug in $_LIST_OF_DEBUG; do
+    rm -f $debug
+  done
+
+  # Delete empty directories left.
+  find . -type d -empty -delete
+
+  # Invalidate the cache.
+  _LIST_OF_DEBUG=""
+
+  popd
+}
+
+dump_interesting_info_from_elfs_in_lib()
+{
+  local platform=$1
+
+  # Enter in platform folder
+  pushd $platform
+
+  # Iterate on every version
+  for dir in $(ls); do
+    dump_interesting_info_from_elfs $dir
+  done
+  popd
+
 }
 
 sanitize_platform()
 {
-  local platforms="15-SP3 15-SP4"
+  local platforms="15-SP3 15-SP4 15-SP5"
 
   for platform in ${platforms}; do
     if [ "$PLATFORM" = "$platform" ]; then
@@ -440,36 +548,49 @@ parse_program_argv()
   sanitize_package
 
   # Set platform globally
-  set_url_platform "$PLATFORM"
+  set_url_platform "$PLATFORM" "GA"
 }
 
 main()
 {
-  # Set default URL platform to "15-SP4".
-  set_url_platform "15-SP4"
   parse_program_argv $*
 
+  # Clean the directory
+  rm -rf $PLATFORM
 
-  download_package_list "/tmp/suse_package_list.html"
-  local names=$(extract_lib_package_names "/tmp/suse_package_list.html" $PACKAGE)
+  local all_names=""
+  local products="GA Update"
 
-  parallel_download_packages "$names"
+  for product in GA Update; do
+    # Set platform globally
+    set_url_platform "$PLATFORM" $product
 
-  if [ $NO_SRC_DOWNLOAD -eq 0 ]; then
-    download_src_packages "$names"
-  fi
-  if [ $NO_IPA_CLONES_DOWNLOAD -eq 0 ]; then
-    download_ipa_clones "$names"
-  fi
-  if [ $NO_DEBUGINFO_DOWNLOAD -eq 0 ]; then
-    download_debuginfo_packages "$names"
-  fi
+    download_package_list "/tmp/suse_package_list.html"
+    local names=$(extract_lib_package_names "/tmp/suse_package_list.html" $PACKAGE)
 
-  for package in $names; do
+    # Clean the directory
+    rm -rf $PLATFORM
+
+    parallel_download_packages "$names"
+
+    if [ $NO_SRC_DOWNLOAD -eq 0 ]; then
+      download_src_packages "$names"
+    fi
+    if [ $NO_IPA_CLONES_DOWNLOAD -eq 0 ]; then
+      download_ipa_clones "$names"
+    fi
+    if [ $NO_DEBUGINFO_DOWNLOAD -eq 0 ]; then
+      download_debuginfo_packages "$names"
+    fi
+
+    all_names="$all_names $names"
+  done
+
+  for package in $all_names; do
     extract_libs_from_package "$package"
   done
 
-  dump_interesting_info_from_elfs
+  dump_interesting_info_from_elfs_in_lib $PLATFORM/$PACKAGE
 
   # Delete all packages to cleanup.
   if [ $NO_CLEANUP -ne 1 ]; then

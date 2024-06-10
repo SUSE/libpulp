@@ -171,8 +171,10 @@ static struct argp_option options[] = {
     "Use this livepatch file\nDefaults to the one described in ARG1", 0 },
   { "target", 't', "LIBRARY", 0,
     "Use this target library\nDefaults to the one described in ARG1", 0 },
-  { "color", ULP_OP_COLOR, "yes/no/auto", 0, "Enable/disable colored messages",
-    0 },
+  { "color", ULP_OP_COLOR, "yes/no/auto", 0, "Enable/disable colored messages", 0 },
+  { 0, 0, 0, 0, "extract command only:", 0 },
+  { "with-debuginfo", 'd', "DEBUGINFO", 0,
+    "Use debuginfo information for symbolextraction", 0 },
   { 0 }
 };
 
@@ -343,6 +345,9 @@ parser(int key, char *arg, struct argp_state *state)
       break;
     case 'R':
       arguments->prefix = arg;
+      break;
+    case 'd':
+      arguments->with_debuginfo = arg;
       break;
     case ULP_OP_REVERT_ALL:
       arguments->library = get_basename(arg);
