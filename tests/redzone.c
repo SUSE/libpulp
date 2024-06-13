@@ -31,10 +31,10 @@
 int
 main(void)
 {
-  long int counter = LOOPS;
-  long int result1;
-  long int result2;
-  long int result3;
+  volatile long int counter = LOOPS;
+  volatile long int result1;
+  volatile long int result2;
+  volatile long int result3;
 
   /* Signal readiness. */
   printf("Waiting for input.\n");
@@ -69,11 +69,14 @@ main(void)
     "loop:\n"
     "li %%r10, 1\n"
     "lwa %%r11, -0x08(%%r1)\n"
-    "add %%r10, %%r10, %%r11\n"
+    "add %%r11, %%r11, %%r10\n"
+    "stw %%r11, -0x08(%%r1)\n"
     "lwa %%r11, -0x78(%%r1)\n"
-    "add %%r10, %%r10, %%r11\n"
+    "add %%r11, %%r11, %%r10\n"
+    "stw %%r11, -0x78(%%r1)\n"
     "lwa %%r11, -0x80(%%r1)\n"
-    "add %%r10, %%r10, %%r11\n"
+    "add %%r11, %%r11, %%r10\n"
+    "stw %%r11, -0x80(%%r1)\n"
     "addi %3, %3, -1\n"
     "cmpdi %%cr0, %3, 0\n"
     "bne %%cr0, loop\n"

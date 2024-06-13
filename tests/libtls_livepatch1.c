@@ -39,6 +39,7 @@ new_banner_set(__attribute__((unused)) char *new)
     errx(EXIT_FAILURE, "Live patch data references not initialized");
 
   char **ulpr_banner = __tls_get_addr(&ti);
+  printf("module: %lx, offset: %lx\n", ti.ti_module, ti.ti_offset);
   printf("addr: 0x%lx\n", (unsigned long)ulpr_banner);
   *ulpr_banner = ulpr_string;
 }
