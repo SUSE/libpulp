@@ -423,7 +423,7 @@ load_so(char *obj)
 {
   void *patch_obj;
 
-  patch_obj = dlopen(obj, RTLD_LAZY);
+  patch_obj = dlopen(obj, RTLD_NOW);
   if (!patch_obj) {
     WARN("Unable to load shared object %s: %s.", obj, dlerror());
     return NULL;
@@ -459,7 +459,7 @@ parse_metadata(struct ulp_metadata *ulp)
     goto metadata_clean;
 
   if (!load_so_handlers(ulp)) {
-    ret = errno;
+    ret = EDLOPEN;
     goto metadata_clean;
   }
 
@@ -730,11 +730,17 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
          symbol's address by its name.  */
       patch_address =
           (uintptr_t)load_so_symbol(ref->reference_name, ulp->so_handler);
+
+      if (patch_address == 0) {
+        return ENONEWFUNC;
+      }
+
       ref->patch_offset = patch_address - patch_base;
     }
     else {
       patch_address = patch_base + ref->patch_offset;
     }
+
     if (ref->tls) {
       tls_index ti = { .ti_module = tls_idx, .ti_offset = ref->target_offset };
       memcpy((void *)patch_address, &ti, sizeof(ti));
