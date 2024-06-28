@@ -1,0 +1,3 @@
+__ABS_BUILDDIR__/.libs/libvisibility_livepatch1.so
+@__ABS_BUILDDIR__/.libs/libvisibility.so.0.json
+get_hidden_address:get_address_lp

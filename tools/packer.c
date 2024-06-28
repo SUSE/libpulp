@@ -526,7 +526,8 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
   int cur_comment_size = 0;
 
   struct ulp_so_info *container = NULL, *target = NULL;
-  const char *container_path = NULL, *target_path = NULL;
+  const char *container_path = NULL;
+  char target_path[PATH_MAX];
 
   *info = NULL;
 
@@ -664,9 +665,9 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
         first[n - 1] = '\0';
 
       if (target_override)
-        target_path = target_override;
+        strcpy(target_path, target_override);
       else
-        target_path = &first[1];
+        strcpy(target_path, &first[1]);
       ulp->objs->nunits = 0;
       last_unit = NULL;
 
@@ -731,21 +732,25 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
         if (second == NULL) {
           ref->reference_name = strdup(third);
 
-          if (!get_symbol_with_name(target, ref->target_name)) {
+          struct symbol *new_sym = get_symbol_with_name(target, ref->target_name);
+          if (new_sym == NULL) {
             parse_error(loc, "symbol %s is not present in %s",
                         ref->target_name, target_path);
             ret = 0;
             goto dsc_clean;
           }
-
+          ref->target_offset = new_sym->offset;
           loc.col += strlen(ref->target_name) + 1;
 
-          if (!get_symbol_with_name(container, ref->reference_name)) {
+          struct symbol *old_sym = get_symbol_with_name(container, ref->reference_name);
+          if (old_sym == NULL) {
             parse_error(loc, "symbol %s is not present in %s",
                         ref->reference_name, container_path);
             ret = 0;
             goto dsc_clean;
           }
+
+          ref->patch_offset = old_sym->offset;
         }
         else {
           *second = '\0';
@@ -844,8 +849,7 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
     }
 
     /* get new line */
-    free(first);
-    first = NULL;
+    FREE_AND_NULLIFY(first);
     second = NULL;
     len = 0;
     n = getline(&first, &len, parse_file);

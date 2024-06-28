@@ -198,6 +198,14 @@ libstress_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
 POST_PROCESS += .libs/libstress.post
 
+libvisibility_la_SOURCES = libvisibility.c
+libvisibility_la_CFLAGS  = $(TARGET_CFLAGS)
+libvisibility_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
+
+POST_PROCESS += .libs/libvisibility.post
+
+check_LTLIBRARIES += libvisibility.la
+
 # Live patches
 check_LTLIBRARIES += libdozens_livepatch1.la \
                      libdozens_livepatch99.la \
@@ -224,7 +232,9 @@ check_LTLIBRARIES += libdozens_livepatch1.la \
                      libprefix_livepatch1.la \
                      libmanyprocesses_livepatch1.la \
                      libstress_livepatch1.la \
-                     libcomments_livepatch1.la
+                     libcomments_livepatch1.la \
+                     libvisibility_livepatch1.la \
+                     libvisibility_livepatch2.la
 
 libdozens_livepatch1_la_SOURCES = libdozens_livepatch1.c
 libdozens_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
@@ -304,6 +314,13 @@ libstress_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 libcomments_livepatch1_la_SOURCES = libcomments_livepatch1.c
 libcomments_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
+libvisibility_livepatch1_la_SOURCES = libvisibility_livepatch1.c
+libvisibility_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
+
+libvisibility_livepatch2_la_SOURCES = libvisibility_livepatch2.c
+libvisibility_livepatch2_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
+
+
 METADATA = \
   libdozens_livepatch1.dsc \
   libdozens_livepatch1.ulp \
@@ -356,7 +373,11 @@ METADATA = \
   libcomments_livepatch1.dsc \
   libcomments_livepatch1.ulp \
   libstress_livepatch1.dsc \
-  libstress_livepatch1.ulp
+  libstress_livepatch1.ulp \
+  libvisibility_livepatch1.dsc \
+  libvisibility_livepatch1.ulp \
+  libvisibility_livepatch2.dsc \
+  libvisibility_livepatch2.ulp
 
 EXTRA_DIST = \
   libdozens_livepatch1.in \
@@ -384,7 +405,9 @@ EXTRA_DIST = \
   libprocess_livepatch1.in \
   libprocess_access_livepatch1.in \
   libcomments_livepatch1.in \
-  libstress_livepatch1.in
+  libstress_livepatch1.in \
+  libvisibility_livepatch1.in \
+  libvisibility_livepatch2.in
 
 clean-local:
 	rm -f $(METADATA)
@@ -422,7 +445,8 @@ check_PROGRAMS = \
   comments \
   block_mprotect \
   insn_queue \
-  chroot
+  chroot \
+  visibility
 
 numserv_SOURCES = numserv.c
 numserv_LDADD = libdozens.la libhundreds.la
@@ -564,6 +588,10 @@ chroot_SOURCES = chroot.c
 chroot_CFLAGS = $(AM_CFLAGS)
 chroot_LDADD = libparameters.la
 
+visibility_SOURCES = visibility.c
+visibility_CFLAGS = $(AM_CFLAGS)
+visibility_LDADD = libvisibility.la
+
 TESTS = \
   numserv.py \
   numserv_bsymbolic.py \
@@ -616,7 +644,8 @@ TESTS = \
   patches.py \
   mprotect_patch.py \
   insn_queue.py \
-  chroot.py
+  chroot.py \
+  visibility.py
 
 XFAIL_TESTS = \
   blocked.py \

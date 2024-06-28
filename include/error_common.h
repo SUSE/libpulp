@@ -67,6 +67,7 @@ typedef int ulp_error_t;
 #define ENOPATCH      284 /** No patches installed.  */
 #define EINSNQ        285 /** Instruction queue in inconsistent state.  */
 #define EOLDULP       286 /** ULP tool is too old.  */
+#define EDLOPEN       287 /** Failure in dlopen.  */
 
 /** Table used to map error code to message.  Define it here so that it is
  *  easier for it being maintained.
@@ -104,6 +105,7 @@ typedef int ulp_error_t;
     "No patches installed", \
     "Instruction queue in inconsistent state", \
     "ULP tool is too old", \
+    "Failure in dlopen", \
   }
 /* clang-format on */
 
