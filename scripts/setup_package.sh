@@ -105,7 +105,8 @@ get_sle_version_from_package_name()
                         ["150200"]="15-SP2"
                         ["150300"]="15-SP3"
                         ["150400"]="15-SP4"
-                        ["150500"]="15-SP5")
+                        ["150500"]="15-SP5"
+                        ["150600"]="15-SP6")
 
 
   local version=$(echo "$1" | grep -Eo "($SLE_VERSION_REGEX)")
@@ -195,6 +196,11 @@ get_list_of_ipa_clones()
       package_name="openssl"
     fi
 
+    # libopenssl-3 ipa-clones artifacts are named openssl-3
+    if [ "$package_name" = "libopenssl3" ]; then
+      package_name="openssl-3"
+    fi
+
     ipa_clones_list="$ipa_clones_list $package_name-livepatch-$version.x86_64.tar.xz"
   done
 
@@ -214,6 +220,11 @@ get_list_of_src_packages()
     # libopenssl1_1 src comes from openssl.
     if [ "$package_name" = "libopenssl1_1" ]; then
       package_name="openssl-1_1"
+    fi
+
+    # libopenssl-3 src comes from openssl-3
+    if [ "$package_name" = "libopenssl3" ]; then
+      package_name="openssl-3"
     fi
 
     src_package_list="$src_package_list $package_name-$version.src.rpm"
@@ -300,7 +311,10 @@ extract_libs_from_package()
     cp $ipa_clones $PLATFORM/$name/$version/$ipa_clones
     if [ $? -ne 0 ]; then
       echo "error: $ipa_clones not downloaded."
-      exit 1
+      read -r -p "Continue without it? [y/N] " response
+      if [[ ! "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+        exit 1
+      fi
     fi
   fi
 
@@ -441,7 +455,7 @@ dump_interesting_info_from_elfs_in_lib()
 
 sanitize_platform()
 {
-  local platforms="15-SP3 15-SP4 15-SP5"
+  local platforms="15-SP3 15-SP4 15-SP5 15-SP6"
 
   for platform in ${platforms}; do
     if [ "$PLATFORM" = "$platform" ]; then
@@ -456,8 +470,7 @@ sanitize_platform()
 
 sanitize_package()
 {
-  local packages="glibc libopenssl1_1"
-
+  local packages="glibc libopenssl1_1 libopenssl3"
   if [ "x$PACKAGE" = "x" ]; then
     echo "You must pass a --package=<PACKAGE> parameter!"
     exit 1
