@@ -743,11 +743,11 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
 
     if (ref->tls) {
       tls_index ti = { .ti_module = tls_idx, .ti_offset = ref->target_offset };
-      memcpy((void *)patch_address, &ti, sizeof(ti));
+      insnq_insert_write((void *)patch_address, sizeof(ti), &ti);
     }
     else {
       uintptr_t target_address = target_base + ref->target_offset;
-      memcpy((void *)patch_address, &target_address, sizeof(void *));
+      insnq_insert_write((void *)patch_address, sizeof(void *), &target_address);
     }
     ref = ref->next;
   }
