@@ -564,12 +564,14 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
       goto dsc_clean;
     }
 
-    if (first[0] == '!') {
+    if (first[0] == '\n') {
+      /* Skip newline  */
+      continue;
+    } else if (first[0] == '!') {
       /* Lines starting with ! are comments.  */
       read_comment(ulp, first, n, &cur_comment_pos, &cur_comment_size);
       continue;
-    }
-    else {
+    } else {
       if (container_override) {
         ulp->so_filename = strdup(container_override);
       }
@@ -642,7 +644,10 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
 
   while (n > 0) {
 
-    if (first[0] == '!') {
+    if (first[0] == '\n') {
+      /* Skip empty lines.  */
+      goto get_new_line;
+    } else if (first[0] == '!') {
       /* Lines starting with ! are comments.  */
       read_comment(ulp, first, n, &cur_comment_pos, &cur_comment_size);
     }
@@ -849,6 +854,7 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
     }
 
     /* get new line */
+get_new_line:
     FREE_AND_NULLIFY(first);
     second = NULL;
     len = 0;
