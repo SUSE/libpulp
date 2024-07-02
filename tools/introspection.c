@@ -1059,7 +1059,7 @@ parse_main_dynobj(struct ulp_process *process)
   }
 
   /* calloc initializes all to zero */
-  obj = calloc(sizeof(struct ulp_dynobj), 1);
+  obj = calloc(1, sizeof(struct ulp_dynobj));
   if (!obj) {
     DEBUG("unable to allocate memory.");
     return ENOMEM;
@@ -1161,7 +1161,7 @@ get_libname_dynobj(struct ulp_process *process, struct link_map *link_map_addr)
   int pid = process->pid;
 
   /* calloc initializes all to zero */
-  obj = calloc(sizeof(struct ulp_dynobj), 1);
+  obj = calloc(1, sizeof(struct ulp_dynobj));
 
   if (read_memory((char *)&obj->link_map, sizeof(struct link_map), pid,
                   (Elf64_Addr)link_map_addr)) {
@@ -1447,7 +1447,7 @@ hijack_threads(struct ulp_process *process)
          *   Save all registers;
          *   Update the list.
          */
-        t = calloc(sizeof(struct ulp_thread), 1);
+        t = calloc(1, sizeof(struct ulp_thread));
         if (!t) {
           WARN("unable to allocate memory.");
           goto child_alloc_error;

@@ -25,8 +25,6 @@ libpulp_la_SOURCES = \
   msg_queue.c \
   insn_queue.c \
   error.c \
-  hash.c \
-  arch/$(target_cpu)/ulp_prologue.S \
   arch/$(target_cpu)/ulp_interface.S \
   arch/$(target_cpu)/patch.c
 libpulp_la_DEPENDENCIES= libpulp.versions

@@ -234,8 +234,8 @@ AS_CASE([$host_cpu],
         ],
         [powerpc64le],
         [
-          _NOPS_LEN=72
-          _PRE_NOPS_LEN=0
+          _NOPS_LEN=19
+          _PRE_NOPS_LEN=18
         ]
 )
 

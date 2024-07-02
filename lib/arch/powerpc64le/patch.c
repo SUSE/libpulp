@@ -23,8 +23,8 @@
 
 #include <stddef.h>
 #include <string.h>
+#include <limits.h>
 
-#include "hash.h"
 #include "config.h"
 #include "error.h"
 #include "insn_queue_lib.h"
@@ -33,7 +33,10 @@
 
 /* clang-format off */
 
-static unsigned char ulp_prologue[ULP_NOPS_LEN] = {
+/** Size of each instructions, in bytes.  */
+#define INSN_SIZE 4
+
+static unsigned char ulp_prologue[INSN_SIZE * PRE_NOPS_LEN] = {
   0x02, 0x10, 0x40, 0x3c,    // lis     r2,4098
   0x00, 0x7f, 0x42, 0x38,    // addi    r2,r2,32512
   0x22, 0x11, 0x80, 0x3d,    // lis     r12,0x1122
@@ -54,12 +57,20 @@ static unsigned char ulp_prologue[ULP_NOPS_LEN] = {
   0x20, 0x00, 0x80, 0x4e,    // blr
 };
 
+/** The NOP instruction.  */
 static const unsigned char gNop[] = { 0x00, 0x00, 0x00, 0x60 };
 
+/** Generate a branch (b) instruction according to offset.  */
+static uint32_t
+generate_branch_to_prologue(int32_t offset)
+{
+  return (offset & 0x00FFFFFF) | (0x4B << 24);
+}
+
+#define WITH_OFFSET(x) (-(INSN_SIZE * PRE_NOPS_LEN + (offset)))
+#define WITHOUT_OFFSET WITH_OFFSET(0)
+
 /* clang-format on */
-
-static hash_t insn_memory = NULL;
-
 
 /** @brief Copy the ulp proglogue layout into the function to be patched's
  * prologue
@@ -71,30 +82,64 @@ static hash_t insn_memory = NULL;
 static void
 ulp_patch_prologue_layout(void *old_fentry, void *new_fentry, const unsigned char *prologue, int len)
 {
+  (void) len;
+
   /* Create a copy of the prologue.  */
-  unsigned char prolog[ULP_NOPS_LEN];
-  memcpy(prolog, prologue, len);
+  unsigned char prolog[INSN_SIZE*PRE_NOPS_LEN];
+  _Static_assert(sizeof(prolog) == sizeof(ulp_prologue),
+                 "Prologue sizes do not match");
+  memcpy(prolog, prologue, sizeof(prolog));
 
   unsigned char new_fentry_bytes[sizeof(void*)];
   memcpy(new_fentry_bytes, &new_fentry, sizeof(new_fentry_bytes));
 
-  /* Remember what instructions was there when patching.  */
-  if (hash_get_entry(insn_memory, old_fentry) == NULL) {
-    void *value;
-    memcpy(&value, old_fentry, 8);
-    hash_insert_single(&insn_memory, old_fentry, value);
-  }
-
+  /* Patch the code with the address of the function we want to be redirected.  */
   prolog[8]  = new_fentry_bytes[6];
   prolog[9]  = new_fentry_bytes[7];
-  prolog[16]  = new_fentry_bytes[4];
-  prolog[17]  = new_fentry_bytes[5];
+  prolog[16] = new_fentry_bytes[4];
+  prolog[17] = new_fentry_bytes[5];
   prolog[24] = new_fentry_bytes[2];
   prolog[25] = new_fentry_bytes[3];
   prolog[36] = new_fentry_bytes[0];
   prolog[37] = new_fentry_bytes[1];
 
-  insnq_insert_write(old_fentry, len, prolog);
+  /* Point to the prologue.  */
+  char *fentry_prologue = old_fentry - INSN_SIZE * PRE_NOPS_LEN;
+  insnq_insert_write(fentry_prologue, INSN_SIZE * PRE_NOPS_LEN, prolog);
+}
+
+/** @brief Get the offset of the NOP instruction.
+ *
+ * Some function do not have a global entry point prologue, that means
+ * the NOP instruction is placed at the same address as the calling point.
+ * We have to figure out which case we are handling.
+ */
+static int
+get_branch_offset(void *fentry)
+{
+  int valid_offsets[] = {
+    0, // NOP located at the calling point.
+    8, // func with global entry point, NOP is located 8 bytes after it.
+  };
+
+  for (unsigned i = 0; i < ARRAY_LENGTH(valid_offsets); i++) {
+    int offset = valid_offsets[i];
+    void *fpos = (void *) ((char *)fentry + offset);
+
+    /* Generate a branch instruction to the begining of the NOP prologue.  */
+    uint32_t branch = generate_branch_to_prologue(WITH_OFFSET(offset));
+
+    /* There are two cases we must check:
+        - Function not livepatched: have a NOP insn here.
+        - Function is livepatched: have a B (branch) insn here.  */
+    if (memcmp(fpos, gNop, sizeof(gNop)) == 0 ||
+        memcmp(fpos, &branch, sizeof(branch)) == 0) {
+      return offset;
+    }
+  }
+
+  /* Not valid.  */
+  return -INT_MAX;
 }
 
 /** @brief skip the ulp prologue.
@@ -111,27 +156,43 @@ ulp_patch_prologue_layout(void *old_fentry, void *new_fentry, const unsigned cha
  *
  * @param fentry        Address to write the prologue to.
  */
-void
+static int
 ulp_skip_prologue(void *fentry)
 {
-  unsigned char prolog[ULP_NOPS_LEN];
-
-  struct hash_entry *entry = hash_get_entry(insn_memory, fentry);
-  libpulp_assert(entry);
-
-  memcpy(prolog, &entry->value, 8);
-
-  /* Assemble the absolute address in the instructions.  Little endian, so
-     bytes are inverted.  */
-  unsigned char *dst = prolog + 8;
-  while (dst - prolog < ULP_NOPS_LEN) {
-    libpulp_assert(dst - prolog < ULP_NOPS_LEN);
-    memcpy(dst, gNop, sizeof(gNop));
-    dst += sizeof(gNop);
+  int offset = get_branch_offset(fentry);
+  if (offset < 0) {
+    return ENOPATCHABLE;
   }
 
-  insnq_insert_write(fentry, ULP_NOPS_LEN, prolog);
+  unsigned char *dst = (unsigned char *)fentry + get_branch_offset(fentry);
+  insnq_insert_write(dst, sizeof(gNop), gNop);
+
+  return 0;
 }
+
+/** @brief Insert the backwards jump to the NOP prologue.
+ *
+ * When a function gets live patch, the nops at its entry point get replaced
+ * with a backwards-jump to a small segment of code that redirects execution to
+ * the new version of the function. This function does exactly this.
+ *
+ * @param fentry        Address to write the prologue to.
+ */
+static int
+ulp_patch_addr_trampoline(void *old_fentry)
+{
+  int offset = get_branch_offset(old_fentry);
+  if (offset < 0) {
+    return ENOPATCHABLE;
+  }
+
+  uint32_t branch = generate_branch_to_prologue(WITH_OFFSET(offset));
+  char *dst = (char *)old_fentry + offset;
+  insnq_insert_write(dst, sizeof(branch), &branch);
+
+  return 0;
+}
+
 
 /** @brief Actually patch the old function with the new function
  *
@@ -148,31 +209,16 @@ ulp_skip_prologue(void *fentry)
 int
 ulp_patch_addr(void *old_faddr, void *new_faddr, int enable)
 {
-  if (insn_memory == NULL) {
-    insn_memory = hash_table_create(0);
-  }
-
   unsigned char *dst = (unsigned char *) old_faddr;
 
+  int ret = 0;
+
   if (enable) {
-    ulp_patch_prologue_layout(dst, new_faddr, ulp_prologue, ULP_NOPS_LEN);
+    ulp_patch_prologue_layout(dst, new_faddr, ulp_prologue, 4*ULP_NOPS_LEN);
+    ret = ulp_patch_addr_trampoline(dst);
   } else {
-    ulp_skip_prologue(dst);
+    ret = ulp_skip_prologue(dst);
   }
 
-  return 0;
-}
-
-
-void save_to_register(void *target)
-{
-  (void) target;
-/*
-  asm (
-    "mr %0, %%r31;"
-    :
-    : "r" (target)
-    :
-  );
-*/
+  return ret;
 }

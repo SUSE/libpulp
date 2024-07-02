@@ -176,14 +176,3 @@ ulp_patch_addr(void *old_faddr, void *new_faddr, int enable)
 
   return 0;
 }
-
-
-void save_to_register(void *target)
-{
-  asm (
-    "movq %0, %%r11;"
-    :
-    : "r" (target)
-    :
-  );
-}

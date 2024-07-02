@@ -1053,9 +1053,6 @@ __ulp_manage_universes(unsigned long idx)
   }
   if (!target)
     target = root->patched_addr + 2;
-
-  /* Save to r11 for later use in __ulp_prologue subroutine.  */
-  save_to_register(target);
 }
 
 /** @brief Get next root index and update the global counter.
