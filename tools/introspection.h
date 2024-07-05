@@ -28,15 +28,7 @@
 #include "error_common.h"
 #include "ptrace.h"
 #include "ulp_common.h"
-
-/* Program load bias, which can be recovered by running `ld --verbose`.  */
-#if defined(__x86_64__)
-# define EXECUTABLE_START      0x400000UL
-#elif defined(__powerpc64__)
-# define EXECUTABLE_START      0x10000000UL
-#else
-# error "Unknown executable load address"
-#endif
+#include "arch_common.h"
 
 extern int ulp_verbose;
 extern int ulp_quiet;

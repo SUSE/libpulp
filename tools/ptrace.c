@@ -43,21 +43,12 @@
 #include "introspection.h"
 #include "ptrace.h"
 #include "ulp_common.h"
+#include "arch_common.h"
 
 /** Set an amout of time to retry to read/write target process memory before
     giving up. The process could be being patched or analyzed by another ulp
     instance.  */
 #define PTRACE_TIMEOUT 5
-
-/*
- * Number of bytes that the kernel subtracts from the program counter,
- * when an ongoing syscall gets interrupted and must be restarted.
- */
-#if defined(__x86_64__)
-# define RESTART_SYSCALL_SIZE 2
-#elif defined(__powerpc64__)
-# define RESTART_SYSCALL_SIZE 0
-#endif
 
 /** Timeout for run_and_redirect function.  Set default to 200s.  */
 static long rr_timeout = 200;

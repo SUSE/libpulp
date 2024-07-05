@@ -23,10 +23,13 @@
 #include <libelf.h>
 #include <assert.h>
 #include <string.h>
+#include <gelf.h>
+#include <link.h>
 
 #include "ulp_common.h"
 #include "post.h"
-#include "arch/x86_64/common.h"
+#include "arch_common.h"
+#include "ptrace.h"
 
 extern Elf *elf;
 
@@ -98,4 +101,33 @@ merge_nops_at_addr(Elf64_Addr addr, size_t amount)
       return;
     }
   }
+}
+
+/** @brief Check if function at `sym_address` has the NOP preamble.
+ *
+ * Functions that are livepatchable has ULP_NOPS_LEN - PRE_NOPS_LEN at the
+ * beginning of the function. Check the existence of this preamble.
+ *
+ * @param sym_address  Address of function in target process.
+ * @param pid          Pid of the target process.
+ *
+ * @return  True if preamble exists, false if not.
+ */
+bool
+check_preamble(ElfW(Addr) sym_address, pid_t pid)
+{
+  unsigned char bytes[2];
+
+  if (read_memory((char *)bytes, 2, pid, sym_address)) {
+    /* In case it was unable to read the symbol due to permission error, just
+     * warn in debug output.  */
+    DEBUG("Unable to read symbol preamble at address %lx in process %d",
+          sym_address, pid);
+    return false;
+  }
+
+  /* Check for NOP NOP or XGCH AX, AX.  */
+  if ((bytes[0] == 0x90 || bytes[0] == 0x66) && bytes[1] == 0x90)
+    return true;
+  return false;
 }

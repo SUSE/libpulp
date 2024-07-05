@@ -37,7 +37,7 @@ libpulp_la_LDFLAGS = \
 
 libpulp_la_LIBADD = $(top_builddir)/common/libcommon.la
 
-AM_CFLAGS += -I$(top_srcdir)/include
+AM_CFLAGS += -I$(top_srcdir)/include -I$(top_srcdir)/include/arch/$(target_cpu)
 
 # Add -fno-strict-alias to the insn_queue code.
 insn_queue.lo : CFLAGS += -fno-strict-aliasing

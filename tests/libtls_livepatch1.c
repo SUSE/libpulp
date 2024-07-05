@@ -32,6 +32,8 @@ static char *ulpr_string = "String from live patch";
 
 void *__tls_get_addr(tls_index *);
 
+#define SWAP(a,b) { typeof(a) _t = (a); (a) = (b); (b) = _t; }
+
 void
 new_banner_set(__attribute__((unused)) char *new)
 {

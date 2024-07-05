@@ -23,9 +23,12 @@
 #include <libelf.h>
 #include <assert.h>
 #include <string.h>
+#include <gelf.h>
+#include <link.h>
 
 #include "ulp_common.h"
 #include "post.h"
+#include "ptrace.h"
 
 /*
  * On POWER all instructions are 4 bytes long, so there is no need
@@ -36,4 +39,37 @@ merge_nops_at_addr(Elf64_Addr addr, size_t amount)
 {
   (void) addr;
   (void) amount;
+}
+
+/** @brief Check if function at `sym_address` has the NOP preamble.
+ *
+ * Functions that are livepatchable has ULP_NOPS_LEN - PRE_NOPS_LEN at the
+ * beginning of the function. Check the existence of this preamble.
+ *
+ * @param sym_address  Address of function in target process.
+ * @param pid          Pid of the target process.
+ *
+ * @return  True if preamble exists, false if not.
+ */
+bool
+check_preamble(ElfW(Addr) sym_address, pid_t pid)
+{
+  unsigned char bytes[12]; // 3 instructions
+
+  if (read_memory((char *)bytes, sizeof(bytes), pid, sym_address)) {
+    /* In case it was unable to read the symbol due to permission error, just
+     * warn in debug output.  */
+    DEBUG("Unable to read symbol preamble at address %lx in process %d",
+          sym_address, pid);
+    return false;
+  }
+
+  const unsigned char nop[] = { 0x00, 0x00, 0x00, 0x60 };
+
+  /* Check if first or third insn is a NOP..  */
+  if (memcmp(bytes, nop, sizeof(nop)) == 0 ||
+      memcmp(bytes + 8, nop, sizeof(nop)) == 0) {
+    return true;
+  }
+  return false;
 }

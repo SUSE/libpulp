@@ -40,6 +40,7 @@
 #include "interpose.h"
 #include "msg_queue.h"
 #include "ulp.h"
+#include "arch_common.h"
 
 /* ulp data structures */
 struct ulp_patching_state __ulp_state = { 0, NULL };
@@ -710,7 +711,8 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
       patch_address = patch_base + ref->patch_offset;
     }
     if (ref->tls) {
-      tls_index ti = { .ti_module = tls_idx, .ti_offset = ref->target_offset };
+      tls_index ti = { .ti_module = tls_idx,
+                       .ti_offset = ref->target_offset - TLS_DTV_OFFSET };
       memcpy((void *)patch_address, &ti, sizeof(ti));
     }
     else {

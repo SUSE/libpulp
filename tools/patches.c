@@ -393,56 +393,6 @@ print_lib_patches(struct ulp_applied_patch *patch, const char *libname)
   }
 }
 
-/** @brief Check if function at `sym_address` has the NOP preamble.
- *
- * Functions that are livepatchable has ULP_NOPS_LEN - PRE_NOPS_LEN at the
- * beginning of the function. Check the existence of this preamble.
- *
- * @param sym_address  Address of function in target process.
- * @param pid          Pid of the target process.
- *
- * @return  True if preamble exists, false if not.
- */
-static bool
-check_preamble(ElfW(Addr) sym_address, pid_t pid)
-{
-#ifdef __x86_64__
-  unsigned char bytes[2];
-
-  if (read_memory((char *)bytes, 2, pid, sym_address)) {
-    /* In case it was unable to read the symbol due to permission error, just
-     * warn in debug output.  */
-    DEBUG("Unable to read symbol preamble at address %lx in process %d",
-          sym_address, pid);
-    return false;
-  }
-
-  /* Check for NOP NOP or XGCH AX, AX.  */
-  if ((bytes[0] == 0x90 || bytes[0] == 0x66) && bytes[1] == 0x90)
-    return true;
-  return false;
-#elif defined(__powerpc64__)
-  unsigned char bytes[8];
-
-  if (read_memory((char *)bytes, sizeof(bytes), pid, sym_address)) {
-    /* In case it was unable to read the symbol due to permission error, just
-     * warn in debug output.  */
-    DEBUG("Unable to read symbol preamble at address %lx in process %d",
-          sym_address, pid);
-    return false;
-  }
-
-  const unsigned char nop[] = { 0x00, 0x00, 0x00, 0x60 };
-
-  /* Check for NOP NOP or XGCH AX, AX.  */
-  if (memcmp(bytes, nop, sizeof(nop)) == 0 &&
-      memcmp(bytes + 4, nop, sizeof(nop)) == 0) {
-    return true;
-  }
-  return false;
-#endif
-}
-
 /** @brief Check if `libname` has a livepatch loaded.
  *
  * Check if the library with name `libname` has a livepatch loaded in the
@@ -472,6 +422,20 @@ has_livepatch_loaded(struct ulp_applied_patch *patch, const char *libname)
 
   return false;
 }
+
+/** @brief Check if function at `sym_address` has the NOP preamble.
+ *
+ * Functions that are livepatchable has ULP_NOPS_LEN - PRE_NOPS_LEN at the
+ * beginning of the function. Check the existence of this preamble.
+ *
+ * This function is arch specific.
+ *
+ * @param sym_address  Address of function in target process.
+ * @param pid          Pid of the target process.
+ *
+ * @return  True if preamble exists, false if not.
+ */
+bool check_preamble(ElfW(Addr) sym_address, pid_t pid);
 
 /** @brief Check if library in `obj` on target process is livepatchable.
  *
