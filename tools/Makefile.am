@@ -55,12 +55,13 @@ ulp_SOURCES = \
   pcqueue.c \
   extract.c \
   set_patchable.c \
-  insn_queue.c
+  insn_queue.c \
+  arch/$(target_cpu)/post-arch.c
 
 ulp_LDADD = $(top_builddir)/common/libcommon.la -lelf -ljson-c -lpthread -ldl $(LIBUNWIND_LIBS)
 
 # Ensure access to the include directory
-AM_CFLAGS += -I$(abs_top_srcdir)/include
+AM_CFLAGS += -I$(abs_top_srcdir)/include -I$(top_srcdir)/include/arch/$(target_cpu)
 
 # Add -fno-strict-alias to the insn_queue code.
 insn_queue.$(OBJEXT) : CFLAGS += -fno-strict-aliasing

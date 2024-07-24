@@ -36,7 +36,7 @@ static int
 run_enable_disable_patching(struct ulp_process *p)
 {
   struct ulp_thread *thread = p->main_thread;
-  struct user_regs_struct context = thread->context;
+  registers_t context = thread->context;
   Elf64_Addr routine = p->dynobj_libpulp->enable_disable_patching;
 
   int ret = run_and_redirect(thread->tid, &context, routine);
@@ -45,7 +45,7 @@ run_enable_disable_patching(struct ulp_process *p)
     return ret;
   }
 
-  return context.rax;
+  return FUNCTION_RETURN_REG(context);
 }
 
 /** @brief Enable or disable livepatching on remote process.

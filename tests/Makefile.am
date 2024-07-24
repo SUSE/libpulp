@@ -469,7 +469,7 @@ parameters_LDADD = libparameters.la
 parameters_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
 process_SOURCES = process.c
-process_CFLAGS = -fpatchable-function-entry=16,14 $(AM_CFLAGS)
+process_CFLAGS = -fpatchable-function-entry=$(ULP_NOPS_LEN),$(PRE_NOPS_LEN) $(AM_CFLAGS)
 process_DEPENDENCIES = $(POST_PROCESS)
 process_LDFLAGS = $(AM_LDFLAGS)
 
@@ -552,7 +552,7 @@ buildid_LDADD = libbuildid.la
 buildid_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
 process_access_SOURCES = process_access.c
-process_access_CFLAGS = -fpatchable-function-entry=16,14 $(AM_CFLAGS)
+process_access_CFLAGS = -fpatchable-function-entry=$(ULP_NOPS_LEN),$(PRE_NOPS_LEN) $(AM_CFLAGS)
 process_access_DEPENDENCIES = $(POST_PROCESS)
 
 manyprocesses_SOURCES = manyprocesses.c
@@ -571,7 +571,7 @@ pcqueue_SOURCES = pcqueue.c
 pcqueue_LDADD = -lpthread
 
 comments_SOURCES = comments.c
-comments_CFLAGS = -fpatchable-function-entry=16,14 $(AM_CFLAGS)
+comments_CFLAGS = -fpatchable-function-entry=$(ULP_NOPS_LEN),$(PRE_NOPS_LEN) $(AM_CFLAGS)
 comments_LDADD =
 
 # block_mprotect is a auxiliary program to block page flags change through
@@ -581,7 +581,8 @@ block_mprotect_CFLAGS = $(AM_CFLAGS) -I/usr/include/libseccomp/
 block_mprotect_LDADD = -lseccomp
 
 insn_queue_SOURCES = insn_queue.c
-insn_queue_CFLAGS = $(AM_CFLAGS) -I$(srcdir)/../include -I$(srcdir)/../tools/include
+insn_queue_CFLAGS = $(AM_CFLAGS) -I$(top_srcdir)/include -I$(top_srcdir)/tools/include \
+                    -I$(top_srcdir)/include/arch/$(target_cpu)
 insn_queue_LDADD =
 
 chroot_SOURCES = chroot.c

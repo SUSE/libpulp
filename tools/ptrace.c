@@ -44,17 +44,12 @@
 #include "introspection.h"
 #include "ptrace.h"
 #include "ulp_common.h"
+#include "arch_common.h"
 
 /** Set an amout of time to retry to read/write target process memory before
     giving up. The process could be being patched or analyzed by another ulp
     instance.  */
 #define PTRACE_TIMEOUT 5
-
-/*
- * Number of bytes that the kernel subtracts from the program counter,
- * when an ongoing syscall gets interrupted and must be restarted.
- */
-#define RESTART_SYSCALL_SIZE 2
 
 /** Timeout for run_and_redirect function.  Set default to 200s.  */
 static long rr_timeout = 200;
@@ -452,7 +447,7 @@ detach(int pid)
 }
 
 int
-get_regs(int pid, struct user_regs_struct *regs)
+get_regs(int pid, registers_t *regs)
 {
   if (ulp_ptrace(PTRACE_GETREGS, pid, NULL, regs)) {
     DEBUG("PTRACE_GETREGS error: %s.\n", strerror(errno));
@@ -462,7 +457,7 @@ get_regs(int pid, struct user_regs_struct *regs)
 }
 
 int
-set_regs(int pid, struct user_regs_struct *regs)
+set_regs(int pid, registers_t *regs)
 {
   if (ulp_ptrace(PTRACE_SETREGS, pid, NULL, regs)) {
     DEBUG("PTRACE_SETREGS error: %s.\n", strerror(errno));
@@ -488,7 +483,7 @@ set_run_and_redirect_timeout(long t)
 }
 
 int
-run_and_redirect(int pid, struct user_regs_struct *regs, ElfW(Addr) routine)
+run_and_redirect(int pid, registers_t *regs, ElfW(Addr) routine)
 {
   int status;
   time_t t0, t1;
@@ -511,7 +506,11 @@ run_and_redirect(int pid, struct user_regs_struct *regs, ElfW(Addr) routine)
    * as from a few bytes before it. As such, they start with a few
    * nops, which are skipped below.
    */
-  regs->rip = routine + RESTART_SYSCALL_SIZE;
+  PROGRAM_COUNTER_REG(*regs) = routine + RESTART_SYSCALL_SIZE;
+
+  /* Machines with global entrypoint register must set it to the function
+     we are going to call.  */
+  SET_GLOBAL_ENTRYPOINT_REG(*regs, PROGRAM_COUNTER_REG(*regs));
 
   /*
    * Even though libpulp does not register signal handlers with the
@@ -528,7 +527,7 @@ run_and_redirect(int pid, struct user_regs_struct *regs, ElfW(Addr) routine)
    * handler registering, it cannot rely on this kernel feature, so it
    * must adjust the stack on its own.
    */
-  regs->rsp -= RED_ZONE_LEN;
+  STACK_TOP_REG(*regs) -= RED_ZONE_LEN;
 
   /*
    * The ABI for AMD64 requires that the stack pointer be aligned on a
@@ -545,7 +544,7 @@ run_and_redirect(int pid, struct user_regs_struct *regs, ElfW(Addr) routine)
    * highest boundary, before transfering control to the live patching
    * routines in ulp_interface.S.
    */
-  regs->rsp &= 0xFFFFFFFFFFFFFFC0;
+  STACK_TOP_REG(*regs) &= 0xFFFFFFFFFFFFFFC0;
 
   if (ulp_ptrace(PTRACE_SETREGS, pid, NULL, regs)) {
     WARN("PTRACE_SETREGS error (pid %d).\n", pid);

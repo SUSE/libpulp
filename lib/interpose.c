@@ -41,6 +41,7 @@
 #include "msg_queue.h"
 #include "ulp.h"
 #include "ulp_common.h"
+#include "arch_common.h"
 
 /* This header should be included last, as it poisons some symbols.  */
 #include "error.h"
@@ -393,8 +394,7 @@ get_ld_global_locks()
   const char *tok;
   int major, minor;
 
-  void *rtld_global =
-      get_loaded_symbol_addr("ld-linux-x86-64.so.2", "_rtld_global", NULL);
+  void *rtld_global = get_loaded_symbol_addr(LD_LINUX, "_rtld_global", NULL);
   if (!rtld_global) {
     libpulp_crash("symbol _rtld_global not found in ld-linux-x86_64.so\n");
   }
