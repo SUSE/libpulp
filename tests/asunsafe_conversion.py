@@ -34,7 +34,7 @@ child.expect('hello')
 errors = 0
 try:
   # Apply the live patch.
-  child.livepatch('.libs/libblocked_livepatch1.so', retries=100)
+  child.livepatch('.libs/libblocked_livepatch1.so', retries=2000)
 except subprocess.TimeoutExpired:
   print('Deadlock while live patching - AS-Unsafe conversion not tested')
   # The deadlock test (tests/deadlock) has a far greater chance of

@@ -15,7 +15,7 @@ jobs:
 
     steps:
     - name: dependencies
-      run: zypper -n install clang git findutils
+      run: zypper -n install clang git findutils file
     - uses: actions/checkout@v2
     - name: format
       run: find -type f \( -name "*.[c|h]" -or -name "*.cc" \) -exec clang-format -style=file -i {} \;

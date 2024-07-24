@@ -23,16 +23,34 @@ libpulp_la_SOURCES = \
   ulp.c \
   interpose.c \
   msg_queue.c \
-  error.c \
-  arch/$(target_cpu)/ulp_interface.S \
-  arch/$(target_cpu)/patch.c
-libpulp_la_DEPENDENCIES= libpulp.versions
+  error.c
+
 libpulp_la_LDFLAGS = \
   -ldl \
-  -l:@_LD_LINUX@ \
   -Wl,--version-script=$(srcdir)/libpulp.versions \
   -Wl,--hash-style=sysv \ # Ubuntu seems to default to gnu, so be clear we ...
   $(AM_LDFLAGS) # ... want old style hash sections, else DT_HASH is empty.
+
+# Workaround a bug in Autoconf 2.69
+if CPU_X86_64
+libpulp_la_SOURCES += \
+  arch/x86_64/ulp_interface.S \
+  arch/x86_64/patch.c
+
+libpulp_la_LDFLAGS += \
+  -l:ld-linux-x86-64.so.2
+endif
+
+if CPU_PPC64LE
+libpulp_la_SOURCES += \
+  arch/powerpc64le/ulp_interface.S \
+  arch/powerpc64le/patch.c
+
+libpulp_la_LDFLAGS += \
+  -l:ld64.so.2
+endif
+
+libpulp_la_DEPENDENCIES= libpulp.versions
 
 libpulp_la_LIBADD = $(top_builddir)/common/libcommon.la
 

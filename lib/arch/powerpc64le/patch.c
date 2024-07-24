@@ -27,7 +27,6 @@
 
 #include "config.h"
 #include "error.h"
-#include "insn_queue_lib.h"
 #include "msg_queue.h"
 #include "ulp.h"
 
@@ -212,7 +211,7 @@ ulp_patch_addr(void *old_faddr, void *new_faddr, int enable)
   int ret = 0;
 
   if (enable) {
-    ulp_patch_prologue_layout(dst, new_faddr, ulp_prologue, 4*ULP_NOPS_LEN);
+    ulp_patch_prologue_layout(dst, new_faddr, ulp_prologue, INSN_SIZE * ULP_NOPS_LEN);
     ret = ulp_patch_addr_trampoline(dst);
   } else {
     ret = ulp_skip_prologue(dst);

@@ -27,3 +27,14 @@ noinst_HEADERS = \
 	terminal_colors.h \
 	ld_rtld.h \
 	insn_queue.h
+
+# Workaround a bug in Autoconf 2.69
+if CPU_X86_64
+noinst_HEADERS += \
+  arch/x86_64/arch_common.h
+endif
+
+if CPU_PPC64LE
+noinst_HEADERS += \
+  arch/powerpc64le/arch_common.h
+endif
