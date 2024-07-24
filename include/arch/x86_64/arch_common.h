@@ -28,9 +28,6 @@ typedef struct user_regs_struct registers_t;
 /** The red zone.  */
 #define RED_ZONE_LEN          128
 
-/** File name of the dynamic loader.  */
-#define LD_LINUX              "ld-linux-x86-64.so.2"
-
 /**
  * Number of bytes that the kernel subtracts from the program counter,
  * when an ongoing syscall gets interrupted and must be restarted.

@@ -26,8 +26,7 @@
 static char *banner = "Original banner";
 
 /* Noinline must be set, else no calls are issued.  */
-char *__attribute__((noinline)) banner_get(void) { printf("banner addr: 0x%lx\n", (unsigned long)banner); return banner; }
-
+char *__attribute__((noinline)) banner_get(void) { return banner; }
 
 /* Since clang-18 when compiling this function it is broken in two parts:
    banner_set and banner_set.specialized.1.  We don't want it on this test so

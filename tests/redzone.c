@@ -31,10 +31,10 @@
 int
 main(void)
 {
-  long int counter = LOOPS;
-  long int result1;
-  long int result2;
-  long int result3;
+  volatile long int counter = LOOPS;
+  volatile long int result1;
+  volatile long int result2;
+  volatile long int result3;
 
   /* Signal readiness. */
   printf("Waiting for input.\n");
@@ -47,6 +47,7 @@ main(void)
    */
   /* clang-format off */
   asm volatile (
+#if defined(__x86_64__)
     "movq $0, -0x08(%%rsp)\n"
     "movq $0, -0x78(%%rsp)\n"
     "movq $0, -0x80(%%rsp)\n"
@@ -60,6 +61,29 @@ main(void)
     "movq -0x08(%%rsp), %0\n"
     "movq -0x78(%%rsp), %1\n"
     "movq -0x80(%%rsp), %2\n"
+#elif defined(__powerpc64__)
+    "li %%r10, 0\n"
+    "stw %%r10, -0x08(%%r1)\n"
+    "stw %%r10, -0x78(%%r1)\n"
+    "stw %%r10, -0x80(%%r1)\n"
+    "loop:\n"
+    "li %%r10, 1\n"
+    "lwa %%r11, -0x08(%%r1)\n"
+    "add %%r11, %%r11, %%r10\n"
+    "stw %%r11, -0x08(%%r1)\n"
+    "lwa %%r11, -0x78(%%r1)\n"
+    "add %%r11, %%r11, %%r10\n"
+    "stw %%r11, -0x78(%%r1)\n"
+    "lwa %%r11, -0x80(%%r1)\n"
+    "add %%r11, %%r11, %%r10\n"
+    "stw %%r11, -0x80(%%r1)\n"
+    "addi %3, %3, -1\n"
+    "cmpdi %%cr0, %3, 0\n"
+    "bne %%cr0, loop\n"
+    "lwz %0, -0x08(%%r1)\n"
+    "lwz %1, -0x78(%%r1)\n"
+    "lwz %2, -0x80(%%r1)\n"
+#endif
     : "=r"(result1), "=r"(result2), "=r"(result3), "+r"(counter)
   );
   /* clang-format on */
