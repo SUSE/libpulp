@@ -24,8 +24,8 @@ libpulp_la_SOURCES = \
   interpose.c \
   msg_queue.c \
   error.c \
-  ulp_prologue.S \
-  ulp_interface.S
+  arch/$(target_cpu)/ulp_interface.S \
+  arch/$(target_cpu)/patch.c
 libpulp_la_DEPENDENCIES= libpulp.versions
 libpulp_la_LDFLAGS = \
   -ldl \
@@ -36,6 +36,6 @@ libpulp_la_LDFLAGS = \
 
 libpulp_la_LIBADD = $(top_builddir)/common/libcommon.la
 
-AM_CFLAGS += -I$(top_srcdir)/include
+AM_CFLAGS += -I$(top_srcdir)/include -I$(top_srcdir)/include/arch/$(target_cpu)
 
 EXTRA_DIST = libpulp.versions

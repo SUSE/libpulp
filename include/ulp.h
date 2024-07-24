@@ -81,6 +81,8 @@ int __ulp_apply_patch();
 void __ulp_print();
 
 /* functions */
+void *memwrite(void *dest, const void *src, size_t n);
+
 void free_metadata(struct ulp_metadata *ulp);
 
 int unload_handlers(struct ulp_metadata *ulp);
