@@ -55,8 +55,18 @@ ulp_SOURCES = \
   pcqueue.c \
   extract.c \
   set_patchable.c \
-  insn_queue.c \
-  arch/$(target_cpu)/post-arch.c
+  insn_queue.c
+
+# Workaround a bug in Autoconf 2.69
+if CPU_X86_64
+ulp_SOURCES += \
+  arch/x86_64/post-arch.c
+endif
+
+if CPU_PPC64LE
+ulp_SOURCES += \
+  arch/powerpc64le/post-arch.c
+endif
 
 ulp_LDADD = $(top_builddir)/common/libcommon.la -lelf -ljson-c -lpthread -ldl $(LIBUNWIND_LIBS)
 

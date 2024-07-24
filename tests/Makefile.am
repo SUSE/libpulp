@@ -559,8 +559,18 @@ manyprocesses_LDADD = libmanyprocesses.la
 manyprocesses_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
 dlsym_SOURCES = dlsym.c
-dlsym_LDADD = -lpthread -ldl -lrt -l:@_LD_LINUX@
+dlsym_LDADD = -lpthread -ldl -lrt
 dlsym_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
+
+# Workaround a bug in Autoconf 2.69
+if CPU_X86_64
+dlsym_LDADD += \
+  -l:ld-linux-x86-64.so.2
+endif
+if CPU_PPC64LE
+dlsym_LDADD += \
+  -l:ld64.so.2
+endif
 
 stress_SOURCES = stress.c
 stress_LDADD = libstress.la
