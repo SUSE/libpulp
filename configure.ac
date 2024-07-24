@@ -136,12 +136,6 @@ AX_PYTHON_MODULE([psutil], [fatal])
 AC_SUBST([AM_CFLAGS], ["-Wall -Wextra -Werror"])
 AC_SUBST([AM_CCASFLAGS], ["-Wa,--fatal-warnings"])
 
-# Use the glibc versions installed on path
-AC_ARG_WITH([glibc],
-AS_HELP_STRING([--with-glibc=GLIBC_PATH],[Use the glibc installed on GLIBC_PATH, where the .so file is present]),
-[AC_SUBST([AM_LDFLAGS], ["-Wl,--dynamic-linker=$with_glibc/ld-linux-x86-64.so.2 -Wl,--rpath=$with_glibc/"])],
-[])
-
 # Checking the call stack of all threads enables libpulp to only apply a live
 # patch when no threads sit within the target library.
 AC_ARG_ENABLE(stack-check,
@@ -223,13 +217,56 @@ AC_SUBST([PAGE_SIZE], [$($GETCONF PAGE_SIZE)]))
 # before the entry point, and the remaining nops after it. At running time,
 # whenever a live patch is applied, libpulp replaces the remaining nops with
 # instructions that redirect execution to the universe handling routines.
-AC_SUBST([ULP_NOPS_LEN], [16])
-AC_SUBST([PRE_NOPS_LEN], [14])
+_NOPS_LEN=0
+_PRE_NOPS_LEN=0
+
+AS_CASE([$host_cpu],
+        [x86_64],
+        [
+          _NOPS_LEN=16
+          _PRE_NOPS_LEN=14
+        ],
+        [powerpc64le],
+        [
+          _NOPS_LEN=17
+          _PRE_NOPS_LEN=16
+        ]
+)
+
+AC_SUBST([ULP_NOPS_LEN], [$_NOPS_LEN])
+AC_SUBST([PRE_NOPS_LEN], [$_PRE_NOPS_LEN])
 
 AC_DEFINE_UNQUOTED([ULP_NOPS_LEN], [$ULP_NOPS_LEN],
 [Total number of padding nops])
 AC_DEFINE_UNQUOTED([PRE_NOPS_LEN], [$PRE_NOPS_LEN],
 [Padding nops before the entry point of functions])
+
+_LD_LINUX=""
+AC_CHECK_FILE("/usr/lib64/ld-linux-x86-64.so.2",
+              AC_SUBST([_LD_LINUX], "ld-linux-x86-64.so.2"))
+AC_CHECK_FILE("/usr/lib64/ld64.so.2",
+              AC_SUBST([_LD_LINUX], "ld64.so.2"))
+
+AC_DEFINE_UNQUOTED([LD_LINUX], ["$_LD_LINUX"], [Path to the ld-linux loader] )
+
+# Use the glibc versions installed on path
+AC_ARG_WITH([glibc],
+AS_HELP_STRING([--with-glibc=GLIBC_PATH],[Use the glibc installed on GLIBC_PATH, where the .so file is present]),
+[AC_SUBST([AM_LDFLAGS], ["-Wl,--dynamic-linker=$with_glibc/$_LD_LINUX -Wl,--rpath=$with_glibc/"])],
+[])
+
+# Check if -fpatchable-function-entry=$ULP_NOPS_LEN,$PRE_NOPS_LEN works
+# correctly.
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
+  [[extern void g(void);
+    __attribute__((patchable_function_entry($_NOPS_LEN, $_PRE_NOPS_LEN)))
+    void f(void) { g(); }]])],
+  [patchable_works=yes],
+  [patchable_works=no])
+
+AS_IF([test "x$patchable_works" == "xno"],
+AC_MSG_ERROR(
+[The -fpatchable-functions-entry flag of your C compiler does not work correctly]))
 
 AC_CONFIG_FILES([Makefile
 		 include/Makefile

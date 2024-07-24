@@ -29,6 +29,12 @@ banner_get(void)
   return banner;
 }
 
+char **
+banner_get_ref(void)
+{
+  return &banner;
+}
+
 void
 banner_set(char *new)
 {
