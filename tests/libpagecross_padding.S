@@ -27,5 +27,4 @@
  */
 .set FILL_SIZE, PAGE_SIZE-16
 .section .text
-.align PAGE_SIZE
 .fill FILL_SIZE, 1, 0xCC

@@ -31,7 +31,8 @@
 static pthread_t threads[NUM_THREADS];
 static pthread_barrier_t barrier;
 
-char *banner_get();
+char *banner_get(void);
+char **banner_get_ref(void);
 void banner_set(char *);
 
 /* On two threads this should work.  If more, race conditions will appear.  */
@@ -51,7 +52,7 @@ thread_func(void *arg)
   }
 
   /* Original banner. */
-  printf("Banner addr: 0x%lX\n", (unsigned long)banner_get());
+  printf("Banner addr: 0x%lX\n", (unsigned long)banner_get_ref());
   printf("%s\n", banner_get());
 
   sprintf(buf, "Banner changed from thread_func: %lu\n", i);
