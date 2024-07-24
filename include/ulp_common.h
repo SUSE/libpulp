@@ -35,7 +35,6 @@
  * scenarios.  */
 #define ULP_METADATA_BUF_LEN (512 * 1024)
 #define ULP_PATH_LEN 256
-#define RED_ZONE_LEN 128
 
 #define ARRAY_LENGTH(v) (sizeof(v) / sizeof(*(v)))
 

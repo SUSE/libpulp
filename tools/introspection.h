@@ -28,6 +28,7 @@
 #include "error_common.h"
 #include "ptrace.h"
 #include "ulp_common.h"
+#include "arch_common.h"
 
 extern int ulp_verbose;
 extern int ulp_quiet;
@@ -67,7 +68,7 @@ struct ulp_process
 struct ulp_thread
 {
   int tid;
-  struct user_regs_struct context;
+  registers_t context;
   int consistent;
   struct ulp_thread *next;
 };
