@@ -226,16 +226,21 @@ AC_SUBST([PAGE_SIZE], [$($GETCONF PAGE_SIZE)]))
 _NOPS_LEN=0
 _PRE_NOPS_LEN=0
 
-AS_CASE([$host_cpu],
+_LD_LINUX=""
+AS_CASE([$target_cpu],
         [x86_64],
         [
           _NOPS_LEN=16
           _PRE_NOPS_LEN=14
+          _LD_LINUX="ld-linux-x86-64.so.2"
+          _PROC="x86_64"
         ],
         [powerpc64le],
         [
           _NOPS_LEN=19
           _PRE_NOPS_LEN=18
+          _LD_LINUX="ld64.so.2"
+          _PROC="powerpc64le"
         ]
 )
 
@@ -247,15 +252,14 @@ AC_DEFINE_UNQUOTED([ULP_NOPS_LEN], [$ULP_NOPS_LEN],
 AC_DEFINE_UNQUOTED([PRE_NOPS_LEN], [$PRE_NOPS_LEN],
 [Padding nops before the entry point of functions])
 
-_LD_LINUX=""
-AC_CHECK_FILE("/usr/lib64/ld-linux-x86-64.so.2",
-              AC_SUBST([_LD_LINUX], "ld-linux-x86-64.so.2"))
-AC_CHECK_FILE("/usr/lib64/ld64.so.2",
-              AC_SUBST([_LD_LINUX], "ld64.so.2"))
+AC_DEFINE_UNQUOTED([LD_LINUX], ["$_LD_LINUX"],
+[Path to the ld-linux loader] )
 
-AC_DEFINE_UNQUOTED([LD_LINUX], ["$_LD_LINUX"], [Path to the ld-linux loader] )
+# Workaround a bug in autoconf 2.69
+AM_CONDITIONAL([CPU_X86_64],  [test "$_PROC" == "x86_64"])
+AM_CONDITIONAL([CPU_PPC64LE], [test "$_PROC" == "powerpc64le"])
 
-# Check if -fpatchable-function-entry=$ULP_NOPS_LEN,$PRE_NOPS_LEN works
+# Check if -fpatchable-function-entry=$ULP_NOPS_LEN,$RE_NOPS_LEN works
 # correctly.
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
   [[extern void g(void);
