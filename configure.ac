@@ -23,6 +23,9 @@ AC_INIT([libpulp],[0.3.5],[noreply@suse.com])
 AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_MACRO_DIRS([config])
 
+# For multiarch builds.
+AC_CANONICAL_TARGET
+
 # Check for the availability of macros from autoconf-archive.
 AC_MSG_CHECKING([autoconf-archive availability])
 m4_ifndef([AX_CHECK_COMPILE_FLAG], [ax_available="no"])
@@ -136,7 +139,7 @@ AC_SUBST([AM_CCASFLAGS], ["-Wa,--fatal-warnings"])
 # Use the glibc versions installed on path
 AC_ARG_WITH([glibc],
 AS_HELP_STRING([--with-glibc=GLIBC_PATH],[Use the glibc installed on GLIBC_PATH, where the .so file is present]),
-[AC_SUBST([AM_LDFLAGS], ["-Wl,--dynamic-linker=$with_glibc/ld-linux-x86-64.so.2 -Wl,--rpath=$with_glibc/"])],
+[AC_SUBST([AM_LDFLAGS], ["-Wl,--dynamic-linker=$with_glibc/ld-linux-${target_cpu//_/-}.so.2 -Wl,--rpath=$with_glibc/"])],
 [])
 
 # Checking the call stack of all threads enables libpulp to only apply a live
@@ -220,18 +223,54 @@ AC_SUBST([PAGE_SIZE], [$($GETCONF PAGE_SIZE)]))
 # before the entry point, and the remaining nops after it. At running time,
 # whenever a live patch is applied, libpulp replaces the remaining nops with
 # instructions that redirect execution to the universe handling routines.
-AC_SUBST([ULP_NOPS_LEN], [16])
-AC_SUBST([PRE_NOPS_LEN], [14])
+_NOPS_LEN=0
+_PRE_NOPS_LEN=0
 
-AC_SUBST([ULP_NOPS_LEN_ENDBR64], [$(expr $ULP_NOPS_LEN + 4)])
-AC_SUBST([PRE_NOPS_LEN_ENDBR64], [$(expr $PRE_NOPS_LEN + 4)])
+_LD_LINUX=""
+AS_CASE([$target_cpu],
+        [x86_64],
+        [
+          _NOPS_LEN=16
+          _PRE_NOPS_LEN=14
+          _LD_LINUX="ld-linux-x86-64.so.2"
+          _PROC="x86_64"
+        ],
+        [powerpc64le],
+        [
+          _NOPS_LEN=19
+          _PRE_NOPS_LEN=18
+          _LD_LINUX="ld64.so.2"
+          _PROC="powerpc64le"
+        ]
+)
+
+AC_SUBST([ULP_NOPS_LEN], [$_NOPS_LEN])
+AC_SUBST([PRE_NOPS_LEN], [$_PRE_NOPS_LEN])
 
 AC_DEFINE_UNQUOTED([ULP_NOPS_LEN], [$ULP_NOPS_LEN],
 [Total number of padding nops])
 AC_DEFINE_UNQUOTED([PRE_NOPS_LEN], [$PRE_NOPS_LEN],
 [Padding nops before the entry point of functions])
-AC_DEFINE_UNQUOTED([ULP_NOPS_LEN_ENDBR64], [$ULP_NOPS_LEN_ENDBR64],
-[Total number of padding nops when endbr64 is issued])
+
+AC_DEFINE_UNQUOTED([LD_LINUX], ["$_LD_LINUX"],
+[Path to the ld-linux loader] )
+
+# Workaround a bug in autoconf 2.69
+AM_CONDITIONAL([CPU_X86_64],  [test "$_PROC" == "x86_64"])
+AM_CONDITIONAL([CPU_PPC64LE], [test "$_PROC" == "powerpc64le"])
+
+# Check if -fpatchable-function-entry=$ULP_NOPS_LEN,$RE_NOPS_LEN works
+# correctly.
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
+  [[extern void g(void);
+    __attribute__((patchable_function_entry($_NOPS_LEN, $_PRE_NOPS_LEN)))
+    void f(void) { g(); }]])],
+  [patchable_works=yes],
+  [patchable_works=no])
+
+AS_IF([test "x$patchable_works" == "xno"],
+AC_MSG_ERROR(
+[The -fpatchable-functions-entry flag of your C compiler does not work correctly]))
 
 AC_CONFIG_FILES([Makefile
 		 include/Makefile

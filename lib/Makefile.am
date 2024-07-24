@@ -24,20 +24,38 @@ libpulp_la_SOURCES = \
   interpose.c \
   msg_queue.c \
   insn_queue.c \
-  error.c \
-  ulp_prologue.S \
-  ulp_interface.S
-libpulp_la_DEPENDENCIES= libpulp.versions
+  error.c
+
 libpulp_la_LDFLAGS = \
   -ldl \
-  -l:ld-linux-x86-64.so.2 \
   -Wl,--version-script=$(srcdir)/libpulp.versions \
   -Wl,--hash-style=sysv \ # Ubuntu seems to default to gnu, so be clear we ...
   $(AM_LDFLAGS) # ... want old style hash sections, else DT_HASH is empty.
 
+# Workaround a bug in Autoconf 2.69
+if CPU_X86_64
+libpulp_la_SOURCES += \
+  arch/x86_64/ulp_interface.S \
+  arch/x86_64/patch.c
+
+libpulp_la_LDFLAGS += \
+  -l:ld-linux-x86-64.so.2
+endif
+
+if CPU_PPC64LE
+libpulp_la_SOURCES += \
+  arch/powerpc64le/ulp_interface.S \
+  arch/powerpc64le/patch.c
+
+libpulp_la_LDFLAGS += \
+  -l:ld64.so.2
+endif
+
+libpulp_la_DEPENDENCIES= libpulp.versions
+
 libpulp_la_LIBADD = $(top_builddir)/common/libcommon.la
 
-AM_CFLAGS += -I$(top_srcdir)/include
+AM_CFLAGS += -I$(top_srcdir)/include -I$(top_srcdir)/include/arch/$(target_cpu)
 
 # Add -fno-strict-alias to the insn_queue code.
 insn_queue.lo : CFLAGS += -fno-strict-aliasing

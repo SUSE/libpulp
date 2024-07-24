@@ -32,6 +32,8 @@ static char *ulpr_string = "String from live patch";
 
 void *__tls_get_addr(tls_index *);
 
+#define SWAP(a,b) { typeof(a) _t = (a); (a) = (b); (b) = _t; }
+
 void
 new_banner_set(__attribute__((unused)) char *new)
 {
@@ -39,6 +41,7 @@ new_banner_set(__attribute__((unused)) char *new)
     errx(EXIT_FAILURE, "Live patch data references not initialized");
 
   char **ulpr_banner = __tls_get_addr(&ti);
+  printf("module: %lx, offset: %lx\n", ti.ti_module, ti.ti_offset);
   printf("addr: 0x%lx\n", (unsigned long)ulpr_banner);
   *ulpr_banner = ulpr_string;
 }

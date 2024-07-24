@@ -1,7 +1,7 @@
 /*
  *  libpulp - User-space Livepatching Library
  *
- *  Copyright (C) 2017-2021 SUSE Software Solutions GmbH
+ *  Copyright (C) 2017-2024 SUSE Software Solutions GmbH
  *
  *  This file is part of libpulp.
  *
@@ -38,36 +38,94 @@
  */
 
 .global __ulp_revert_all
+    nop
+    nop
 __ulp_revert_all:
     nop
     nop
-    call    __ulp_revert_patches_from_lib@PLT
-    int3
+    addis   2, 12, .TOC.-__ulp_revert_all@ha
+    addi    2, 2,  .TOC.-__ulp_revert_all@l
+    mflr    %r0
+    std     %r0,16(%r1)
+    stdu    %r1,-32(%r1)
+    bl      __ulp_revert_patches_from_lib
+    nop
+    addi    %r1,%r1,32
+    ld      %r0,16(%r1)
+    mtlr    %r0
+    trap
 
-.global __ulp_trigger
+.globl __ulp_trigger
+.type  __ulp_trigger, @function
+    nop
+    nop
 __ulp_trigger:
     nop
     nop
-    call    __ulp_apply_patch@PLT
-    int3
+    addis   2, 12, .TOC.-__ulp_trigger@ha
+    addi    2, 2,  .TOC.-__ulp_trigger@l
+    #.localentry     __ulp_trigger,.-__ulp_trigger
+    mflr    %r0
+    std     %r0,16(%r1)
+    stdu    %r1,-32(%r1)
+    bl      __ulp_apply_patch
+    nop
+    addi    %r1,%r1,32
+    ld      %r0,16(%r1)
+    mtlr    %r0
+    trap
 
 .global __ulp_check_patched
+    nop
+    nop
 __ulp_check_patched:
     nop
     nop
-    call   __ulp_check_applied_patch@PLT
-    int3
+    addis   2, 12, .TOC.-__ulp_check_patched@ha
+    addi    2, 2,  .TOC.-__ulp_check_patched@l
+    mflr    %r0
+    std     %r0,16(%r1)
+    stdu    %r1,-32(%r1)
+    bl      __ulp_check_applied_patch
+    nop
+    addi    %r1,%r1,32
+    ld      %r0,16(%r1)
+    mtlr    %r0
+    trap
 
 .global __ulp_get_global_universe
+    nop
+    nop
 __ulp_get_global_universe:
     nop
     nop
-    call   __ulp_get_global_universe_value@PLT
-    int3
+    addis   2, 12, .TOC.-__ulp_get_global_universe@ha
+    addi    2, 2,  .TOC.-__ulp_get_global_universe@l
+    mflr    %r0
+    std     %r0,16(%r1)
+    stdu    %r1,-32(%r1)
+    bl      __ulp_get_global_universe_value
+    nop
+    addi    %r1,%r1,32
+    ld      %r0,16(%r1)
+    mtlr    %r0
+    trap
+
 
 .global __ulp_enable_or_disable_patching
+    nop
+    nop
 __ulp_enable_or_disable_patching:
     nop
     nop
-    call ulp_enable_or_disable_patching@PLT
-    int3
+    addis   2, 12, .TOC.-__ulp_enable_or_disable_patching@ha
+    addi    2, 2,  .TOC.-__ulp_enable_or_disable_patching@l
+    mflr    %r0
+    std     %r0,16(%r1)
+    stdu    %r1,-32(%r1)
+    bl      ulp_enable_or_disable_patching
+    nop
+    addi    %r1,%r1,32
+    ld      %r0,16(%r1)
+    mtlr    %r0
+    trap

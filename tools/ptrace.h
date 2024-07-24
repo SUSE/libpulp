@@ -28,6 +28,7 @@
 #include <sys/wait.h>
 #include <stdbool.h>
 
+#include "arch_common.h"
 #include "ulp_common.h"
 
 /* System configuration options.  */
@@ -57,11 +58,11 @@ int attach(int pid);
 
 int detach(int pid);
 
-int get_regs(int pid, struct user_regs_struct *regs);
+int get_regs(int pid, registers_t *regs);
 
-int set_regs(int pid, struct user_regs_struct *regs);
+int set_regs(int pid, registers_t *regs);
 
 void set_run_and_redirect_timeout(long t);
 
-int run_and_redirect(int pid, struct user_regs_struct *regs,
+int run_and_redirect(int pid, registers_t *regs,
                      Elf64_Addr routine);
