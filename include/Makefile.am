@@ -28,3 +28,14 @@ noinst_HEADERS = \
 	ld_rtld.h \
 	insn_queue.h \
 	insn_queue_lib.h
+
+# Workaround a bug in Autoconf 2.69
+if CPU_X86_64
+noinst_HEADERS += \
+  arch/x86_64/arch_common.h
+endif
+
+if CPU_PPC64LE
+noinst_HEADERS += \
+  arch/powerpc64le/arch_common.h
+endif
