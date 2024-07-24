@@ -37,6 +37,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#include "config.h"
 #include "ld_rtld.h"
 #include "msg_queue.h"
 #include "ulp.h"
