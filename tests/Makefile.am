@@ -444,7 +444,6 @@ check_PROGRAMS = \
   pcqueue \
   comments \
   block_mprotect \
-  insn_queue \
   chroot \
   visibility
 
@@ -580,10 +579,6 @@ block_mprotect_SOURCES = block_mprotect.c
 block_mprotect_CFLAGS = $(AM_CFLAGS) -I/usr/include/libseccomp/
 block_mprotect_LDADD = -lseccomp
 
-insn_queue_SOURCES = insn_queue.c
-insn_queue_CFLAGS = $(AM_CFLAGS) -I$(srcdir)/../include -I$(srcdir)/../tools/include
-insn_queue_LDADD =
-
 chroot_SOURCES = chroot.c
 chroot_CFLAGS = $(AM_CFLAGS)
 chroot_LDADD = libparameters.la
@@ -643,7 +638,6 @@ TESTS = \
   mprotect_patch.py \
   patches.py \
   mprotect_patch.py \
-  insn_queue.py \
   chroot.py \
   visibility.py
 

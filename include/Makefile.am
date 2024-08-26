@@ -26,5 +26,4 @@ noinst_HEADERS = \
 	error_common.h \
 	terminal_colors.h \
 	ld_rtld.h \
-	insn_queue.h \
-	insn_queue_lib.h
+	insn_queue.h
