@@ -36,7 +36,6 @@
 
 #include "config.h"
 #include "error.h"
-#include "insn_queue_lib.h"
 #include "interpose.h"
 #include "msg_queue.h"
 #include "ulp.h"
@@ -87,6 +86,38 @@ begin(void)
 {
   __ulp_state.load_state = 1;
   msgq_push("libpulp loaded...\n");
+}
+
+/** @brief Write into memory bypassing memory protections
+ *
+ * The process may be launched with mprotect through seccomp, which
+ * will block certain addresses to be written.  This function
+ * circunvent this by writing through /proc/self/map.
+ *
+ * @param dest    Destination address
+ * @param src     Source address
+ * @param n       number of bytes
+ * @return dest on success, NULL if error.
+ */
+void *
+memwrite(void *dest, const void *src, size_t n)
+{
+  FILE *file = fopen("/proc/self/mem", "r+");
+
+  /* SLE have some processes which chroots into /proc.  If the above fopen
+     fails then try this to check if this is the case.  */
+  if (file == NULL) {
+    file = fopen("/self/mem", "r+");
+    libpulp_assert(file != NULL);
+  }
+
+  libpulp_assert(fseek(file, (size_t)dest, SEEK_SET) == 0);
+  libpulp_assert(fwrite(src, 1, n, file) == n);
+
+  fflush(file);
+  fclose(file);
+
+  return dest;
 }
 
 /** @brief Revert all live patches associated with library `lib_name`
@@ -157,10 +188,6 @@ __ulp_revert_patches_from_lib()
   if (libpulp_is_in_error_state())
     return get_libpulp_error_state();
 
-  /* If the instruction queue is in an weird state, we cannot continue.  */
-  if (insnq_ensure_emptiness())
-    return get_libpulp_error_state();
-
   /*
    * If the target process is busy within functions from the malloc or
    * dlopen implementations, applying a live patch could lead to a
@@ -172,6 +199,10 @@ __ulp_revert_patches_from_lib()
 
   /* Otherwise, try to apply the live patch. */
   result = revert_all_patches_from_lib(__ulp_metadata_buffer);
+
+  /* If we entered in an error state, then return the error.  */
+  if (libpulp_is_in_error_state())
+    return get_libpulp_error_state();
 
   /*
    * Live patching could fail for a couple of different reasons, thus
@@ -191,10 +222,6 @@ __ulp_apply_patch()
   if (libpulp_is_in_error_state())
     return get_libpulp_error_state();
 
-  /* If the instruction queue is in an weird state, we cannot continue.  */
-  if (insnq_ensure_emptiness())
-    return get_libpulp_error_state();
-
   /*
    * If the target process is busy within functions from the malloc or
    * dlopen implementations, applying a live patch could lead to a
@@ -206,6 +233,10 @@ __ulp_apply_patch()
 
   /* Otherwise, try to apply the live patch. */
   result = load_patch();
+
+  /* If we entered in an error state, then return the error.  */
+  if (libpulp_is_in_error_state())
+    return get_libpulp_error_state();
 
   /*
    * Live patching could fail for a couple of different reasons, thus
@@ -743,11 +774,11 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
 
     if (ref->tls) {
       tls_index ti = { .ti_module = tls_idx, .ti_offset = ref->target_offset };
-      insnq_insert_write((void *)patch_address, sizeof(ti), &ti);
+      memwrite((void *)patch_address, &ti, sizeof(ti));
     }
     else {
       uintptr_t target_address = target_base + ref->target_offset;
-      insnq_insert_write((void *)patch_address, sizeof(void *), &target_address);
+      memwrite((void *)patch_address, &target_address, sizeof(void *));
     }
     ref = ref->next;
   }
@@ -1064,7 +1095,7 @@ check_build_id(struct ulp_metadata *ulp)
 static void
 ulp_patch_prologue_layout(void *old_fentry, const char *prologue, int len)
 {
-  insnq_insert_write(old_fentry, len, prologue);
+  memwrite(old_fentry, prologue, len);
 }
 
 /** @brief skip the ulp prologue.
@@ -1090,7 +1121,7 @@ ulp_skip_prologue(void *fentry)
     bias += sizeof(insn_endbr64);
 
   /* Do not jump backwards on function entry (0x6690 is a nop on x86). */
-  insnq_insert_write((char *)fentry + bias, sizeof(insn_nop2), insn_nop2);
+  memwrite((char *)fentry + bias, insn_nop2, sizeof(insn_nop2));
 }
 
 /** @brief Get patched address of function with universe index = idx.
@@ -1193,7 +1224,7 @@ void
 ulp_patch_addr_absolute(void *old_fentry, void *manager)
 {
   char *dst = (char *)old_fentry + ULP_DATA_OFFSET;
-  insnq_insert_write(dst, sizeof(void *), &manager);
+  memwrite(dst, &manager, sizeof(void *));
 }
 
 /** @brief Actually patch the old function with the new function
