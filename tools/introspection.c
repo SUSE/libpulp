@@ -1824,8 +1824,10 @@ extract_ulp_from_so_to_mem(const char *livepatch, bool revert, char **out,
 
   /* Get full path to patch buffer.  */
   if (realpath(livepatch, &path_buffer[path_size]) == NULL) {
-    WARN("Unable to retrieve realpath to %s", livepatch);
-    return 0;
+    /* If we can't figure out the realpath, then use the path it was given to
+       us.  */
+    DEBUG("Unable to retrieve realpath to %s: %s", livepatch, libpulp_strerror(errno));
+    strcpy(&path_buffer[path_size], livepatch);
   }
   path_size = strlen(path_buffer) + 1;
 
