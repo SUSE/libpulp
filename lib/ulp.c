@@ -36,6 +36,7 @@
 
 #include "config.h"
 #include "error.h"
+#include "insn_queue_lib.h"
 #include "interpose.h"
 #include "msg_queue.h"
 #include "ulp.h"
@@ -64,7 +65,8 @@ begin(void)
  *
  * The process may be launched with mprotect through seccomp, which
  * will block certain addresses to be written.  This function
- * circunvent this by writing through /proc/self/map.
+ * circunvent this by queuing up an instruction to the ulp insn queue
+ * for the `ulp` tool to process later.
  *
  * @param dest    Destination address
  * @param src     Source address
@@ -74,20 +76,10 @@ begin(void)
 void *
 memwrite(void *dest, const void *src, size_t n)
 {
-  FILE *file = fopen("/proc/self/mem", "r+");
-
-  /* SLE have some processes which chroots into /proc.  If the above fopen
-     fails then try this to check if this is the case.  */
-  if (file == NULL) {
-    file = fopen("/self/mem", "r+");
-    libpulp_assert(file != NULL);
+  error_t e = insnq_insert_write(dest, n, src);
+  if (e != ENONE) {
+    return NULL;
   }
-
-  libpulp_assert(fseek(file, (size_t)dest, SEEK_SET) == 0);
-  libpulp_assert(fwrite(src, 1, n, file) == n);
-
-  fflush(file);
-  fclose(file);
 
   return dest;
 }
@@ -160,6 +152,10 @@ __ulp_revert_patches_from_lib()
   if (libpulp_is_in_error_state())
     return get_libpulp_error_state();
 
+  /* If the instruction queue is in an weird state, we cannot continue.  */
+  if (insnq_ensure_emptiness())
+    return get_libpulp_error_state();
+
   /*
    * If the target process is busy within functions from the malloc or
    * dlopen implementations, applying a live patch could lead to a
@@ -171,10 +167,6 @@ __ulp_revert_patches_from_lib()
 
   /* Otherwise, try to apply the live patch. */
   result = revert_all_patches_from_lib(__ulp_metadata_buffer);
-
-  /* If we entered in an error state, then return the error.  */
-  if (libpulp_is_in_error_state())
-    return get_libpulp_error_state();
 
   /*
    * Live patching could fail for a couple of different reasons, thus
@@ -194,6 +186,10 @@ __ulp_apply_patch()
   if (libpulp_is_in_error_state())
     return get_libpulp_error_state();
 
+  /* If the instruction queue is in an weird state, we cannot continue.  */
+  if (insnq_ensure_emptiness())
+    return get_libpulp_error_state();
+
   /*
    * If the target process is busy within functions from the malloc or
    * dlopen implementations, applying a live patch could lead to a
@@ -205,10 +201,6 @@ __ulp_apply_patch()
 
   /* Otherwise, try to apply the live patch. */
   result = load_patch();
-
-  /* If we entered in an error state, then return the error.  */
-  if (libpulp_is_in_error_state())
-    return get_libpulp_error_state();
 
   /*
    * Live patching could fail for a couple of different reasons, thus
@@ -1121,7 +1113,7 @@ push_new_detour(unsigned long universe, unsigned char *patch_id,
 
   detour = calloc(1, sizeof(struct ulp_detour));
   if (!detour) {
-    WARN("Unable to acllocate memory for ulp detour");
+    WARN("Unable to allocate memory for ulp detour");
     return 0;
   }
 

@@ -271,8 +271,7 @@ insnq_interpret_from_process_(int pid, Elf64_Addr queue_addr)
   static insn_queue_t queue;
 
   if (queue_addr == 0) {
-    /* Libpulp is old and do not have a instruction queue, or is too new and
-       the instruction queue was overcame.  */
+    /* Libpulp is old and do not have a instruction queue.  */
     return EOLDLIBPULP;
   }
 
