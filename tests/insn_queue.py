@@ -1,6 +1,4 @@
-#   libpulp - User-space Livepatching Library
-#
-#   Copyright (C) 2020-2021 SUSE Software Solutions GmbH
+#!/usr/bin/env python3
 #
 #   This file is part of libpulp.
 #
@@ -17,25 +15,13 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-noinst_HEADERS = \
-	ulp.h \
-	ulp_common.h \
-	interpose.h \
-	msg_queue.h \
-	error.h \
-	error_common.h \
-	terminal_colors.h \
-	ld_rtld.h \
-	insn_queue.h \
-	insn_queue_lib.h
+# This test checks the integrity of the instruction queue between libpulp and
+# the ULP tool.
 
-# Workaround a bug in Autoconf 2.69
-if CPU_X86_64
-noinst_HEADERS += \
-  arch/x86_64/arch_common.h
-endif
+import sys
+import testsuite
+import subprocess
 
-if CPU_PPC64LE
-noinst_HEADERS += \
-  arch/powerpc64le/arch_common.h
-endif
+child = testsuite.spawn('insn_queue', timeout = 20)
+child.expect("Success")
+child.close(force=False)

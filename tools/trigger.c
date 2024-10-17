@@ -192,19 +192,11 @@ trigger_one_process(struct ulp_process *target, int retries,
             "fatal error during live patch application (hijacked execution).");
         retry = 0;
       }
-      switch (result) {
-        /* In case of success or a failure because the patch were already
-           applied, then do not retry.  */
-        case 0:
-        case EAPPLIED:
-          retry = 0;
-          break;
-
-        default:
-          DEBUG("live patching %d failed (attempt #%d).", target->pid,
-                (retries - retry));
-          break;
-      }
+      if (result)
+        DEBUG("live patching %d failed (attempt #%d).", target->pid,
+              (retries - retry));
+      else
+        retry = 0;
     }
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
   range_check_failed:

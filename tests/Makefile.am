@@ -444,6 +444,7 @@ check_PROGRAMS = \
   pcqueue \
   comments \
   block_mprotect \
+  insn_queue \
   chroot \
   visibility
 
@@ -562,16 +563,6 @@ dlsym_SOURCES = dlsym.c
 dlsym_LDADD = -lpthread -ldl -lrt
 dlsym_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
-# Workaround a bug in Autoconf 2.69
-if CPU_X86_64
-dlsym_LDADD += \
-  -l:ld-linux-x86-64.so.2
-endif
-if CPU_PPC64LE
-dlsym_LDADD += \
-  -l:ld64.so.2
-endif
-
 stress_SOURCES = stress.c
 stress_LDADD = libstress.la
 stress_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
@@ -588,6 +579,22 @@ comments_LDADD =
 block_mprotect_SOURCES = block_mprotect.c
 block_mprotect_CFLAGS = $(AM_CFLAGS) -I/usr/include/libseccomp/
 block_mprotect_LDADD = -lseccomp
+
+insn_queue_SOURCES = insn_queue.c
+insn_queue_CFLAGS = $(AM_CFLAGS) -I$(srcdir)/../include -I$(srcdir)/../tools/include
+insn_queue_LDADD =
+
+# Workaround a bug in Autoconf 2.69
+if CPU_X86_64
+dlsym_LDADD += \
+  -l:ld-linux-x86-64.so.2
+insn_queue_CFLAGS += -I$(srcdir)/../include/arch/x86_64/
+endif
+if CPU_PPC64LE
+dlsym_LDADD += \
+  -l:ld64.so.2
+insn_queue_CFLAGS += -I$(srcdir)/../include/powerpc64le/x86_64/
+endif
 
 chroot_SOURCES = chroot.c
 chroot_CFLAGS = $(AM_CFLAGS)
@@ -648,6 +655,7 @@ TESTS = \
   mprotect_patch.py \
   patches.py \
   mprotect_patch.py \
+  insn_queue.py \
   chroot.py \
   visibility.py
 
