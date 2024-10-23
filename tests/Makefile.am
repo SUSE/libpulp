@@ -593,7 +593,7 @@ endif
 if CPU_PPC64LE
 dlsym_LDADD += \
   -l:ld64.so.2
-insn_queue_CFLAGS += -I$(srcdir)/../include/powerpc64le/x86_64/
+insn_queue_CFLAGS += -I$(srcdir)/../include/arch/powerpc64le/
 endif
 
 chroot_SOURCES = chroot.c
