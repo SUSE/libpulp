@@ -24,7 +24,8 @@ libpulp_la_SOURCES = \
   interpose.c \
   msg_queue.c \
   insn_queue.c \
-  error.c
+  error.c \
+  minielf.c
 
 libpulp_la_LDFLAGS = \
   -ldl \
