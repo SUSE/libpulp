@@ -27,7 +27,8 @@ noinst_HEADERS = \
 	terminal_colors.h \
 	ld_rtld.h \
 	insn_queue.h \
-	insn_queue_lib.h
+	insn_queue_lib.h \
+	minielf.h
 
 # Workaround a bug in Autoconf 2.69
 if CPU_X86_64
