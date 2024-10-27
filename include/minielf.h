@@ -63,7 +63,7 @@ long Elf_Load_Section(unsigned dest_size, unsigned char *dest,
 /** ----- ELF functions related to ULP ----- .  */
 
 /** Get the .ulp section from the given ELF file.  */
-int Get_ULP_Section(unsigned dest_size, unsigned char *dest, const char *file);
+long Get_ULP_Section(unsigned dest_size, unsigned char *dest, const char *file);
 
 /** Get the .ulp.rev section from the given ELF file.  */
-int Get_ULP_REV_Section(unsigned dest_size, unsigned char *dest, const char *file);
+long Get_ULP_REV_Section(unsigned dest_size, unsigned char *dest, const char *file);

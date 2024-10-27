@@ -187,7 +187,7 @@ long Elf_Load_Section(unsigned dest_size, unsigned char *dest,
 }
 
 /** Load the .ulp section of livepatch of `file` into the buffer.  */
-static int
+static long
 Get_Elf_Section(unsigned dest_size, unsigned char *dest,
                 const char *section_name, const char *file)
 {
@@ -195,7 +195,7 @@ Get_Elf_Section(unsigned dest_size, unsigned char *dest,
   int elf_fd = open(file, O_RDONLY);
   if (elf_fd < 0) {
     warn("Unable to open file %s: %s", file, strerror(errno));
-    return ENOENT;
+    return -ENOENT;
   }
 
   /* Load ELF file header.  */
@@ -205,7 +205,7 @@ Get_Elf_Section(unsigned dest_size, unsigned char *dest,
     warn("File is not an ELF object.");
 
     close(elf_fd);
-    return EINVAL;
+    return -EINVAL;
   }
 
   /* Load ELF section string table.  */
@@ -221,27 +221,27 @@ Get_Elf_Section(unsigned dest_size, unsigned char *dest,
     warn("Section %s not found.", section_name);
 
     close(elf_fd);
-    return EINVAL;
+    return -EINVAL;
   }
 
   /* Load ELF section into dest.  */
-  long x = Elf_Load_Section(dest_size, dest, &ulp_shdr, elf_fd);
-  if (x == 0) {
+  long len = Elf_Load_Section(dest_size, dest, &ulp_shdr, elf_fd);
+  if (len == 0) {
     close(elf_fd);
-    return EINVAL;
+    return -EINVAL;
   }
 
   close(elf_fd);
-  return 0;
+  return len;
 }
 
-int
+long
 Get_ULP_Section(unsigned dest_size, unsigned char *dest, const char *file)
 {
   return Get_Elf_Section(dest_size, dest, ".ulp", file);
 }
 
-int
+long
 Get_ULP_REV_Section(unsigned dest_size, unsigned char *dest, const char *file)
 {
   return Get_Elf_Section(dest_size, dest, ".ulp.rev", file);

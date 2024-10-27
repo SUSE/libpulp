@@ -25,7 +25,8 @@ libpulp_la_SOURCES = \
   msg_queue.c \
   insn_queue.c \
   error.c \
-  minielf.c
+  minielf.c \
+  gdb_interface.c
 
 libpulp_la_LDFLAGS = \
   -ldl \

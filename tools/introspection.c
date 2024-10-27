@@ -1848,6 +1848,9 @@ extract_ulp_from_so_to_mem(const char *livepatch, bool revert, char **out,
   char *final_meta = (char *)malloc(meta_size);
   char *meta_head = final_meta;
 
+
+  /* FIXME: This is absurdly awkward.  */
+
   /* Copy the final metadata into final_meta buffer.  Things works here as
    * follows:
    *
