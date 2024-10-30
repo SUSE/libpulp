@@ -28,6 +28,8 @@
     __ulp_enable_or_disable_patching;
     __ulp_insn_queue;
     __ulp_version;
+    gdb_ulp_apply;
+    gdb_ulp_revert;
   local:
     *;
 };

@@ -33,9 +33,13 @@ msgq_push(const char *format, ...)
 /* Disable the poisoning in error.h.  */
 #define DISABLE_ERR_POISON
 
+/* Disable some functions from libpulp side.  */
+#define DISABLE_INSNQ_FUNCS_FOR_TESTING
+
 #include "../lib/error.c"
 #include "../lib/insn_queue.c"
 #include "../tools/insn_queue.c"
+#include "../common/insn_queue.c"
 #include "../tools/ptrace.c"
 
 /* Set a two-way communcation channel between child and parent.  */

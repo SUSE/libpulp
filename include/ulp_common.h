@@ -27,6 +27,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <time.h>
+#include <sys/types.h>
 
 #define OUT_PATCH_NAME "metadata.ulp"
 #define OUT_REVERSE_NAME "reverse.ulp"

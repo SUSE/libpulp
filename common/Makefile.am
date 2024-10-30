@@ -23,4 +23,7 @@ noinst_LTLIBRARIES = libcommon.la
 # Ensure access to the include directory
 AM_CFLAGS += -I$(abs_top_srcdir)/include
 
-libcommon_la_SOURCES = common.c
+# Add -fno-strict-alias to the insn_queue code.
+insn_queue.lo : CFLAGS += -fno-strict-aliasing
+
+libcommon_la_SOURCES = common.c insn_queue.c

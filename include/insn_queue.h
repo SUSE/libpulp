@@ -138,4 +138,13 @@ ulp_insn_valid(struct ulp_insn *insn)
   }
 }
 
+
+/** @brief Interpret the instructions in queue.
+ *
+ * Interpret all instructions inserted into the queue object.
+ *
+ * @param queue
+ */
+int insnq_interpret(insn_queue_t *queue);
+
 #endif /* INSNQ_H */
