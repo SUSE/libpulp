@@ -35,6 +35,7 @@
 #include "ulp.h"
 #include "minielf.h"
 #include "error_common.h"
+#include "insn_queue_lib.h"
 
 extern char __ulp_metadata_buffer[ULP_METADATA_BUF_LEN];
 
@@ -90,6 +91,8 @@ inject_lp_path(const char *path, long metadata_size)
 int
 gdb_ulp_apply(const char *path)
 {
+  int ret;
+
   /* Prepare the ULP metadata buffer.  */
   memset(__ulp_metadata_buffer, '\0', ULP_METADATA_BUF_LEN);
 
@@ -105,13 +108,23 @@ gdb_ulp_apply(const char *path)
   }
 
   /* Trigger the livepatch.  */
-  return  __ulp_apply_patch();
+  if ((ret = __ulp_apply_patch()) != 0) {
+    return ret;
+  }
+
+  /* Process instruction queue.  */
+  if ((ret = insnq_interpret_from_lib()) != 0) {
+    return ret;
+  }
+
+  return 0;
 }
 
 
 int
 gdb_ulp_revert(const char *path)
 {
+  int ret;
   /* Prepare the ULP metadata buffer.  */
   memset(__ulp_metadata_buffer, '\0', ULP_METADATA_BUF_LEN);
 
@@ -127,5 +140,14 @@ gdb_ulp_revert(const char *path)
   }
 
   /* Trigger the livepatch.  */
-  return __ulp_apply_patch();
+  if ((ret = __ulp_apply_patch()) != 0) {
+    return ret;
+  }
+
+  /* Process instruction queue.  */
+  if ((ret = insnq_interpret_from_lib()) != 0) {
+    return ret;
+  }
+
+  return 0;
 }

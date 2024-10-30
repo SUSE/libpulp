@@ -24,6 +24,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <string.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <stdlib.h>
+#include <sys/mman.h>
 
 #include "error.h"
 #include "ulp_common.h"
@@ -169,4 +174,192 @@ insnq_ensure_emptiness(void)
   }
 
   return 0;
+}
+
+
+/*
+ * Read one line from FD into BUF, which must be pre-allocated and large
+ * enough to hold LEN characteres. The offset into FD is advanced by the
+ * amount of bytes read.
+ *
+ * @return  -1 on error, 0 on End-of-file, or the amount of bytes read.
+ */
+static int
+read_line(int fd, char *buf, size_t len)
+{
+  char *ptr;
+  int retcode;
+  size_t offset;
+
+  /* Read one byte at a time, until a newline is found. */
+  offset = 0;
+  while (offset < len) {
+    ptr = buf + offset;
+
+    /* Read one byte. */
+    retcode = read(fd, ptr, 1);
+
+    /* Error with read syscall. */
+    if (retcode == -1) {
+      if (errno == EINTR || errno == EAGAIN)
+        continue;
+      else
+        return -1;
+    }
+
+    /* Stop at EOF or EOL. */
+    if (retcode == 0 || *ptr == '\n') {
+      return offset;
+    }
+
+    offset++; /* Reading one byte at a time. */
+  }
+
+  /* EOL not found. */
+  return -1;
+}
+
+/* @brief Retrieves the memory protection bits of the page containing ADDR.
+ *
+ * @param addr    Address of the page.
+ * @return        If errors ocurred, return -1.
+ */
+static int __attribute((unused))
+memory_protection_get(uintptr_t addr)
+{
+  char line[LINE_MAX];
+  char *str;
+  char *end;
+  int fd;
+  int result;
+  int retcode;
+  uintptr_t addr1;
+  uintptr_t addr2;
+
+  fd = open("/proc/self/maps", O_RDONLY);
+  if (fd == -1)
+    return -1;
+
+  /* Iterate over /proc/self/maps lines. */
+  result = -1;
+  for (;;) {
+
+    /* Read one line. */
+    retcode = read_line(fd, line, LINE_MAX);
+    if (retcode <= 0)
+      break;
+
+    /* Parse the address range in the current line. */
+    str = line;
+    addr1 = strtoul(str, &end, 16);
+    str = end + 1; /* Skip the dash used in the range output. */
+    addr2 = strtoul(str, &end, 16);
+
+    /* Skip line if target address not within range. */
+    if (addr < addr1 || addr >= addr2)
+      continue;
+
+    /* Otherwise, parse the memory protection bits. */
+    result = 0;
+    if (*(end + 1) == 'r')
+      result |= PROT_READ;
+    if (*(end + 2) == 'w')
+      result |= PROT_WRITE;
+    if (*(end + 3) == 'x')
+      result |= PROT_EXEC;
+    break;
+  }
+
+  close(fd);
+  return result;
+}
+
+/* When we are testing insnq there are some functions we do not want in the
+   compilation unit.  */
+#ifndef DISABLE_INSNQ_FUNCS_FOR_TESTING
+
+/** @brief Interpret WRITE instruction.
+ *
+ * @param insn    Instruction to interpet. Must be a WRITE instruction.
+ *
+ * @return        Size of interpreted instruction.
+ */
+int
+insn_interpret_write(struct ulp_insn *insn)
+{
+  struct ulp_insn_write *winsn = (struct ulp_insn_write *)insn;
+
+  uintptr_t page_mask, page_size;
+
+  page_size = getpagesize();
+  page_mask = ~(page_size - 1);
+
+  uintptr_t page1 = winsn->address & page_mask;
+  uintptr_t pagen = (winsn->address + winsn->n) & page_mask;
+
+  int num_pages = 1 + (pagen - page1) / page_size;
+
+  int prot[num_pages];
+
+  for (int i = 0; i < num_pages; i++) {
+    uintptr_t page = page1 + i * page_size;
+
+    /* Make sure we always get the one with page size.  */
+    libpulp_assert(page == (page & page_mask));
+
+    prot[i] = memory_protection_get(page);
+
+    if (prot[i] == -1) {
+      WARN("Memory protection get error (%d page)", i);
+      return errno;
+    }
+  }
+
+  for (int i = 0; i < num_pages; i++) {
+    uintptr_t page = page1 + i * page_size;
+    if (mprotect((void *)page, page_size, prot[i] | PROT_WRITE)) {
+      WARN("Memory protection set error (%d page)", i);
+      return errno;
+    }
+  }
+
+  memcpy((void *)winsn->address, winsn->bytes, winsn->n);
+
+  /* Make sure we wrote that.  */
+  if (memcmp((void *)winsn->address, winsn->bytes, winsn->n) != 0) {
+    WARN("Failed to write at address 0x%lx", winsn->address);
+  }
+
+  for (int i = 0; i < num_pages; i++) {
+    uintptr_t page = page1 + i * page_size;
+    if (mprotect((void *)page, page_size, prot[i])) {
+      WARN("Memory protection set error (%d page)", i);
+      return errno;
+    }
+  }
+
+  return insn->size;
+}
+
+#endif //DISABLE_INSNQ_FUNCS_FOR_TESTING
+
+/** @brief Process global instruction queue.
+  *
+  * Processes the global instruction queue that should be sent to the `ulp`
+  * command, but we may need to process this queue in the process side if we
+  * are debugging libpulp (e.g. patch triggered from gdb interface).
+  */
+int
+insnq_interpret_from_lib(void)
+{
+  /* Interpret global queue.  */
+  struct insn_queue *queue = &__ulp_insn_queue;
+  int ret = insnq_interpret(queue);
+
+  /* Clean up the queue.  */
+  memset(queue->buffer, 0, INSN_BUFFER_MAX);
+  queue->num_insns = 0;
+  queue->size = 0;
+
+  return ret;
 }
