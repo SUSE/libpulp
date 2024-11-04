@@ -22,6 +22,7 @@
 #ifndef _ULP_LIB_COMMON_
 #define _ULP_LIB_COMMON_
 
+#include "config.h"
 #include <elf.h>
 #include <stdbool.h>
 #include <stddef.h>

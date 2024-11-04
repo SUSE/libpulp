@@ -32,7 +32,12 @@ ulp_error_t insnq_insert_write(void *addr, int n, const void *bytes);
 
 int insnq_ensure_emptiness(void);
 
+/* Not necessary if compiling without gdb interface.  */
+#ifdef ENABLE_GDB_INTERFACE
+
 /** Interpret the global instruction queue from process side.  */
 int insnq_interpret_from_lib(void);
+
+#endif //ENABLE_GDB_INTERFACE
 
 #endif
