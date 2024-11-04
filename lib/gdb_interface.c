@@ -20,7 +20,13 @@
  */
 
 /* Small interface that allows livepatches to be applied or reverted
- * within gdb.  */
+ * within gdb.  There is no need to compile this file if
+ *  ENABLE_GDB_INTERFACE is not defined.
+ */
+
+#include "config.h"
+
+#ifdef ENABLE_GDB_INTERFACE
 
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -30,7 +36,6 @@
 #include <sys/types.h>
 #include <link.h>
 
-#include "config.h"
 #include "ulp_common.h"
 #include "ulp.h"
 #include "minielf.h"
@@ -151,3 +156,5 @@ gdb_ulp_revert(const char *path)
 
   return 0;
 }
+
+#endif //ENABLE_GDB_INTERFACE

@@ -24,6 +24,11 @@
  * in this library.
  */
 
+#include "config.h"
+
+/* So far there is no need to compile this file if GDB interface is not set.  */
+#ifdef ENABLE_GDB_INTERFACE
+
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -246,3 +251,5 @@ Get_ULP_REV_Section(unsigned dest_size, unsigned char *dest, const char *file)
 {
   return Get_Elf_Section(dest_size, dest, ".ulp.rev", file);
 }
+
+#endif //ENABLE_GDB_INTERFACE

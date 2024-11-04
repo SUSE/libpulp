@@ -150,6 +150,16 @@ AC_SUBST([LIBUNWIND_LIBS], ["-lunwind-generic -lunwind-ptrace -lunwind"])
 AC_DEFINE(ENABLE_STACK_CHECK, 1, [Enable stack checking routines]),
 AC_DEFINE(ENABLE_STACK_CHECK, 0, [Disable stack checking routines]))
 
+# Enable a gdb interface so that livepatches can be triggered within gdb.
+AC_ARG_ENABLE(gdb-interface,
+AS_HELP_STRING([--enable-gdb-interface],
+[build and exposes an interface for livepatching withing gdb. [default=no]]),
+[enable_gdb_interface=yes],
+[enable_gdb_interface=no; break])
+
+AS_IF([test "$enable_gdb_interface" = "yes"],
+AC_DEFINE(ENABLE_GDB_INTERFACE, 1, [Enable gdb interface for livepatching]))
+
 # Check if libseccomp is present.  This is required for testing.
 CFLAGS="$CFLAGS -I/usr/include/libseccomp/"
 AC_CHECK_HEADER([seccomp.h],,

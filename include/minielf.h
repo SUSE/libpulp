@@ -24,6 +24,9 @@
  * in this library.
  */
 
+/* This file is not needed if we are compiling without gdb interface.  */
+#ifdef ENABLE_GDB_INTERFACE
+
 #include <elf.h>
 
 /** Maximum size of the Section String Table.  */
@@ -67,3 +70,5 @@ long Get_ULP_Section(unsigned dest_size, unsigned char *dest, const char *file);
 
 /** Get the .ulp.rev section from the given ELF file.  */
 long Get_ULP_REV_Section(unsigned dest_size, unsigned char *dest, const char *file);
+
+#endif //ENABLE_GDB_INTERFACE
