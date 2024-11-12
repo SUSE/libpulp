@@ -260,8 +260,6 @@ parse_metadata_from_mem(struct ulp_metadata *ulp, void *src, size_t size)
   struct ulp_dependency *dep, *prev_dep = NULL;
   struct ulp_reference *ref, *prev_ref = NULL;
 
-  DEBUG("reading live patch metadata from memory");
-
   /* read metadata header information */
   ulp->objs = NULL;
 
@@ -501,6 +499,10 @@ parse_metadata_from_mem(struct ulp_metadata *ulp, void *src, size_t size)
       ulp->refs = ref;
     }
     prev_ref = ref;
+  }
+
+  if (ulp->so_filename) {
+    DEBUG("Patch path: %s", ulp->so_filename);
   }
 
   return 0;
