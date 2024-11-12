@@ -61,22 +61,6 @@ static char ulp_prologue_endbr64[ULP_NOPS_LEN_ENDBR64] = {
 };
 /* clang-format on */
 
-/** @brief Write new function address into data prologue of  `old_fentry`.
- *
- *  This function replaces the `<data>` section in prologue `old_fentry`
- *  with a pointer to the new function given by `manager`, which will
- *  replace the to be patched function.
- *
- *  @param old_fentry Pointer to prologue of to be replaced function
- *  @param manager Address of new function.
- */
-void
-ulp_patch_addr_absolute(void *old_fentry, void *manager)
-{
-  char *dst = (char *)old_fentry + ULP_DATA_OFFSET;
-  memwrite(dst, &manager, sizeof(void *));
-}
-
 /** @brief Copy the ulp proglogue layout into the function to be patched's
  * prologue
  *
@@ -166,10 +150,18 @@ ulp_patch_addr(void *old_faddr, void *new_faddr, int enable)
 
   /* Actually patch the prologue. */
   if (enable) {
-    ulp_patch_prologue_layout(addr, prologue, ulp_nops_len);
-    ulp_patch_addr_absolute(addr, new_faddr);
+    char patched_prologue[ULP_NOPS_LEN_ENDBR64];
+    memcpy(patched_prologue, prologue, ulp_nops_len);
+
+    /* Insert the function redirection jump.  */
+    DEBUG("Patching function 0x%lx to 0x%lx", old_faddr, new_faddr);
+    memcpy(patched_prologue + ULP_DATA_OFFSET, &new_faddr, sizeof(void *));
+
+    /* Replace the prologue.  */
+    ulp_patch_prologue_layout(addr, patched_prologue, ulp_nops_len);
   }
   else {
+    DEBUG("Removing patch from 0x%lx", old_faddr);
     ulp_skip_prologue(old_faddr);
   }
 
