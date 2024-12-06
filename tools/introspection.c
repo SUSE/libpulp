@@ -86,6 +86,17 @@ void
 ulp_warn(const char *format, ...)
 {
   if (!ulp_quiet) {
+    time_t rawtime;
+    struct tm *timeinfo, local_tm;
+    char timestamp[32];
+
+    time(&rawtime);
+    timeinfo = localtime_r(&rawtime, &local_tm);
+
+    strftime(timestamp, 32, "[%Y-%m-%d %H:%M:%S] ", timeinfo);
+
+    fputs(timestamp, stderr);
+
     va_list args;
     va_start(args, format);
     vfprintf(stderr, format, args);
@@ -97,6 +108,17 @@ void
 ulp_debug(const char *format, ...)
 {
   if (ulp_verbose) {
+    time_t rawtime;
+    struct tm *timeinfo, local_tm;
+    char timestamp[32];
+
+    time(&rawtime);
+    timeinfo = localtime_r(&rawtime, &local_tm);
+
+    strftime(timestamp, 32, "[%Y-%m-%d %H:%M:%S] ", timeinfo);
+
+    fputs(timestamp, stderr);
+
     va_list args;
     va_start(args, format);
     vfprintf(stderr, format, args);
