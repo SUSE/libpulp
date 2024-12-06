@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 /* Create an externally visible msg_queue object that will be read with ptrace.
  * It will be read by ulp_messages (tools/messages.c) using ptrace. */
@@ -139,6 +140,17 @@ msgq_vpush(const char *format, va_list arglist)
 void
 ulp_warn(const char *format, ...)
 {
+  time_t rawtime;
+  struct tm *timeinfo, local_tm;
+  char timestamp[32];
+
+  time(&rawtime);
+  timeinfo = localtime_r(&rawtime, &local_tm);
+
+  size_t n = strftime(timestamp, 32, "[%Y-%m-%d %H:%M:%S] ", timeinfo);
+  if (n > 0)
+    msgq_strpush(timestamp, n + 1);
+
   va_list args;
   va_start(args, format);
   msgq_vpush(format, args);
@@ -148,6 +160,17 @@ ulp_warn(const char *format, ...)
 void
 ulp_debug(const char *format, ...)
 {
+  time_t rawtime;
+  struct tm *timeinfo, local_tm;
+  char timestamp[32];
+
+  time(&rawtime);
+  timeinfo = localtime_r(&rawtime, &local_tm);
+
+  size_t n = strftime(timestamp, 32, "[%Y-%m-%d %H:%M:%S] ", timeinfo);
+  if (n > 0)
+    msgq_strpush(timestamp, n + 1);
+
   va_list args;
   va_start(args, format);
   msgq_vpush(format, args);
