@@ -34,13 +34,13 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#include "arch_common.h"
 #include "config.h"
 #include "error.h"
 #include "insn_queue_lib.h"
 #include "interpose.h"
 #include "msg_queue.h"
 #include "ulp.h"
-#include "arch_common.h"
 
 /* ulp data structures */
 struct ulp_patching_state __ulp_state = { 0, NULL };
@@ -958,6 +958,23 @@ check_patch_dependencies(struct ulp_metadata *ulp)
   return 0;
 }
 
+/** build_id_note structure, holding information about the build id.  */
+struct build_id_note
+{
+  /* The NHdr ELF.  See elf.h for more information.   */
+
+  /** Size of the name structure.  */
+  uint32_t namesz;
+  /** Length of the build id.  */
+  uint32_t descsz;
+  /** Unknown.  */
+  uint32_t type;
+  /** Name.  */
+  char name[4]; /* Note name for build-id is "GNU\0" */
+  /** Build id.  */
+  unsigned char build_id[0];
+};
+
 /** @brief Function used by dl_iterate_phdr to check if there are some library
  *        that matches the buildid in the `data` ulp_metadata object.
  */
@@ -965,69 +982,44 @@ int
 compare_build_ids(struct dl_phdr_info *info,
                   size_t __attribute__((unused)) size, void *data)
 {
-  int i;
-  char *note_ptr, *build_id_ptr, *note_sec;
-  uint32_t note_type, build_id_len, name_len, sec_size, next = 0;
-  struct ulp_metadata *ulp;
-  ulp = (struct ulp_metadata *)data;
 
-  /* algorithm goes as follows:
-   * 1 - check every object inside ulp_metadata
-   * 1.1 - if object is main, match loaded object whose name length is 0
-   * 1.2 - else, match ulp object and loaded object names
-   * 2 - check every phdr for loaded object and match all PT_NOTE
-   * 3 - trespass PT_NOTE searching for NT_GNU_BUILD_ID
-   * 3.1 - once found, match contents with ulp object build id
-   * 3.2 - if match, mark ulp object as checked and break dl_iterate (return 1)
-   * 3.3 - else, continue looking for the library by returning 0
-   *
-   * Algorithm assumes that objects will only have one NT_GNU_BUILD_ID entry
-   */
+/** Align `val` to `align` bytes.  */
+#define ALIGN(val, align) (((val) + (align) - 1) & ~((align) - 1))
 
-  for (i = 0; i < info->dlpi_phnum; i++) {
+  struct ulp_metadata *ulp = (struct ulp_metadata *)data;
+
+  for (unsigned i = 0; i < info->dlpi_phnum; ++i) {
     if (info->dlpi_phdr[i].p_type != PT_NOTE)
       continue;
 
-    note_sec = (char *)(info->dlpi_phdr[i].p_vaddr + info->dlpi_addr);
-    sec_size = info->dlpi_phdr[i].p_memsz;
+    struct build_id_note *note =
+        (struct build_id_note *)(info->dlpi_addr + info->dlpi_phdr[i].p_vaddr);
+    ptrdiff_t size = info->dlpi_phdr[i].p_filesz;
 
-    for (note_ptr = note_sec, note_type = (uint32_t) * (note_ptr + 8);
-         note_type != NT_GNU_BUILD_ID && note_ptr < note_sec + sec_size;
-         note_ptr = note_sec + next, note_type = (uint32_t) * (note_ptr + 8)) {
+    while (size >= (ptrdiff_t)sizeof(struct build_id_note)) {
+      if (note->type == NT_GNU_BUILD_ID && note->namesz == 4 &&
+          note->descsz >= 16) {
 
-      build_id_len = (uint32_t) * (note_ptr + 4);
-      name_len = (uint32_t)*note_ptr;
+        /* Check if build matches.  */
+        if (note->descsz == ulp->objs->build_id_len &&
+            memcmp(ulp->objs->build_id, note->build_id, note->descsz)) {
+          ulp->objs->build_id_check = 1;
+          return 1;
+        }
 
-      /* fix paddings */
-      build_id_len += build_id_len % 4;
-      name_len += name_len % 4;
-
-      next = next + build_id_len + name_len + 12;
-    }
-
-    /* could not fid the build id in the note section, go to next sec */
-    if (note_type != NT_GNU_BUILD_ID)
-      continue;
-
-    build_id_len = (uint32_t) * (note_ptr + 4);
-    build_id_len += build_id_len % 4;
-    if (build_id_len != ulp->objs->build_id_len)
-      return 0;
-
-    /* we compute, but currently do not check note names */
-    name_len = (uint32_t)*note_ptr;
-    name_len += name_len % 4;
-
-    build_id_ptr = note_ptr + 12 + name_len;
-    if (memcmp(ulp->objs->build_id, build_id_ptr, build_id_len) == 0) {
-      ulp->objs->build_id_check = 1;
-      return 1;
-    }
-    else {
-      return 0;
+        /* Does not match.  Go to another lib.  */
+        break;
+      }
+      size_t offset = (sizeof(uint32_t) * 3 + ALIGN(note->namesz, 4) +
+                       ALIGN(note->descsz, 4));
+      note = (struct build_id_note *)((char *)note + offset);
+      size -= offset;
     }
   }
+
   return 0;
+
+#undef ALIGN
 }
 
 /** @brief Check if the build id in the patch matches some .
