@@ -263,12 +263,6 @@ AC_DEFINE_UNQUOTED([LD_LINUX], ["$_LD_LINUX"],
 AM_CONDITIONAL([CPU_X86_64],  [test "$_PROC" == "x86_64"])
 AM_CONDITIONAL([CPU_PPC64LE], [test "$_PROC" == "powerpc64le"])
 
-# Use the glibc versions installed on path
-AC_ARG_WITH([glibc],
-AS_HELP_STRING([--with-glibc=GLIBC_PATH],[Use the glibc installed on GLIBC_PATH, where the .so file is present]),
-[AC_SUBST([AM_LDFLAGS], ["-Wl,--dynamic-linker=$with_glibc/$_LD_LINUX -Wl,--rpath=$with_glibc/"])],
-[])
-
 # Check if -fpatchable-function-entry=$ULP_NOPS_LEN,$RE_NOPS_LEN works
 # correctly.
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
@@ -277,6 +271,9 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
     void f(void) { g(); }]])],
   [patchable_works=yes],
   [patchable_works=no])
+
+# Fix some problems with the Makefiles expecting a default value for AM_LDFLAGS
+AC_SUBST([AM_LDFLAGS], [""])
 
 AS_IF([test "x$patchable_works" == "xno"],
 AC_MSG_ERROR(
