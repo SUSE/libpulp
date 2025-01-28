@@ -241,8 +241,8 @@ AS_CASE([$target_cpu],
         ],
         [powerpc64le],
         [
-          _NOPS_LEN=17
-          _PRE_NOPS_LEN=16
+          _NOPS_LEN=14
+          _PRE_NOPS_LEN=13
           _LD_LINUX="ld64.so.2"
           _PROC="powerpc64le"
         ]

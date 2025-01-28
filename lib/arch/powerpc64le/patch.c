@@ -1,7 +1,7 @@
 /*
  *  libpulp - User-space Livepatching Library
  *
- *  Copyright (C) 2017-2023 SUSE Software Solutions GmbH
+ *  Copyright (C) 2017-2025 SUSE Software Solutions GmbH
  *
  *  This file is part of libpulp.
  *
@@ -21,6 +21,11 @@
 
 #define _GNU_SOURCE
 
+#include <stdlib.h>
+#include <unistd.h>
+#include <pthread.h>
+#include <sys/mman.h>
+
 #include <stddef.h>
 #include <string.h>
 #include <limits.h>
@@ -30,29 +35,18 @@
 #include "msg_queue.h"
 #include "ulp.h"
 
+#include "arch/powerpc64le/arch_common.h"
+
 /* clang-format off */
 
 /** Size of each instructions, in bytes.  */
 #define INSN_SIZE 4
 
-static unsigned char ulp_prologue[INSN_SIZE * PRE_NOPS_LEN] = {
-  0x22, 0x11, 0x80, 0x3d,    // lis     r12,0x1122
-  0xa6, 0x02, 0x08, 0x7c,    // mflr    r0
-  0x44, 0x33, 0x8c, 0x61,    // ori     r12,r12,0x3344
-  0xc6, 0x07, 0x8c, 0x79,    // sldi    r12,r12,32
-  0x66, 0x55, 0x8c, 0x65,    // oris    r12,r12,0x5566
-  0x10, 0x00, 0x01, 0xf8,    // std     r0,16(r1)
-  0xe1, 0xff, 0x21, 0xf8,    // stdu    r1,-32(r1)
-  0x88, 0x77, 0x8c, 0x61,    // ori     r12,r12,0x7788
-  0x18, 0x00, 0x41, 0xf8,    // std     r2,24(r1)
-  0xa6, 0x03, 0x89, 0x7d,    // mtctr   r12
-  0x21, 0x04, 0x80, 0x4e,    // bctrl
-  0x18, 0x00, 0x41, 0xe8,    // ld      r2,24(r1)
-  0x20, 0x00, 0x21, 0x38,    // addi    r1,r1,32
-  0x10, 0x00, 0x01, 0xe8,    // ld      r0,16(r1)
-  0xa6, 0x03, 0x08, 0x7c,    // mtlr    r0
-  0x20, 0x00, 0x80, 0x4e,    // blr
-};
+/** Declare ulp_prologue routine, defined in ulp_prologue.S.  */
+extern unsigned char ulp_prologue[];
+
+/** Size of the above object.  */
+extern unsigned int ulp_prologue_size;
 
 /** The NOP instruction.  */
 static const unsigned char gNop[] = { 0x00, 0x00, 0x00, 0x60 };
@@ -82,23 +76,21 @@ ulp_patch_prologue_layout(void *old_fentry, void *new_fentry, const unsigned cha
   (void) len;
 
   /* Create a copy of the prologue.  */
-  unsigned char prolog[INSN_SIZE*PRE_NOPS_LEN];
-  _Static_assert(sizeof(prolog) == sizeof(ulp_prologue),
-                 "Prologue sizes do not match");
+  unsigned char prolog[ulp_prologue_size];
   memcpy(prolog, prologue, sizeof(prolog));
 
   unsigned char new_fentry_bytes[sizeof(void*)];
   memcpy(new_fentry_bytes, &new_fentry, sizeof(new_fentry_bytes));
 
   /* Patch the code with the address of the function we want to be redirected.  */
-  prolog[0]  = new_fentry_bytes[6];
-  prolog[1]  = new_fentry_bytes[7];
-  prolog[8]  = new_fentry_bytes[4];
-  prolog[9]  = new_fentry_bytes[5];
-  prolog[16] = new_fentry_bytes[2];
-  prolog[17] = new_fentry_bytes[3];
-  prolog[28] = new_fentry_bytes[0];
-  prolog[29] = new_fentry_bytes[1];
+  prolog[32]  = new_fentry_bytes[6];
+  prolog[33]  = new_fentry_bytes[7];
+  prolog[36]  = new_fentry_bytes[4];
+  prolog[37]  = new_fentry_bytes[5];
+  prolog[40]  = new_fentry_bytes[2];
+  prolog[41]  = new_fentry_bytes[3];
+  prolog[44]  = new_fentry_bytes[0];
+  prolog[45]  = new_fentry_bytes[1];
 
   /* Point to the prologue.  */
   char *fentry_prologue = old_fentry - INSN_SIZE * PRE_NOPS_LEN;
@@ -218,4 +210,85 @@ ulp_patch_addr(void *old_faddr, void *new_faddr, int enable)
   }
 
   return ret;
+}
+
+
+/** Key used for setuping a thread-cancel destructor.  */
+static pthread_key_t ulp_key;
+
+/** pthread_once to indicate that our destructor was installed.  */
+static pthread_once_t ulp_once_control = PTHREAD_ONCE_INIT;
+
+/** Destructor for mmap ulp_stack buffer.  Called when a thread is killed or
+    exited.  */
+static void
+ulp_stack_cleanup(void *)
+{
+  if (ulp_stack[ULP_STACK_PTR] != 0UL) {
+    int ret = munmap((void *)ulp_stack[ULP_STACK_PTR],
+                     ulp_stack[ULP_STACK_REAL_SIZE]);
+    libpulp_assert(ret == 0);
+
+    ulp_stack[ULP_STACK_PTR] = 0;
+    ulp_stack[ULP_STACK_REAL_SIZE] = 0;
+    ulp_stack[ULP_STACK_USED_SIZE] = 0;
+
+  }
+}
+
+/** Setup a destructor for the mmap buffer in ulp_stack.  */
+static void
+ulp_pthread_key_init(void)
+{
+  int ret = pthread_key_create(&ulp_key, ulp_stack_cleanup);
+  libpulp_assert(ret == 0);
+}
+
+/** @brief Helper function called to allocate the ulp_stack
+ *
+ * In the ulp prologue in ppc64le we need to save the TOC and LR registers
+ * before redirect into a new function, and we store it in a stack allocated
+ * by mmap.  This routine does exactly this.
+ */
+void ulp_stack_helper(void)
+{
+  /* Comparison should have been done in trampoline_routine (this function
+     caller), so just assert it here.  */
+  libpulp_assert(ulp_stack[ULP_STACK_REAL_SIZE] <= ulp_stack[ULP_STACK_USED_SIZE]);
+
+  /* Storage depleted, allocate a new stack.  */
+  unsigned long old_size = ulp_stack[ULP_STACK_REAL_SIZE];
+
+  /* Setup new size.  */
+  ulp_stack[ULP_STACK_REAL_SIZE] += 32;
+  ulp_stack[ULP_STACK_REAL_SIZE] *= 2;
+
+  void *old = (void *)ulp_stack[ULP_STACK_PTR];
+
+  DEBUG("thread %lu: expanding stack to %lu bytes", pthread_self(), ulp_stack[ULP_STACK_REAL_SIZE]);
+
+  /* Allocate buffer for our stack.  */
+  void *new = mmap(NULL, ulp_stack[ULP_STACK_REAL_SIZE],
+                   PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+  if (new == (void *) -1) {
+    /* In this case the system is out of memory...  And there is nothing
+       we can do.  */
+    libpulp_crash("libpulp: mmap returned -1, application can not continue\n");
+    return;
+  }
+
+  /* In case we have a previous allocated buffer, then copy this.  */
+  if (old != NULL) {
+    memcpy(new, old, old_size);
+    munmap(old, old_size);
+    old = NULL;
+  }
+
+  ulp_stack[ULP_STACK_PTR] = (unsigned long) new;
+  libpulp_assert(ulp_stack[ULP_STACK_PTR] != 0L);
+
+  /* Setup destructor for mmap memory, so we don't leak memory when a thread
+     is destroyed.  */
+  pthread_once(&ulp_once_control, ulp_pthread_key_init);
 }
