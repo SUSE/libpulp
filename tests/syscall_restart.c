@@ -75,7 +75,7 @@ main(void)
     return 1; /* The test driver is not expected to send EOF. */
   }
 
-  int_params(1, 2, 3, 4, 5, 6, 7, 8);
+  int_params(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
   float_params(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
   return 0; /* At least one byte was read. */
 }

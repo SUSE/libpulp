@@ -23,9 +23,9 @@
 #include <stdio.h>
 
 __attribute__((noinline)) void
-int_params(int a, int b, int c, int d, int e, int f, int g, int h)
+int_params(int a, int b, int c, int d, int e, int f, int g, int h, int i, int j)
 {
-  printf("%d-%d-%d-%d-%d-%d-%d-%d\n", a, b, c, d, e, f, g, h);
+  printf("%d-%d-%d-%d-%d-%d-%d-%d-%d-%d\n", a, b, c, d, e, f, g, h, i, j);
 }
 
 __attribute__((noinline)) void
@@ -52,7 +52,7 @@ main(void)
       printf("Reached the end of file; quitting.\n");
       return 0;
     }
-    int_params(1, 2, 3, 4, 5, 6, 7, 8);
+    int_params(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
     float_params(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
   }
 

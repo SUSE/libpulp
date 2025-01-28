@@ -22,7 +22,8 @@
 #include <errno.h>
 #include <stdio.h>
 
-void int_params(int a, int b, int c, int d, int e, int f, int g, int h);
+void int_params(int a, int b, int c, int d, int e, int f, int g, int h,
+                int i, int j);
 
 void float_params(float a, float b, float c, float d, float e, float f,
                   float g, float h, float i, float j);
@@ -43,7 +44,7 @@ main(void)
       printf("Reached the end of file; quitting.\n");
       return 0;
     }
-    int_params(1, 2, 3, 4, 5, 6, 7, 8);
+    int_params(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
     float_params(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
   }
 
