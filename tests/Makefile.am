@@ -676,8 +676,7 @@ TESTS = \
 
 XFAIL_TESTS = \
   blocked.py \
-  contract.py \
-  notes.py
+  contract.py
 
 # Some tests must run serially because they may interfere with other
 # tests. We use *.log because automake rule that runs the tests are
