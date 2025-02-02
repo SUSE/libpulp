@@ -655,6 +655,11 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
       do {
         ElfW(Nhdr) note;
 
+        /* Stop processing more NOTES headers if Build ID already found. */
+        if (pt_note_ran == true) {
+          break;
+        }
+
         /* Get the note section in remote process.  */
         ret = read_memory((char *)&note, sizeof(note), pid, note_addr);
         if (ret != 0) {
