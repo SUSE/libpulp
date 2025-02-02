@@ -234,7 +234,8 @@ check_LTLIBRARIES += libdozens_livepatch1.la \
                      libstress_livepatch1.la \
                      libcomments_livepatch1.la \
                      libvisibility_livepatch1.la \
-                     libvisibility_livepatch2.la
+                     libvisibility_livepatch2.la \
+                     libnotes_livepatch1.la
 
 libdozens_livepatch1_la_SOURCES = libdozens_livepatch1.c
 libdozens_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
@@ -320,6 +321,8 @@ libvisibility_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 libvisibility_livepatch2_la_SOURCES = libvisibility_livepatch2.c
 libvisibility_livepatch2_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
+libnotes_livepatch1_la_SOURCES = libnotes_livepatch1.c
+libnotes_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
 METADATA = \
   libdozens_livepatch1.dsc \
@@ -377,7 +380,9 @@ METADATA = \
   libvisibility_livepatch1.dsc \
   libvisibility_livepatch1.ulp \
   libvisibility_livepatch2.dsc \
-  libvisibility_livepatch2.ulp
+  libvisibility_livepatch2.ulp \
+  libnotes_livepatch1.dsc \
+  libnotes_livepatch1.ulp
 
 EXTRA_DIST = \
   libdozens_livepatch1.in \
@@ -407,7 +412,8 @@ EXTRA_DIST = \
   libcomments_livepatch1.in \
   libstress_livepatch1.in \
   libvisibility_livepatch1.in \
-  libvisibility_livepatch2.in
+  libvisibility_livepatch2.in \
+  libnotes_livepatch1.in
 
 clean-local:
 	rm -f $(METADATA)
@@ -446,7 +452,8 @@ check_PROGRAMS = \
   block_mprotect \
   insn_queue \
   chroot \
-  visibility
+  visibility \
+  notes
 
 numserv_SOURCES = numserv.c
 numserv_LDADD = libdozens.la libhundreds.la
@@ -604,6 +611,13 @@ visibility_SOURCES = visibility.c
 visibility_CFLAGS = $(AM_CFLAGS)
 visibility_LDADD = libvisibility.la
 
+notes_SOURCES = notes.c
+notes_CFLAGS = -fpatchable-function-entry=$(ULP_NOPS_LEN),$(PRE_NOPS_LEN) $(AM_CFLAGS)
+notes_LDFLAGS = -Wl,--hash-style=gnu -Wl,-T$(srcdir)/notes.ld $(AM_LDFLAGS)
+notes_DEPENDENCIES = notes.ld $(POST_PROCESS) $(METADATA)
+
+EXTRA_DIST += notes.ld
+
 TESTS = \
   numserv.py \
   numserv_bsymbolic.py \
@@ -657,11 +671,13 @@ TESTS = \
   mprotect_patch.py \
   insn_queue.py \
   chroot.py \
-  visibility.py
+  visibility.py \
+  notes.py
 
 XFAIL_TESTS = \
   blocked.py \
-  contract.py
+  contract.py \
+  notes.py
 
 # Some tests must run serially because they may interfere with other
 # tests. We use *.log because automake rule that runs the tests are
@@ -734,3 +750,5 @@ libprocess_livepatch1.ulp: process libprocess_livepatch1.dsc
 libprocess_access_livepatch1.ulp: process_access libprocess_access_livepatch1.dsc
 
 libcomments_livepatch1.ulp: comments libprocess_livepatch1.dsc
+
+libnotes_livepatch1.ulp: notes libnotes_livepatch1.dsc
