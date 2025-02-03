@@ -48,7 +48,7 @@ trampoline_routine:
   # Move the target function ptr to control register so we can free r6.
   mtctr %r6
 
-  # Load the ulp_stack into r3 through r13 (thread local storage ptr)
+  # Load the ulp_stack into r5 through r13 (thread local storage ptr)
   addis %r5, %r13, ulp_stack@tprel@ha
   addi  %r5, %r5,  ulp_stack@tprel@l
 
@@ -62,7 +62,7 @@ trampoline_routine:
 
 .Lcontinue_ulp_prologue:
 
-  # Reload the ulp_stack into r3 through r13 (thread local storage ptr)
+  # Reload the ulp_stack into r5 through r13 (thread local storage ptr)
   addis %r5, %r13, ulp_stack@tprel@ha
   addi  %r5, %r5,  ulp_stack@tprel@l
 
@@ -78,11 +78,17 @@ trampoline_routine:
 
   # Store TOC
   add   %r5, %r5, %r6  # ulp_stack + used_size
-  std   %r2, -16(%r5)  # store in *(ulp_stack + used_size - 16)
 
-  # Store LR which we saved on the stack in the prologue. r2 was saved so use it.
+  # At this point, %r5 points to 16 bytes ahead of the slot where we shall
+  # save TOC.  Hence we have to subtract 16 bytes of the storing location,
+  # as pictured in this diagram.
+  #                              %r5 --+
+  # +----------------------------------v
+  # | TOC1 | LR1 || ... || _8b_ | _8b_ |
+  # +----------------------------------+
+  std   %r2, -16(%r5)  # store in *(ulp_stack + used_size - 16)
   mflr  %r2
-  std   %r2, -8(%r5)    # store in (ulp_stack + used_size)
+  std   %r2, -8(%r5)   # store in *(ulp_stack + used_size - 8)
 
   # Restore registers
   ld    %r5, -8(%r1)  # Restore register.
@@ -218,6 +224,39 @@ ulp_prologue_size:
   .long     ulp_prologue_end - ulp_prologue
 
 # Declare a space in thread local storage for the ulp stack.
+# This datastructure layout is pictured below:
+# bytes:      8          16          24        32
+# +-----------+-----------+-----------+---------+
+# | real_size | used_size | stack_ptr | padding |
+# +-----------+-----------+-----------+---------+
+#
+# The macros in powerpc64le/arch_common.h defines how such fields shall
+# be accessed in a clean way.  For ASM, the pointer to this structure
+# shall be passed as a parameter to the macro, and for C it should be
+# used as a index for a C array. For example:
+#
+# ASM:
+# ld  %dst, ULP_STACK_REAL_SIZE(%r5)
+#
+# C:
+# ulp_stack[ULP_STACK_REAL_SIZE];
+#
+# Now the stack_ptr field in above array holds reference to the actual
+# stack "ulp_stack"(provisioned by mmap). The used_size field indicates
+# the memory used (in bytes) by the entries pushed on the stack, and
+# real_size indicates the total memory allocated for the stack. Stack
+# overflow occurs when used_size >= real_size. In this case, the size
+# of the stack is increased (i.e. realloc'ed) to a larger value.
+#
+# This is the layout of this stack:
+# bytes: 8     16     24     32      used_size           real_size
+# +------------------------------------------------------+
+# | TOC1 | LR1 || TOC2 | LR2 || ... || TOCn | LRn || ... |
+# +------------------------------------------------------+
+#
+# On each redirection, the TOC and LR registers are pushed in this stack
+# (8 bytes per pointer, hence 16 bytes in total).
+
 .section  .tbss,"awT",@nobits
 .align 4
 .type ulp_stack, @object
