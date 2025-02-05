@@ -507,9 +507,9 @@ main(int argc, char **argv, char *envp[] __attribute__((unused)))
   /* Check if command requires ptrace.  */
   if (requires_ptrace(arguments.command) &&
         check_ptrace_scope() == false) {
-    WARN("System has 'ptrace_scope' enabled. Please become root or disable it"
+    WARN("System has 'ptrace_scope' enabled. Please become root or disable it "
          "by setting:\n\n"
-         "$ sudo echo 0 > /proc/sys/kernel/yama/ptrace_scope\n\n"
+         "$ echo 0 | sudo tee /proc/sys/kernel/yama/ptrace_scope\n\n"
          "and try again.");
     return EPERM;
   }
