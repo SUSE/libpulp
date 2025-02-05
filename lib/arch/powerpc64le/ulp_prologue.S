@@ -121,24 +121,31 @@ trampoline_routine:
 .Lexpand_ulp_stack:
 
   # Save all volatile registers
+  # r5 & r6 are designated temp regs, having data already on stack.
+  # After return from expand_ulp_stack, both regs construct values
+  # before use.
   std   %r2,  -24(%r1)
   std   %r3,  -32(%r1)
   std   %r4,  -40(%r1)
-  std   %r5,  -48(%r1)
-  std   %r6,  -56(%r1)
-  std   %r7,  -64(%r1)
-  std   %r8,  -72(%r1)
-  std   %r9,  -80(%r1)
-  std   %r10, -88(%r1)
-  std   %r11, -96(%r1)
-  std   %r12, -104(%r1)
+  std   %r7,  -48(%r1)
+  std   %r8,  -56(%r1)
+  std   %r9,  -64(%r1)
+  std   %r10, -72(%r1)
+  std   %r11, -80(%r1)
+  std   %r12, -88(%r1)
   mfctr %r3
-  std   %r3,  -112(%r1)
+  std   %r3,  -96(%r1)
   mflr  %r3,
-  std   %r3,  -120(%r1)
+  std   %r3,  -104(%r1)
+
+  # As per ppc64le ABIv2, the minimum stack frame is of 32 bytes and
+  # additional 8 bytes padding is needed for alignment in stack frame.
+  # The regs stored in redzone must have this 32+8 bytes padding to form
+  # auxiliary stack frame before calling ulp_stack_helper which will
+  # have its own proper stack frame.
 
   # Move stack register
-  addi  %r1, %r1, -(120 + 32 + 8) # 32 + 8 for padding
+  addi  %r1, %r1, -(104 + 32 + 8) # 32 + 8 for padding
 
   # Fix TOC.  %r12 must be pointing to the address of trampoline_routine.
   addis %r2,%r12, .TOC.-trampoline_routine@ha
@@ -149,24 +156,22 @@ trampoline_routine:
   nop
 
   # Restore stack register.
-  addi  %r1, %r1, (120 + 32 + 8)
+  addi  %r1, %r1, (104 + 32 + 8)
 
   # Restore registers
-  ld    %r3,  -112(%r1)
-  mtctr %r3
-  ld    %r3,  -120(%r1)
+  ld    %r3,  -104(%r1)
   mtlr  %r3
-  ld    %r2,  -24(%r1)
-  ld    %r3,  -32(%r1)
+  ld    %r3,  -96(%r1)
+  mtctr %r3
+  ld    %r12, -88(%r1)
+  ld    %r11, -80(%r1)
+  ld    %r10, -72(%r1)
+  ld    %r9,  -64(%r1)
+  ld    %r8,  -56(%r1)
+  ld    %r7,  -48(%r1)
   ld    %r4,  -40(%r1)
-  ld    %r5,  -48(%r1)
-  ld    %r6,  -56(%r1)
-  ld    %r7,  -64(%r1)
-  ld    %r8,  -72(%r1)
-  ld    %r9,  -80(%r1)
-  ld    %r10, -88(%r1)
-  ld    %r11, -96(%r1)
-  ld    %r12, -104(%r1)
+  ld    %r3,  -32(%r1)
+  ld    %r2,  -24(%r1)
 
   b     .Lcontinue_ulp_prologue
 
