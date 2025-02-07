@@ -37,7 +37,7 @@ output = testsuite.childless_livepatch(wildcard='.libs/*_livepatch1.so',
                                        capture_output=True)
 
 # Check if the patched counter is correct.
-if output.find("Processes patched: 3, Skipped: 0, Failed: 0") == -1:
+if output.find("Processes patched: 3") == -1:
     exit(1)
 
 

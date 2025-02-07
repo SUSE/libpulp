@@ -31,6 +31,13 @@ child = testsuite.spawn('parameters', env=None)
 
 child.expect('Waiting for input.')
 
+# Check if libpulp got loaded in the process.  This may be due to libpulp being
+# loaded as default by the system, hence there is nothing we can do other than
+# skip the test.
+if child.is_so_loaded("libpulp.so") is True:
+  child.close(force=True)
+  exit(77) # Skip test.
+
 child.sendline('')
 child.expect('1-2-3-4-5-6-7-8-9-10');
 child.expect('1.0-2.0-3.0-4.0-5.0-6.0-7.0-8.0-9.0-10.0');
