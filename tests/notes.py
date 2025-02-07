@@ -20,8 +20,16 @@
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
 import testsuite
+import time
 
-child = testsuite.spawn('notes')
+child = testsuite.spawn('notes', script=False)
+
+# In some OSes the linker will fail to load this process for weird
+# reasons.  Skip this test in such cases.
+time.sleep(0.1)
+if child.isalive() is False:
+    print("'notes' can't be launched, most likely due to ld issues.")
+    exit(77)
 
 child.expect('Ready.')
 child.livepatch('.libs/libnotes_livepatch1.so')

@@ -2,6 +2,14 @@
 #include <stdbool.h>
 #include <unistd.h>
 
+void __init_array_start()
+{
+}
+
+void __init_array_end()
+{
+}
+
 __attribute__((noinline))
 bool
 repeat()

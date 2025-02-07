@@ -12,10 +12,18 @@ SECTIONS
   .gnu.version_r     : { *(.gnu.version_r) }
   .rela.dyn          : { *(.rela.*) }
 
+  .rela.plt       :
+    {
+      *(.rela.plt)
+      PROVIDE_HIDDEN (__rela_iplt_start = .);
+      *(.rela.iplt)
+      PROVIDE_HIDDEN (__rela_iplt_end = .);
+    }
+
   /* Executable sections */
   . = ALIGN(CONSTANT (COMMONPAGESIZE));
   .init              : { *(.init) }
-  .plt               : { *(.plt) }
+  .plt               : { *(.plt) *(.iplt) }
   .plt.got           : { *(.plt.got) }
   .plt.sec           : { *(.plt.sec) }
   .text              : { *(.text*) }
@@ -32,7 +40,7 @@ SECTIONS
   .eh_frame          : ONLY_IF_RW { *(.eh_frame) }
   .init_array        : { *(.init_array) }
   .fini_array        : { *(.fini_array) }
-  .got               : { *(.got) }
+  .got               : { *(.got) *(.igot) }
   .got.plt           : { *(.got.plt) }
   .data              : { *(.data*) }
   .bss               : { *(.bss*) *(.*bss) *(COMMON) }
