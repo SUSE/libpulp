@@ -110,6 +110,10 @@ trampoline_routine:
   # Load ulp_stack ptr field.
   ld    %r5, ULP_STACK_PTR(%r5)
 
+  # Point to the top of stack but two, these two entries are popped in
+  # previous step and accessed in next step (stack size decremented before access).
+  add   %r5, %r5, %r6  # ulp_stack + used_size
+
   # Restore saved data.
   ld    %r2, 0(%r5)     # Restore TOC
   ld    %r8, 8(%r5)     # Restore LR
