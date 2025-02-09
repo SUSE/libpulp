@@ -10,6 +10,7 @@ SECTIONS
   .gnu.version       : { *(.gnu.version) }
   .gnu.version_d     : { *(.gnu.version_d) }
   .gnu.version_r     : { *(.gnu.version_r) }
+  .rela.plt          : { *(.rela.plt) }
   .rela.dyn          : { *(.rela.*) }
 
   /* Executable sections */
@@ -30,8 +31,18 @@ SECTIONS
   /* Read-write sections */
   . = ALIGN(CONSTANT (COMMONPAGESIZE));
   .eh_frame          : ONLY_IF_RW { *(.eh_frame) }
-  .init_array        : { *(.init_array) }
-  .fini_array        : { *(.fini_array) }
+  .init_array        :
+  {
+    PROVIDE_HIDDEN (__init_array_start = .);
+    *(.init_array.*)
+    PROVIDE_HIDDEN (__init_array_end = .);
+  }
+  .fini_array        :
+  {
+    PROVIDE_HIDDEN (__fini_array_start = .);
+    *(.fini_array.*)
+    PROVIDE_HIDDEN (__fini_array_end = .);
+  }
   .got               : { *(.got) }
   .got.plt           : { *(.got.plt) }
   .data              : { *(.data*) }
