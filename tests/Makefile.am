@@ -74,6 +74,16 @@ librecursion_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
 
 POST_PROCESS += .libs/librecursion.post
 
+# Target libraries to test recursion2
+check_LTLIBRARIES += librecursion2.la
+noinst_HEADERS += librecursion2.h
+
+librecursion2_la_SOURCES = librecursion2.c
+librecursion2_la_CFLAGS = $(TARGET_CFLAGS)
+librecursion2_la_LDFLAGS = $(TARGET_LDFLAGS) $(CONVENIENCE_LDFLAGS)
+
+POST_PROCESS += .libs/librecursion2.post
+
 # Target libraries to test live patches blocked in threads
 check_LTLIBRARIES += libblocked.la
 noinst_HEADERS += libblocked.h
@@ -219,6 +229,7 @@ check_LTLIBRARIES += libdozens_livepatch1.la \
                      libparameters_livepatch3.la \
                      libprocess_livepatch1.la \
                      librecursion_livepatch1.la \
+                     librecursion2_livepatch1.la \
                      libblocked_livepatch1.la \
                      libpagecross_livepatch1.la \
                      libaddress_livepatch1.la \
@@ -272,6 +283,9 @@ libprocess_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
 librecursion_livepatch1_la_SOURCES = librecursion_livepatch1.c
 librecursion_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
+
+librecursion2_livepatch1_la_SOURCES = librecursion2_livepatch1.c
+librecursion2_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
 libblocked_livepatch1_la_SOURCES = libblocked_livepatch1.c
 libblocked_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
@@ -347,6 +361,8 @@ METADATA = \
   libparameters_livepatch3.ulp \
   librecursion_livepatch1.dsc \
   librecursion_livepatch1.ulp \
+  librecursion2_livepatch1.dsc \
+  librecursion2_livepatch1.ulp \
   libblocked_livepatch1.dsc \
   libblocked_livepatch1.ulp \
   libpagecross_livepatch1.dsc \
@@ -396,6 +412,7 @@ EXTRA_DIST = \
   libparameters_livepatch2.in \
   libparameters_livepatch3.in \
   librecursion_livepatch1.in \
+  librecursion2_livepatch1.in \
   libblocked_livepatch1.in \
   libpagecross_livepatch1.in \
   libaddress_livepatch1.in \
@@ -424,6 +441,7 @@ check_PROGRAMS = \
   numserv_bsymbolic \
   parameters \
   recursion \
+  recursion2 \
   blocked \
   deadlock \
   asunsafe_conversion \
@@ -487,6 +505,10 @@ syscall_restart_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 recursion_SOURCES = recursion.c
 recursion_LDADD = librecursion.la
 recursion_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
+
+recursion2_SOURCES = recursion2.c
+recursion2_LDADD = librecursion2.la
+recursion2_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
 blocked_SOURCES = blocked.c
 blocked_CFLAGS = -pthread $(AM_CFLAGS)
@@ -623,6 +645,7 @@ TESTS = \
   numserv_bsymbolic.py \
   parameters.py \
   recursion.py \
+  recursion2.py \
   blocked.py \
   deadlock.py \
   asunsafe_conversion.py \

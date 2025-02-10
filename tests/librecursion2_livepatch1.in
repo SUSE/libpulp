@@ -1,0 +1,4 @@
+__ABS_BUILDDIR__/.libs/librecursion2_livepatch1.so
+@__ABS_BUILDDIR__/.libs/librecursion2.so.0
+func_1:new_func_1
+func_2:new_func_2
