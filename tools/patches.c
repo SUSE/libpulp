@@ -451,14 +451,15 @@ bool check_preamble(ElfW(Addr) sym_address, pid_t pid);
  *
  * @param patch  The list of patches loaded in the target process.
  * @param obj    The libary object.
- * @param pid    Pid of target process.
+ * @param p      The process to analyze.
  *
  * @return       True if livepatchable, False if not.
  */
 static bool
 is_library_livepatchable(struct ulp_applied_patch *patch,
-                         struct ulp_dynobj *obj, pid_t pid)
+                         struct ulp_dynobj *obj, struct ulp_process *p)
 {
+  pid_t pid = p->pid;
   int i, ret;
   if (has_livepatch_loaded(patch, obj->filename))
     return true;
@@ -469,14 +470,8 @@ is_library_livepatchable(struct ulp_applied_patch *patch,
     goto detach_process;
   }
 
-  ElfW(Addr) ehdr_addr = obj->link_map.l_addr;
+  ElfW(Addr) ehdr_addr = get_ehdr_addr(p, obj);
   ElfW(Addr) dynsym_addr = obj->dynsym_addr;
-
-  if (ehdr_addr == 0) {
-    /* If l_addr is zero, it means that there is no load bias.  In that case,
-     * the elf address is on address 0x400000 on x86_64.  */
-    ehdr_addr = EXECUTABLE_START;
-  }
 
   /* FIXME: Some applications take a very long time to decide if library is
      livepatchable because the library has a lot of symbols.  In this case we
@@ -561,7 +556,7 @@ print_process(struct ulp_process *process, int print_buildid,
   if (!object_item)
     printf("    (none)\n");
   while (object_item) {
-    if (is_library_livepatchable(patch, object_item, pid)) {
+    if (is_library_livepatchable(patch, object_item, process)) {
       printf("    in %s", object_item->filename);
       if (print_buildid)
         printf(" (%s)", buildid_to_string(object_item->build_id));
