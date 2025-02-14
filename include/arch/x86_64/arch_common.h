@@ -22,9 +22,6 @@ typedef struct user_regs_struct registers_t;
 /** Set the GLOBAL ENTRYPOINT REGISTER, which in x86_64 doesn't exist.  */
 #define SET_GLOBAL_ENTRYPOINT_REG(reg, val)
 
-/** Program load bias, which can be recovered by running `ld --verbose`.  */
-#define EXECUTABLE_START      0x400000UL
-
 /** The red zone.  */
 #define RED_ZONE_LEN          128
 
