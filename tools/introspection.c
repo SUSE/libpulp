@@ -517,6 +517,81 @@ get_dynobj_elf_by_cache(struct ulp_process *process)
 }
 #endif // ENABLE_DLINFO_CACHE
 
+
+/** @brief Parsers /proc/pid/maps to figure the EHDR mapping of dynamic object.
+ *
+ * This function reads the /proc/pid/maps to find the EHDR mapping of the
+ * dynamic object.  Usually this can be found by looking at the link_map.l_addr
+ * field, however for the main process this information is not available there.
+ *
+ * NOTE: This information is cached in the link_map struct if its value was
+ *       originally 0.
+ *
+ * @param p   process to analyze.
+ * @param obj Object representing a library, or the main program itself, from p.
+ *
+ * @return 0 on success, anything else on failure.
+ */
+ElfW(Addr)
+get_ehdr_addr(struct ulp_process *p, struct ulp_dynobj *obj)
+{
+  if (obj->link_map.l_addr) {
+    return obj->link_map.l_addr;
+  }
+
+  const char *format_str = "/proc/%d/maps";
+  char filename[strlen(format_str) + 10];
+  sprintf(filename, format_str, p->pid);
+
+  FILE *maps = fopen(filename, "r");
+  if (maps == NULL) {
+    DEBUG("error: unable to open maps.");
+    return 0;
+  }
+
+  char *line = NULL;
+  size_t len = 0;
+  ssize_t n;
+
+  while ((n = getline(&line, &len, maps)) != -1) {
+    const char *str_addr1  =    strtok(line, "-");
+    /* clang-format off */
+
+ /* const char *str_addr2  = */ strtok(NULL, " ");
+ /* const char *str_perm   = */ strtok(NULL, " ");
+ /* const char *str_offset = */ strtok(NULL, " ");
+ /* const char *str_dev    = */ strtok(NULL, " ");
+ /* const char *str_inode  = */ strtok(NULL, " ");
+    const char *str_path   =    strtok(NULL, " ");
+
+    /* clang-format on */
+
+    /* Get the basename (last string after all /) and remove the newline there
+       if it exists.  */
+    char *bin_name = (char *) get_basename(str_path);
+    unsigned bin_len = strlen(bin_name);
+    if (bin_name[bin_len-1] == '\n') {
+      bin_name[bin_len-1] = '\0';
+    }
+
+    if (strcmp(bin_name, p->dynobj_main->filename) == 0) {
+      ElfW(Addr) addr1 = strtoul(str_addr1, NULL, 16);
+
+      /* Store in the unused link_map struct.  */
+      obj->link_map.l_addr = addr1;
+
+      fclose(maps);
+      FREE_AND_NULLIFY(line);
+      return addr1;
+    }
+  }
+
+  fclose(maps);
+  FREE_AND_NULLIFY(line);
+
+  return 0UL;
+}
+
 /** @brief Parses ELF headers of dynobj `obj` from process with pid `pid`.
  *
  * This function read the remote process memory to locate the following
@@ -533,8 +608,10 @@ get_dynobj_elf_by_cache(struct ulp_process *process)
  * @return 0 on success, anything else on failure.
  */
 int
-parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
+parse_dynobj_elf_headers(struct ulp_process *p, struct ulp_dynobj *obj)
 {
+  pid_t pid = p->pid;
+
   ElfW(Addr) ehdr_addr = 0;
   ElfW(Ehdr) ehdr;
   ElfW(Addr) phdr_addr = 0;
@@ -560,17 +637,9 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
   }
 
   /* l_addr holds the pointer to the ELF header.  */
-  ehdr_addr = obj->link_map.l_addr;
+  ehdr_addr = get_ehdr_addr(p, obj); //obj->link_map.l_addr;
 
-  /* Read ELF header from remote process.  */
-  if (ehdr_addr == 0) {
-    /* If l_addr is zero, it means that there is no load bias.  In that case,
-     * the elf address is on address 0x400000 on x86_64.  */
-    ret = read_memory((char *)&ehdr, sizeof(ehdr), pid, EXECUTABLE_START);
-  }
-  else {
-    ret = read_memory((char *)&ehdr, sizeof(ehdr), pid, ehdr_addr);
-  }
+  ret = read_memory((char *)&ehdr, sizeof(ehdr), pid, ehdr_addr);
   if (ret != 0) {
     DEBUG("Unable to read ELF header from process %d\n", pid);
     return ETARGETHOOK;
@@ -584,8 +653,6 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
 
   /* Get first process header address.  */
   phdr_addr = ehdr_addr + ehdr.e_phoff;
-  if (ehdr_addr == 0)
-    phdr_addr += EXECUTABLE_START;
 
   /* Iterate over each process header.  */
   for (i = 0; i < ehdr.e_phnum; i++) {
@@ -602,7 +669,11 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
     /* Look for the dynamic section.  */
     if (phdr.p_type == PT_DYNAMIC && !pt_dynamic_ran) {
       ElfW(Dyn) dyn;
-      ElfW(Addr) dyn_addr = ehdr_addr + phdr.p_paddr;
+      ElfW(Addr) dyn_addr;
+
+      /* When the loaded object is a library, the vaddr is not absolute and
+         must be added with its bias.  */
+      dyn_addr = (obj == p->dynobj_main) ? phdr.p_vaddr : ehdr_addr + phdr.p_vaddr;
 
       /* Iterate over each tag in this section.  */
       do {
@@ -647,8 +718,12 @@ parse_dynobj_elf_headers(int pid, struct ulp_dynobj *obj)
     }
     else if (phdr.p_type == PT_NOTE) {
       /* We are after the build id.  */
+      ElfW(Addr) note_addr;
 
-      ElfW(Addr) note_addr = ehdr_addr + phdr.p_paddr;
+      /* When the loaded object is a library, the vaddr is not absolute and
+         must be added with its bias.  */
+      note_addr = (obj == p->dynobj_main) ? phdr.p_vaddr : ehdr_addr + phdr.p_offset;
+
       unsigned sec_size = phdr.p_memsz;
       ElfW(Addr) note_addr_end = note_addr + sec_size;
 
@@ -1115,7 +1190,7 @@ parse_main_dynobj(struct ulp_process *process)
     return ret;
   }
 
-  parse_dynobj_elf_headers(process->pid, obj);
+  parse_dynobj_elf_headers(process, obj);
 
   return 0;
 }
@@ -1158,7 +1233,7 @@ parse_lib_dynobj(struct ulp_dynobj *obj, struct ulp_process *process)
   /* Pointers to linux-vdso.so are invalid, so skip this library.  */
   if (strcmp(obj->filename, "linux-vdso.so.1") &&
       strcmp(obj->filename, "linux-vdso64.so.1"))
-    parse_dynobj_elf_headers(pid, obj);
+    parse_dynobj_elf_headers(process, obj);
 
   /* Only libpulp.so should have those symbols exported.  */
   if (strstr(libname, "libpulp.so")) {

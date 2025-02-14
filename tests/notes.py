@@ -22,11 +22,6 @@
 import testsuite
 import platform
 
-if platform.processor() == 'ppc64le':
-  # Skip this test on ppc64le, as for some reason the build id of the
-  # main process is not found by libpulp.
-  exit(77)
-
 child = testsuite.spawn('notes')
 
 child.expect('Ready.')

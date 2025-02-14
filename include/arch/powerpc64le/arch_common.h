@@ -4,9 +4,6 @@
 /** Offset of TLS pointer.  */
 #define TLS_DTV_OFFSET 0x8000
 
-/* Program load bias, which can be recovered by running `ld --verbose`.  */
-#define EXECUTABLE_START         0x10000000UL
-
 /* The Red zone.  */
 #define RED_ZONE_LEN             512
 

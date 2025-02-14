@@ -205,6 +205,8 @@ get_process_name(struct ulp_process *process)
   return get_basename(process->dynobj_main->filename);
 }
 
+ElfW(Addr) get_ehdr_addr(struct ulp_process *, struct ulp_dynobj *);
+
 ulp_error_t get_libpulp_error_state_remote(struct ulp_process *);
 
 const char *adjust_prefix_for_chroot(struct ulp_process *,
