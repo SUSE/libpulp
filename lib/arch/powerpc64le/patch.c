@@ -259,8 +259,8 @@ void ulp_stack_helper(void)
   /* Storage depleted, allocate a new stack.  */
   unsigned long old_size = ulp_stack[ULP_STACK_REAL_SIZE];
 
-  /* Setup new size.  */
-  ulp_stack[ULP_STACK_REAL_SIZE] += 32;
+  /* Setup new stack size. Increase by PAGESIZE to be optimal */
+  ulp_stack[ULP_STACK_REAL_SIZE] += sysconf(_SC_PAGESIZE);
   ulp_stack[ULP_STACK_REAL_SIZE] *= 2;
 
   void *old = (void *)ulp_stack[ULP_STACK_PTR];
