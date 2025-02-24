@@ -256,6 +256,9 @@ void ulp_stack_helper(void)
      caller), so just assert it here.  */
   libpulp_assert(ulp_stack[ULP_STACK_REAL_SIZE] <= ulp_stack[ULP_STACK_USED_SIZE]);
 
+  /* NOTE: be careful with the functions we call here.  If we call a certain
+     function here, then we may have problems livepatching it.  */
+
   /* Storage depleted, allocate a new stack.  */
   unsigned long old_size = ulp_stack[ULP_STACK_REAL_SIZE];
 
@@ -264,8 +267,6 @@ void ulp_stack_helper(void)
   ulp_stack[ULP_STACK_REAL_SIZE] *= 2;
 
   void *old = (void *)ulp_stack[ULP_STACK_PTR];
-
-  DEBUG("thread %lu: expanding stack to %lu bytes", pthread_self(), ulp_stack[ULP_STACK_REAL_SIZE]);
 
   /* Allocate buffer for our stack.  */
   void *new = mmap(NULL, ulp_stack[ULP_STACK_REAL_SIZE],
@@ -280,13 +281,25 @@ void ulp_stack_helper(void)
 
   /* In case we have a previous allocated buffer, then copy this.  */
   if (old != NULL) {
-    memcpy(new, old, old_size);
+
+    /* We can't use memcpy here, hence do our thing.  */
+    unsigned char *restrict oldp = old;
+    unsigned char *restrict newp = new;
+    unsigned long s = old_size;
+
+    while (s > 0) {
+      *newp++ = *oldp++;
+      s--;
+    }
+
     munmap(old, old_size);
     old = NULL;
   }
 
   ulp_stack[ULP_STACK_PTR] = (unsigned long) new;
   libpulp_assert(ulp_stack[ULP_STACK_PTR] != 0L);
+
+  DEBUG("thread %lu: expanded stack to %lu bytes", pthread_self(), ulp_stack[ULP_STACK_REAL_SIZE]);
 
   /* Setup destructor for mmap memory, so we don't leak memory when a thread
      is destroyed.  */
