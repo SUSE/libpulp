@@ -1,6 +1,6 @@
 #   libpulp - User-space Livepatching Library
 #
-#   Copyright (C) 2020-2024 SUSE Software Solutions GmbH
+#   Copyright (C) 2020-2025 SUSE Software Solutions GmbH
 #
 #   This file is part of libpulp.
 #
@@ -17,7 +17,7 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-AC_INIT([libpulp],[0.3.10],[noreply@suse.com])
+AC_INIT([libpulp],[0.3.11],[noreply@suse.com])
 
 # Keep most generated files under the config directory.
 AC_CONFIG_AUX_DIR([config])
