@@ -695,7 +695,8 @@ TESTS = \
   insn_queue.py \
   chroot.py \
   visibility.py \
-  notes.py
+  notes.py \
+  textrel.py
 
 XFAIL_TESTS = \
   blocked.py \
