@@ -249,8 +249,10 @@ ulp_pthread_key_init(void)
  * In the ulp prologue in ppc64le we need to save the TOC and LR registers
  * before redirect into a new function, and we store it in a stack allocated
  * by mmap.  This routine does exactly this.
+ *
+ * @return  The address of the ulp_stack object.
  */
-void ulp_stack_helper(void)
+void *ulp_stack_helper(void)
 {
   /* Comparison should have been done in trampoline_routine (this function
      caller), so just assert it here.  */
@@ -276,7 +278,7 @@ void ulp_stack_helper(void)
     /* In this case the system is out of memory...  And there is nothing
        we can do.  */
     libpulp_crash("libpulp: mmap returned -1, application can not continue\n");
-    return;
+    return ulp_stack;
   }
 
   /* In case we have a previous allocated buffer, then copy this.  */
@@ -304,4 +306,6 @@ void ulp_stack_helper(void)
   /* Setup destructor for mmap memory, so we don't leak memory when a thread
      is destroyed.  */
   pthread_once(&ulp_once_control, ulp_pthread_key_init);
+
+  return ulp_stack;
 }

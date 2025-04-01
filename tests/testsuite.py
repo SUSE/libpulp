@@ -39,6 +39,7 @@ testname = os.path.basename(testname[0])
 # Libpulp definitions
 builddir = os.getcwd()
 ulptool = builddir + '/../tools/ulp'
+libpulp_path = builddir + '/../lib/.libs/libpulp.so'
 
 # Check if certain library is livepatchable.
 def is_library_livepatchable(library):
@@ -116,7 +117,7 @@ class spawn(pexpect.spawn):
 
     # If env has not been provided, default to LD_PRELOAD'ing libpulp.so.
     if env == Ellipsis:
-      env = {'LD_PRELOAD': builddir + '/../lib/.libs/libpulp.so'}
+      env = {'LD_PRELOAD': libpulp_path}
 
     # Spawn the testcase with pexpect and enable logging.
     super().__init__(testname, timeout=timeout, env=env, encoding=encoding,
