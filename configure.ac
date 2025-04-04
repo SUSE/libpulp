@@ -132,8 +132,17 @@ AM_PATH_PYTHON([3])
 AX_PYTHON_MODULE([pexpect], [fatal])
 AX_PYTHON_MODULE([psutil], [fatal])
 
+_SPLIT_PATCH_NOPS=""
+
+# Check if compiler provides -msplit-patch-nops.  It may be required on
+# some architectures.
+AX_CHECK_COMPILE_FLAG([-msplit-patch-nops],
+  [_SPLIT_PATCH_NOPS="-msplit-patch-nops"],
+  [_SPLIT_PATCH_NOPS=""])
+
 # Add the following flags to the compilation of all files
-AC_SUBST([AM_CFLAGS], ["-Wall -Wextra -Werror"])
+AC_SUBST([AM_CFLAGS], ["-Wall -Wextra -Werror $_SPLIT_PATCH_NOPS"])
+AC_SUBST([AM_CXXFLAGS], ["-Wall -Wextra -Werror $_SPLIT_PATCH_NOPS"])
 AC_SUBST([AM_CCASFLAGS], ["-Wa,--fatal-warnings"])
 
 # Checking the call stack of all threads enables libpulp to only apply a live
