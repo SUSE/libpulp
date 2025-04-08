@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <sys/mman.h>
+#include <sys/syscall.h>
 
 #include <stddef.h>
 #include <string.h>
@@ -271,7 +272,7 @@ void *ulp_stack_helper(void)
   void *old = (void *)ulp_stack[ULP_STACK_PTR];
 
   /* Allocate buffer for our stack.  */
-  void *new = mmap(NULL, ulp_stack[ULP_STACK_REAL_SIZE],
+  void *new = (void*) syscall(SYS_mmap, NULL, ulp_stack[ULP_STACK_REAL_SIZE],
                    PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
   if (new == (void *) -1) {
