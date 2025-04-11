@@ -134,15 +134,9 @@ AX_PYTHON_MODULE([psutil], [fatal])
 
 _SPLIT_PATCH_NOPS=""
 
-# Check if compiler provides -msplit-patch-nops.  It may be required on
-# some architectures.
-AX_CHECK_COMPILE_FLAG([-msplit-patch-nops],
-  [_SPLIT_PATCH_NOPS="-msplit-patch-nops"],
-  [_SPLIT_PATCH_NOPS=""])
-
 # Add the following flags to the compilation of all files
-AC_SUBST([AM_CFLAGS], ["-Wall -Wextra -Werror $_SPLIT_PATCH_NOPS"])
-AC_SUBST([AM_CXXFLAGS], ["-Wall -Wextra -Werror $_SPLIT_PATCH_NOPS"])
+AC_SUBST([AM_CFLAGS], ["-Wall -Wextra -Werror"])
+AC_SUBST([AM_CXXFLAGS], ["-Wall -Wextra -Werror"])
 AC_SUBST([AM_CCASFLAGS], ["-Wa,--fatal-warnings"])
 
 # Checking the call stack of all threads enables libpulp to only apply a live
@@ -272,6 +266,12 @@ AC_DEFINE_UNQUOTED([LD_LINUX], ["$_LD_LINUX"],
 AM_CONDITIONAL([CPU_X86_64],  [test "$_PROC" == "x86_64"])
 AM_CONDITIONAL([CPU_PPC64LE], [test "$_PROC" == "powerpc64le"])
 
+# Check if compiler provides -msplit-patch-nops.  It may be required on
+# some architectures.
+AX_CHECK_COMPILE_FLAG([-msplit-patch-nops],
+  [AX_APPEND_FLAG([-msplit-patch-nops])],
+  [])
+
 # Check if -fpatchable-function-entry=$ULP_NOPS_LEN,$RE_NOPS_LEN works
 # correctly.
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
@@ -281,12 +281,36 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
   [patchable_works=yes],
   [patchable_works=no])
 
-# Fix some problems with the Makefiles expecting a default value for AM_LDFLAGS
-AC_SUBST([AM_LDFLAGS], [""])
-
 AS_IF([test "x$patchable_works" == "xno"],
 AC_MSG_ERROR(
 [The -fpatchable-functions-entry flag of your C compiler does not work correctly]))
+
+# Now check for C++.
+AC_LANG_PUSH([C++])
+# Check if compiler provides -msplit-patch-nops.  It may be required on
+# some architectures.
+AX_CHECK_COMPILE_FLAG([-msplit-patch-nops],
+  [AX_APPEND_FLAG([-msplit-patch-nops])],
+  [])
+
+# Check if -fpatchable-function-entry=$ULP_NOPS_LEN,$RE_NOPS_LEN works
+# correctly.
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
+  [[extern void g(void);
+    __attribute__((patchable_function_entry($_NOPS_LEN, $_PRE_NOPS_LEN)))
+    void f(void) { g(); }]])],
+  [patchable_works=yes],
+  [patchable_works=no])
+
+AS_IF([test "x$patchable_works" == "xno"],
+AC_MSG_ERROR(
+[The -fpatchable-functions-entry flag of your C++ compiler does not work correctly]))
+
+AC_LANG_POP([C++])
+
+# Fix some problems with the Makefiles expecting a default value for AM_LDFLAGS
+AC_SUBST([AM_LDFLAGS], [""])
+
 
 AC_CONFIG_FILES([Makefile
 		 include/Makefile
