@@ -246,7 +246,8 @@ check_LTLIBRARIES += libdozens_livepatch1.la \
                      libcomments_livepatch1.la \
                      libvisibility_livepatch1.la \
                      libvisibility_livepatch2.la \
-                     libnotes_livepatch1.la
+                     libnotes_livepatch1.la \
+                     libsecdis_livepatch1.la
 
 libdozens_livepatch1_la_SOURCES = libdozens_livepatch1.c
 libdozens_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
@@ -338,6 +339,9 @@ libvisibility_livepatch2_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 libnotes_livepatch1_la_SOURCES = libnotes_livepatch1.c
 libnotes_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
 
+libsecdis_livepatch1_la_SOURCES = libsecdis_livepatch1.c
+libsecdis_livepatch1_la_LDFLAGS = $(CONVENIENCE_LDFLAGS)
+
 METADATA = \
   libdozens_livepatch1.dsc \
   libdozens_livepatch1.ulp \
@@ -398,7 +402,9 @@ METADATA = \
   libvisibility_livepatch2.dsc \
   libvisibility_livepatch2.ulp \
   libnotes_livepatch1.dsc \
-  libnotes_livepatch1.ulp
+  libnotes_livepatch1.ulp \
+  libsecdis_livepatch1.dsc \
+  libsecdis_livepatch1.ulp
 
 EXTRA_DIST = \
   libdozens_livepatch1.in \
@@ -430,7 +436,8 @@ EXTRA_DIST = \
   libstress_livepatch1.in \
   libvisibility_livepatch1.in \
   libvisibility_livepatch2.in \
-  libnotes_livepatch1.in
+  libnotes_livepatch1.in \
+  libsecdis_livepatch1.in
 
 clean-local:
 	rm -f $(METADATA)
@@ -696,7 +703,8 @@ TESTS = \
   chroot.py \
   visibility.py \
   notes.py \
-  textrel.py
+  textrel.py \
+  seccomp_disable.py
 
 XFAIL_TESTS = \
   blocked.py \

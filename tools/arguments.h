@@ -61,6 +61,7 @@ struct arguments
   int recursive;
   int no_summarization;
   int only_livepatched;
+  int disable_seccomp;
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
   int check_stack;
 #endif

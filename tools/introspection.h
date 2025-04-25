@@ -173,7 +173,8 @@ int set_path_buffer(struct ulp_process *process, const char *path);
 
 int patch_applied(struct ulp_process *process, unsigned char *id, int *result);
 
-int apply_patch(struct ulp_process *process, void *metadata, size_t size);
+int apply_patch(struct ulp_process *process, void *metadata, size_t size,
+                bool disable_seccomp_p);
 
 int revert_patches_from_lib(struct ulp_process *, const char *);
 

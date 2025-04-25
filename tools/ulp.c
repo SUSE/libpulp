@@ -131,6 +131,7 @@ static const char doc[] =
 #define ULP_OP_RECURSIVE 261
 #define ULP_OP_DISABLE_SUMMARIZATION 262
 #define ULP_OP_ONLY_LIVEPATCHED 263
+#define ULP_OP_DISABLE_SECCOMP 264
 
 static struct argp_option options[] = {
   { 0, 0, 0, 0, "Options:", 0 },
@@ -156,6 +157,8 @@ static struct argp_option options[] = {
   { "recursive", ULP_OP_RECURSIVE, 0, 0, "Search for patches recursively", 0 },
   { "root", 'R', "PREFIX", 0,
     "Append prefix to livepatch path when passing it to target process", 0 },
+  { "disable-seccomp", ULP_OP_DISABLE_SECCOMP, 0, 0,
+    "disable seccomp filters on target process (use for testing purposes)", 0 },
 #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
   { "check-stack", 'c', 0, 0, "Check the call stack before live patching", 0 },
 #endif
@@ -369,6 +372,10 @@ parser(int key, char *arg, struct argp_state *state)
 
     case ULP_OP_ONLY_LIVEPATCHED:
       arguments->only_livepatched = 1;
+      break;
+
+    case ULP_OP_DISABLE_SECCOMP:
+      arguments->disable_seccomp = 1;
       break;
 
     case 'u':

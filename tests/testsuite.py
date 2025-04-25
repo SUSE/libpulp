@@ -235,7 +235,8 @@ class spawn(pexpect.spawn):
   # output for more information).
   def livepatch(self, filename=None, timeout=10, retries=1,
                 verbose=True, quiet=False, revert=False, revert_lib=None,
-                sanity=True, prefix=None, capture_tool_output=False):
+                sanity=True, prefix=None, capture_tool_output=False,
+                disable_seccomp=False):
 
     # Check sanity of command-line arguments
     if sanity is True:
@@ -263,6 +264,8 @@ class spawn(pexpect.spawn):
     if prefix is not None:
       command.append('-R')
       command.append(str(prefix))
+    if disable_seccomp is True:
+      command.append('--disable-seccomp')
 
     # Apply the live patch and check for common errors
     try:
