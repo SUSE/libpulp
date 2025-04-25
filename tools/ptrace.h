@@ -62,6 +62,8 @@ int get_regs(int pid, registers_t *regs);
 
 int set_regs(int pid, registers_t *regs);
 
+int disable_seccomp(int pid);
+
 void set_run_and_redirect_timeout(long t);
 
 int run_and_redirect(int pid, registers_t *regs,

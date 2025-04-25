@@ -47,6 +47,7 @@
 static bool recursive_mode;
 static bool disable_summarization;
 static const char *prefix = NULL;
+static bool disable_seccomp_p;
 
 static bool
 skippable_error(ulp_error_t err)
@@ -186,7 +187,7 @@ trigger_one_process(struct ulp_process *target, int retries,
     }
 
     if (livepatch && !skip_patch_apply) {
-      result = apply_patch(target, livepatch, livepatch_size);
+      result = apply_patch(target, livepatch, livepatch_size, disable_seccomp_p);
       if (result == -1) {
         FATAL(
             "fatal error during live patch application (hijacked execution).");
@@ -564,6 +565,64 @@ trigger_many_processes(const char *process_wildcard, int retries,
 
 extern bool enable_threading;
 
+/** @brief Check if the ulp tool can disable seccomp
+ *
+ * Disabling seccomp needs a special capability CAP_SYS_ADMIN which the
+ * user may not have.  Hence we need to check if the user have this.
+ *
+ * @return true if capability is met, false otherwise.
+*/
+static bool check_sys_admin(void)
+{
+  bool ret = false;
+
+  /* Index according to libcap.  */
+  const int index = 21;
+
+  /* Open the status file of `ulp` tool process.  */
+  FILE *file = fopen("/proc/self/status", "r");
+
+  /* Well, if we can't open the status file we surely are not priviledged.  */
+  if (file == NULL) {
+    return false;
+  }
+
+  ssize_t nread;
+  size_t size;
+  char *line = NULL;
+
+  while ((nread = getline(&line, &size, file)) != -1) {
+    char *token = strtok(line, " \t\n");
+    if (strcmp(token, "CapPrm:") == 0) {
+      /* Found field.  Lets parse it.  */
+      char *value_str = strtok(NULL, " \t\n");
+      uint64_t value;
+      int reads = sscanf(value_str, "%lx", &value);
+
+      if (reads != 1) {
+        /* Error reading string.  */
+        ret = false;
+        goto sys_adm_clear;
+      }
+
+      /* Check if we got the capability we want.  */
+      if ((value & (1 << index)) != 0) {
+        ret = true;
+      } else {
+        ret = false;
+      }
+
+      /* Clean everything and return.  */
+      goto sys_adm_clear;
+    }
+  }
+  
+sys_adm_clear:
+  FREE_AND_NULLIFY(line);
+  fclose(file);
+  return ret;
+}
+
 /** @brief Trigger command entry point.
  */
 int
@@ -575,6 +634,7 @@ run_trigger(struct arguments *arguments)
   enable_threading = !arguments->disable_threads;
   recursive_mode = arguments->recursive;
   disable_summarization = arguments->no_summarization;
+  disable_seccomp_p = arguments->disable_seccomp;
 
   bool check_stack = false;
   const char *library = arguments->library;
@@ -587,6 +647,12 @@ run_trigger(struct arguments *arguments)
   if (arguments->user_wildcard) {
     WARN("error: user wildcard is currently unsupported in trigger");
     return ENOSYS;
+  }
+
+  if (disable_seccomp_p && !check_sys_admin()) {
+    WARN("error: disabling seccomp requires CAP_SYS_ADMIN, but user does not provide it.\n"
+         "suggestion: run ulp as root.");
+    return EPERM;
   }
 
   /* Set global static prefix variable.  */

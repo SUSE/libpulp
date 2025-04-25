@@ -466,6 +466,21 @@ set_regs(int pid, registers_t *regs)
   return 0;
 }
 
+/** @brief Disable seccomp in the target process.
+ *
+ * @return 0 if success, anything else if error.
+ */
+int
+disable_seccomp(int pid)
+{
+  if (ulp_ptrace(PTRACE_SETOPTIONS, pid, NULL, (void *)PTRACE_O_SUSPEND_SECCOMP)) {
+    DEBUG("PTRACE_O_SUSPEND_SECCOMP error: %s.\n", strerror(errno));
+    return errno;
+  }
+
+  return 0;
+}
+
 /** @brief Set timeout timer on run_and_redirect function
  *
  * If for some reason libpulp.so deadlocks when livepatching, the only

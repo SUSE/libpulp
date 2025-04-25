@@ -1666,7 +1666,8 @@ patch_applied(struct ulp_process *process, unsigned char *id, int *result)
  * called after successful thread hijacking.
  */
 int
-apply_patch(struct ulp_process *process, void *metadata, size_t metadata_size)
+apply_patch(struct ulp_process *process, void *metadata, size_t metadata_size,
+            bool disable_seccomp_p)
 {
   int ret;
   struct ulp_thread *thread;
@@ -1686,6 +1687,13 @@ apply_patch(struct ulp_process *process, void *metadata, size_t metadata_size)
   if (set_metadata_buffer(process, metadata, metadata_size)) {
     WARN("unable to write live patch path into target process memory.");
     return ETARGETHOOK;
+  }
+
+  if (disable_seccomp_p) {
+    if (disable_seccomp(process->pid)) {
+      WARN("unable to disable seccomp in target process: %s", libpulp_strerror(errno));
+      return errno;
+    }
   }
 
   thread = process->main_thread;
