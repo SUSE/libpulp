@@ -22,28 +22,56 @@
 import re
 import testsuite
 import subprocess
+import os
+import signal
 
 # Make sure we can call libc.so.6 and it doesn't crash.
 
 # Distros can have libc in many many places, there seems to be no
 # standard way.  So we try them all.
 libc_potential_paths = (
-  '/usr/lib64/libc.so.6',
-  '/lib64/libc.so.6',
-  '/usr/lib/libc.so.6',
-  '/lib/libc.so.6',
+  '/usr/lib64/',
+  '/lib64/',
+  '/usr/lib/',
+  '/lib/',
 )
 
+# Global variables with the path of libdl and libc.
+path_libc = None
+path_libdl = None
+
+# Old versions of glibc has 'libdl.so.2' not integrated into libc.so.6.
+# Try to find where it is.
+for path in libc_potential_paths:
+  libdl = path + 'libdl.so.2'
+  libc = path + 'libc.so.6'
+
+  if path_libdl is None and os.path.isfile(libdl):
+    # libdl found.
+    path_libdl = libdl
+
+  if path_libc is None and os.path.isfile(libc):
+    # libc found.
+    path_libc = libc
+
+# Older versions of glibc has a bug where calling libc.so.6 with libdl.so.2
+# preloaded causes it to crash.  Check if we are in such case.
+if path_libdl is not None:
+  env = {'LD_PRELOAD': path_libdl}
+  proc = subprocess.Popen(path_libc, stderr=subprocess.STDOUT, env=env)
+  proc.wait()
+
+  if proc.returncode == -signal.SIGSEGV:
+    # Our glibc has this bug. There is nothing we can do.
+    exit(77)
+
+# Proceed with the test.
 env = {'LD_PRELOAD': testsuite.libpulp_path}
 
-for libc in libc_potential_paths:
-  try:
-    output = subprocess.check_output(libc, timeout=2, stderr=subprocess.STDOUT, env=env)
-    gnu = re.search('GNU C Library', output.decode())
-    if gnu:
-      exit(0)
-  except FileNotFoundError:
-    pass
+output = subprocess.check_output(path_libc, timeout=5, stderr=subprocess.STDOUT, env=env)
+gnu = re.search('GNU C Library', output.decode())
+if gnu:
+  exit(0)
 
 
 # We tested them all and everything failed.
