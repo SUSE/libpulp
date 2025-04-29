@@ -36,6 +36,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <sys/param.h>
 
 #include "config.h"
 #include "ld_rtld.h"
@@ -49,9 +50,16 @@
 
 /* Declare internal glibc functions which are exposed. We have to use them
    while __ulp_asunsafe_begin have not run yet.  */
+extern void __libc_free(void *);
 extern void *__libc_malloc(size_t);
 extern void *__libc_calloc(size_t, size_t);
-extern void __libc_free(void *);
+extern void *__libc_realloc(void *, size_t);
+extern void *__libc_reallocarray(void *, size_t, size_t);
+extern void *__libc_valloc(size_t);
+extern void *__libc_pvalloc(size_t);
+extern void *__libc_memalign(size_t, size_t);
+/* aligned_alloc doesn't have an alternate public symbol.  */
+/* posix_memalign doesn't have an alternate public symbol.  */
 extern const char *__progname;
 
 static int flag = 0;
@@ -592,6 +600,8 @@ __ulp_asunsafe_begin(void)
   if (real_malloc)
     return;
 
+  bool ok = true;
+
   real_dlopen = dlsym(RTLD_NEXT, "dlopen");
   real_dlmopen = dlsym(RTLD_NEXT, "dlmopen");
   real_dlclose = dlsym(RTLD_NEXT, "dlclose");
@@ -599,12 +609,36 @@ __ulp_asunsafe_begin(void)
   real_dladdr1 = dlsym(RTLD_NEXT, "dladdr1");
   real_dlinfo = dlsym(RTLD_NEXT, "dlinfo");
 
-  libpulp_crash_assert(real_dlopen);
-  libpulp_crash_assert(real_dlmopen);
-  libpulp_crash_assert(real_dlclose);
-  libpulp_crash_assert(real_dladdr);
-  libpulp_crash_assert(real_dladdr1);
-  libpulp_crash_assert(real_dlinfo);
+  /* Check if we got the symbols we need from libdl.  */
+  if (!real_dlopen) {
+    set_libpulp_error_state_with_reason(ENOLIBDL, "unable to find function `dlopen`.");
+    ok = false;
+  }
+
+  if (!real_dlmopen) {
+    set_libpulp_error_state_with_reason(ENOLIBDL, "unable to find function `dlmopen`.");
+    ok = false;
+  }
+
+  if (!real_dlclose) {
+    set_libpulp_error_state_with_reason(ENOLIBDL, "unable to find function `dlclose`.");
+    ok = false;
+  }
+
+  if (!real_dladdr) {
+    set_libpulp_error_state_with_reason(ENOLIBDL, "unable to find function `dladdr`.");
+    ok = false;
+  }
+
+  if (!real_dladdr1) {
+    set_libpulp_error_state_with_reason(ENOLIBDL, "unable to find function `dladdr1`.");
+    ok = false;
+  }
+
+  if (!real_dlinfo) {
+    set_libpulp_error_state_with_reason(ENOLIBDL, "unable to find function `dlinfo`.");
+    ok = false;
+  }
 
   real_free = dlsym(RTLD_NEXT, "free");
   real_malloc = dlsym(RTLD_NEXT, "malloc");
@@ -617,17 +651,54 @@ __ulp_asunsafe_begin(void)
   real_aligned_alloc = dlsym(RTLD_NEXT, "aligned_alloc");
   real_posix_memalign = dlsym(RTLD_NEXT, "posix_memalign");
 
-  libpulp_crash_assert(real_free);
-  libpulp_crash_assert(real_malloc);
-  libpulp_crash_assert(real_calloc);
-  libpulp_crash_assert(real_realloc);
-  libpulp_crash_assert(real_reallocarray);
-  libpulp_crash_assert(real_valloc);
-  libpulp_crash_assert(real_pvalloc);
-  libpulp_crash_assert(real_memalign);
-  libpulp_crash_assert(real_aligned_alloc);
-  libpulp_crash_assert(real_posix_memalign);
-  libpulp_crash_assert(real_posix_memalign);
+  /* Check if we got the symbols we need from glibc.  */
+  if (!real_free) {
+    set_libpulp_error_state_with_reason(ENOLIBC, "unable to find function `free`.");
+    ok = false;
+  }
+
+  if (!real_malloc) {
+    set_libpulp_error_state_with_reason(ENOLIBC, "unable to find function `malloc`.");
+    ok = false;
+  }
+
+  if (!real_calloc) {
+    set_libpulp_error_state_with_reason(ENOLIBC, "unable to find function `calloc`.");
+    ok = false;
+  }
+
+  if (!real_realloc) {
+    set_libpulp_error_state_with_reason(ENOLIBC, "unable to find function `realloc`.");
+    ok = false;
+  }
+
+  if (!real_reallocarray) {
+    set_libpulp_error_state_with_reason(ENOLIBC, "unable to find function `reallocarray`.");
+    ok = false;
+  }
+
+  if (!real_pvalloc) {
+    set_libpulp_error_state_with_reason(ENOLIBC, "unable to find function `pvalloc`.");
+    ok = false;
+  }
+
+  if (!real_memalign) {
+    set_libpulp_error_state_with_reason(ENOLIBC, "unable to find function `memalign`.");
+    ok = false;
+  }
+
+  if (!real_aligned_alloc) {
+    set_libpulp_error_state_with_reason(ENOLIBC, "unable to find function `aligned_alloc`.");
+    ok = false;
+  }
+
+  if (!real_posix_memalign) {
+    set_libpulp_error_state_with_reason(ENOLIBC, "unable to find function `posix_memalign`");
+    ok = false;
+  }
+
+  if (ok == false)
+    return;
 
   get_ld_global_locks();
 
@@ -730,8 +801,9 @@ realloc(void *ptr, size_t size)
 {
   void *result;
 
-  if (real_realloc == NULL)
-    __ulp_asunsafe_begin();
+  if (real_realloc == NULL) {
+    return __libc_realloc(ptr, size);
+  }
 
   __sync_fetch_and_add(&flag, 1);
   result = real_realloc(ptr, size);
@@ -745,8 +817,9 @@ reallocarray(void *ptr, size_t nmemb, size_t size)
 {
   void *result;
 
-  if (real_reallocarray == NULL)
-    __ulp_asunsafe_begin();
+  if (real_reallocarray == NULL) {
+    return __libc_reallocarray(ptr, nmemb, size);
+  }
 
   __sync_fetch_and_add(&flag, 1);
   result = real_reallocarray(ptr, nmemb, size);
@@ -760,8 +833,9 @@ valloc(size_t size)
 {
   void *result;
 
-  if (real_valloc == NULL)
-    __ulp_asunsafe_begin();
+  if (real_valloc == NULL) {
+    return __libc_valloc(size);
+  }
 
   __sync_fetch_and_add(&flag, 1);
   result = real_valloc(size);
@@ -775,8 +849,9 @@ pvalloc(size_t size)
 {
   void *result;
 
-  if (real_pvalloc == NULL)
-    __ulp_asunsafe_begin();
+  if (real_pvalloc == NULL) {
+    return __libc_pvalloc(size);
+  }
 
   __sync_fetch_and_add(&flag, 1);
   result = real_pvalloc(size);
@@ -790,8 +865,9 @@ memalign(size_t alignment, size_t size)
 {
   void *result;
 
-  if (real_memalign == NULL)
-    __ulp_asunsafe_begin();
+  if (real_memalign == NULL) {
+    return __libc_memalign(alignment, size);
+  }
 
   __sync_fetch_and_add(&flag, 1);
   result = real_memalign(alignment, size);
@@ -805,8 +881,15 @@ aligned_alloc(size_t alignment, size_t size)
 {
   void *result;
 
-  if (real_aligned_alloc == NULL)
-    __ulp_asunsafe_begin();
+  if (real_aligned_alloc == NULL) {
+    /* We have to emulate this function using memalign.  */
+    if ((alignment & (alignment - 1)) || (size & (alignment - 1))) {
+      errno = EINVAL;
+      return NULL;
+    }
+
+    return  __libc_memalign(alignment, size);
+  }
 
   __sync_fetch_and_add(&flag, 1);
   result = real_aligned_alloc(alignment, size);
@@ -820,8 +903,24 @@ posix_memalign(void **memptr, size_t alignment, size_t size)
 {
   int result;
 
-  if (real_posix_memalign == NULL)
-    __ulp_asunsafe_begin();
+  if (real_posix_memalign == NULL) {
+    void *mem;
+
+    /* Implement posix_memalign using memalign.  */
+    if (alignment % sizeof (void *) != 0
+        || !powerof2 (alignment / sizeof (void *))
+        || alignment == 0)
+      return EINVAL;
+
+    mem = __libc_memalign(alignment, size);
+
+    if (mem != NULL) {
+      *memptr = mem;
+      return 0;
+    }
+
+    return ENOMEM;
+  }
 
   __sync_fetch_and_add(&flag, 1);
   result = real_posix_memalign(memptr, alignment, size);
@@ -835,8 +934,9 @@ dlopen(const char *filename, int flags)
 {
   void *result;
 
-  if (real_dlopen == NULL)
+  if (real_dlopen == NULL) {
     __ulp_asunsafe_begin();
+  }
 
   __sync_fetch_and_add(&flag, 1);
   result = real_dlopen(filename, flags);
@@ -850,8 +950,9 @@ dlmopen(Lmid_t nsid, const char *file, int mode)
 {
   void *result;
 
-  if (real_dlmopen == NULL)
+  if (real_dlmopen == NULL) {
     __ulp_asunsafe_begin();
+  }
 
   __sync_fetch_and_add(&flag, 1);
   result = real_dlmopen(nsid, file, mode);
@@ -865,8 +966,9 @@ dlclose(void *handle)
 {
   int result;
 
-  if (real_dlclose == NULL)
+  if (real_dlclose == NULL) {
     __ulp_asunsafe_begin();
+  }
 
   __sync_fetch_and_add(&flag, 1);
   result = real_dlclose(handle);
@@ -880,8 +982,9 @@ dladdr(const void *address, Dl_info *info)
 {
   int result;
 
-  if (real_dladdr == NULL)
+  if (real_dladdr == NULL) {
     __ulp_asunsafe_begin();
+  }
 
   __sync_fetch_and_add(&flag, 1);
   result = real_dladdr(address, info);
@@ -895,8 +998,9 @@ dladdr1(const void *address, Dl_info *info, void **extra_info, int flags)
 {
   int result;
 
-  if (real_dladdr1 == NULL)
+  if (real_dladdr1 == NULL) {
     __ulp_asunsafe_begin();
+  }
 
   __sync_fetch_and_add(&flag, 1);
   result = real_dladdr1(address, info, extra_info, flags);
@@ -910,8 +1014,9 @@ dlinfo(void *handle, int request, void *arg)
 {
   int result;
 
-  if (real_dlinfo == NULL)
+  if (real_dlinfo == NULL) {
     __ulp_asunsafe_begin();
+  }
 
   __sync_fetch_and_add(&flag, 1);
   result = real_dlinfo(handle, request, arg);

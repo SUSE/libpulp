@@ -704,7 +704,8 @@ TESTS = \
   visibility.py \
   notes.py \
   textrel.py \
-  seccomp_disable.py
+  seccomp_disable.py \
+  run_libc.py
 
 XFAIL_TESTS = \
   blocked.py \

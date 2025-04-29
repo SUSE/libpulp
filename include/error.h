@@ -37,7 +37,23 @@ void exit(int);
  **/
 ulp_error_t get_libpulp_error_state(void);
 
+
+/** @brief Set libpulp error state.
+ *
+ * If a fatal error has occured, libpulp cannot continue livepatching processes
+ * because it may be into an unexpected state.  This function sets its state
+ * so livepatching can be marked as disabled for any reason.
+ **/
 void set_libpulp_error_state(ulp_error_t);
+void set_libpulp_error_state_with_reason_func(const char *file, const char *func,
+                                              int line, ulp_error_t state,
+                                              const char *fmt, ...);
+
+/** @brief Macro which passes the current file, function and line number for
+ * logging for the `set_libpulp_error_state_with_reason_func`.
+ */
+#define set_libpulp_error_state_with_reason(...) \
+  set_libpulp_error_state_with_reason_func(__FILE__, __func__, __LINE__, __VA_ARGS__)
 
 /** @brief Check if libpulp is in an fatal error state.
  *

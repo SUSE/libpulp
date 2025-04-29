@@ -68,6 +68,8 @@ typedef int ulp_error_t;
 #define EINSNQ        285 /** Instruction queue in inconsistent state.  */
 #define EOLDULP       286 /** ULP tool is too old.  */
 #define EDLOPEN       287 /** Failure in dlopen.  */
+#define ENOLIBDL      288 /** Libdl not found.  */
+#define ENOLIBC       289 /** Libc not found.  */
 
 /** Table used to map error code to message.  Define it here so that it is
  *  easier for it being maintained.
@@ -106,6 +108,8 @@ typedef int ulp_error_t;
     "Instruction queue in inconsistent state", \
     "ULP tool is too old", \
     "Failure in dlopen", \
+    "Libdl not found." \
+    "Libc not found or unsupported." \
   }
 /* clang-format on */
 
