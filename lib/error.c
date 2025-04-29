@@ -58,6 +58,21 @@ set_libpulp_error_state(ulp_error_t state)
 }
 
 void
+set_libpulp_error_state_with_reason_func(const char *file, const char *func, int line,
+                                         ulp_error_t state, const char *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+
+  set_libpulp_error_state(state);
+  msgq_push("In file = %s, function = %s, line = %d, error state %d: ", file,
+            func, line, state);
+  msgq_push(fmt, args);
+
+  va_end(args);
+}
+
+void
 libpulp_assert_func(const char *file, const char *func, int line,
                     unsigned long expression)
 {
