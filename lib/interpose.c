@@ -54,7 +54,6 @@ extern void __libc_free(void *);
 extern void *__libc_malloc(size_t);
 extern void *__libc_calloc(size_t, size_t);
 extern void *__libc_realloc(void *, size_t);
-extern void *__libc_reallocarray(void *, size_t, size_t);
 extern void *__libc_valloc(size_t);
 extern void *__libc_pvalloc(size_t);
 extern void *__libc_memalign(size_t, size_t);
@@ -69,7 +68,6 @@ static void (*real_free)(void *) = NULL;
 static void *(*real_malloc)(size_t) = NULL;
 static void *(*real_calloc)(size_t, size_t) = NULL;
 static void *(*real_realloc)(void *, size_t) = NULL;
-static void *(*real_reallocarray)(void *, size_t, size_t) = NULL;
 static void *(*real_valloc)(size_t) = NULL;
 static void *(*real_pvalloc)(size_t) = NULL;
 static void *(*real_memalign)(size_t, size_t) = NULL;
@@ -644,7 +642,6 @@ __ulp_asunsafe_begin(void)
   real_malloc = dlsym(RTLD_NEXT, "malloc");
   real_calloc = dlsym(RTLD_NEXT, "calloc");
   real_realloc = dlsym(RTLD_NEXT, "realloc");
-  real_reallocarray = dlsym(RTLD_NEXT, "reallocarray");
   real_valloc = dlsym(RTLD_NEXT, "valloc");
   real_pvalloc = dlsym(RTLD_NEXT, "pvalloc");
   real_memalign = dlsym(RTLD_NEXT, "memalign");
@@ -669,11 +666,6 @@ __ulp_asunsafe_begin(void)
 
   if (!real_realloc) {
     set_libpulp_error_state_with_reason(ENOLIBC, "unable to find function `realloc`.");
-    ok = false;
-  }
-
-  if (!real_reallocarray) {
-    set_libpulp_error_state_with_reason(ENOLIBC, "unable to find function `reallocarray`.");
     ok = false;
   }
 
@@ -807,22 +799,6 @@ realloc(void *ptr, size_t size)
 
   __sync_fetch_and_add(&flag, 1);
   result = real_realloc(ptr, size);
-  __sync_fetch_and_sub(&flag, 1);
-
-  return result;
-}
-
-void *
-reallocarray(void *ptr, size_t nmemb, size_t size)
-{
-  void *result;
-
-  if (real_reallocarray == NULL) {
-    return __libc_reallocarray(ptr, nmemb, size);
-  }
-
-  __sync_fetch_and_add(&flag, 1);
-  result = real_reallocarray(ptr, nmemb, size);
   __sync_fetch_and_sub(&flag, 1);
 
   return result;
