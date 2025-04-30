@@ -705,7 +705,8 @@ TESTS = \
   notes.py \
   textrel.py \
   seccomp_disable.py \
-  run_libc.py
+  run_libc.py \
+  glibc_private.py
 
 XFAIL_TESTS = \
   blocked.py \
