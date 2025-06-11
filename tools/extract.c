@@ -499,7 +499,11 @@ parse_so_json(const char *path)
   int ret;
 
   json_object *root = json_object_from_file(path);
-  assert(root && "Unable to build root object.");
+
+  if (root == NULL) {
+    /* Unable to build root object, most likely not a JSON file.  */
+    return NULL;
+  }
 
   json_object *library = json_object_object_get(root, "library");
   if (!library) {
