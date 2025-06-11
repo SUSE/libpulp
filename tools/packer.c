@@ -616,6 +616,15 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
   container_path = ulp->so_filename;
   container = ulp_so_info_open(container_path);
 
+  if (container == NULL) {
+    /* Failed to open it.  The file is probably not what we expected it to be,
+       or has missing pieces.  */
+    parse_error(loc,
+          "Unsupported container format. Check if it is a valid ELF or JSON.");
+    ret = 0;
+    goto dsc_clean;
+  }
+
   n = getline(&first, &len, parse_file);
   loc.line++;
   loc.col = 1;
@@ -691,6 +700,16 @@ parse_description(const char *filename, struct ulp_metadata *ulp,
       }
 
       target = ulp_so_info_open(target_path);
+
+      if (target == NULL) {
+        /* Failed to open it.  The file is probably not what we expected it to be,
+           or has missing pieces.  */
+        parse_error(loc,
+             "Unsupported target format. Check if it is a valid ELF or JSON.");
+        ret = 0;
+        goto dsc_clean;
+      }
+
       ulp->objs->name = strdup(target->name);
     }
     else {
