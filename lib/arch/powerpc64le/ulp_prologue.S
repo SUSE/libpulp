@@ -46,11 +46,16 @@
 trampoline_routine:
   .cfi_startproc
 
-  # Concatenate two registers from prologue.
-  rldimi %r6, %r5, 32, 0
+  # The address in LR is in the caller's prologue.  Move it to r6, so
+  # we can access the new function pointer stored in the prologue.
+  mflr  %r6
+  ld    %r6, (ulp_prologue_new_function_addr - .prologue_load_pc)(%r6)
 
   # Move the target function ptr to control register so we can free r6.
   mtctr %r6
+
+  # Reload LR which we saved on %r5
+  mtlr  %r5
 
   # Save all volatile registers
   # r5 & r6 are designated temp regs, having data already on stack.
@@ -259,17 +264,27 @@ ulp_prologue:
   # Move to control register
   mtctr %r12
 
-  # Compute absolute address of target function 0x1122334455667788
-  lis   %r5,      0x1122
-  ori   %r5, %r5, 0x3344
-  lis   %r6,      0x5566
-  ori   %r6, %r6, 0x7788
+  # Save LR into R5, as getting the PC will clobber it.
+  mflr  %r5
+
+  # Load PC into LR
+  bl    .prologue_load_pc
+.prologue_load_pc:
 
   # Jump to trampoline_routine
   bctr
 
   # Execution is returned to the caller by the trampoline_routine, not here.
   # so no blr is necessary here.
+
+  # Variable holding the address of the new function.  Note that this prologue
+  # is copied to the target's function prologue, hence this must not be accessed
+  # directly.
+.global ulp_prologue_new_function_addr
+.type   ulp_prologue_new_function_addr, @object
+.size   ulp_prologue_new_function_addr, 8
+ulp_prologue_new_function_addr:
+  .zero 8
 
 ulp_prologue_end = .
 	.long 0

@@ -49,6 +49,22 @@ extern unsigned char ulp_prologue[];
 /** Size of the above object.  */
 extern unsigned int ulp_prologue_size;
 
+/** Global address of the new function address which is stored in the
+    prologue of the function, together with its code.  Should not be
+    accessed directly.  */
+extern unsigned long ulp_prologue_new_function_addr;
+
+/** Get the offset in which we store the new function address in the old
+    function's prologue.  */
+static unsigned long
+ulp_prologue_new_function_offset(void)
+{
+  return (unsigned char *) &ulp_prologue_new_function_addr - ulp_prologue;
+}
+
+#define ULP_PROLOGUE_NEW_FUNCTION_OFFSET(x)
+
+
 /** The NOP instruction.  */
 static const unsigned char gNop[] = { 0x00, 0x00, 0x00, 0x60 };
 
@@ -76,22 +92,16 @@ ulp_patch_prologue_layout(void *old_fentry, void *new_fentry, const unsigned cha
 {
   (void) len;
 
+  /* Assert that the prologue size don't overflow.  ulp_prologue_size is a
+     constant.  */
+  libpulp_crash_assert(ulp_prologue_size <= INSN_SIZE * PRE_NOPS_LEN);
+
   /* Create a copy of the prologue.  */
   unsigned char prolog[ulp_prologue_size];
   memcpy(prolog, prologue, sizeof(prolog));
 
-  unsigned char new_fentry_bytes[sizeof(void*)];
-  memcpy(new_fentry_bytes, &new_fentry, sizeof(new_fentry_bytes));
-
   /* Patch the code with the address of the function we want to be redirected.  */
-  prolog[32]  = new_fentry_bytes[6];
-  prolog[33]  = new_fentry_bytes[7];
-  prolog[36]  = new_fentry_bytes[4];
-  prolog[37]  = new_fentry_bytes[5];
-  prolog[40]  = new_fentry_bytes[2];
-  prolog[41]  = new_fentry_bytes[3];
-  prolog[44]  = new_fentry_bytes[0];
-  prolog[45]  = new_fentry_bytes[1];
+  memcpy(prolog + ulp_prologue_new_function_offset(), &new_fentry, sizeof(void *));
 
   /* Point to the prologue.  */
   char *fentry_prologue = old_fentry - INSN_SIZE * PRE_NOPS_LEN;
