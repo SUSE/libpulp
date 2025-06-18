@@ -51,7 +51,8 @@ libpulp_la_SOURCES += \
   arch/powerpc64le/patch.c
 
 libpulp_la_LDFLAGS += \
-  -l:ld64.so.2
+  -l:ld64.so.2 \
+  -lpthread
 endif
 
 libpulp_la_DEPENDENCIES= libpulp.versions
