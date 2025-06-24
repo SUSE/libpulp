@@ -26,6 +26,17 @@
 
 #define ARGS_MAX 1
 
+/* switches that don't have a shorthand.  */
+#define ULP_OP_REVERT_ALL 256
+#define ULP_OP_REVERT 257
+#define ULP_OP_COLOR 258
+#define ULP_OP_TIMEOUT 259
+#define ULP_OP_DISABLE_THREADING 260
+#define ULP_OP_RECURSIVE 261
+#define ULP_OP_DISABLE_SUMMARIZATION 262
+#define ULP_OP_ONLY_LIVEPATCHED 263
+#define ULP_OP_DISABLE_SECCOMP 264
+
 typedef enum
 {
   ULP_NONE,

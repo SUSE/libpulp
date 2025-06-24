@@ -23,7 +23,10 @@
 #define SET_PATCHABLE_H
 
 struct arguments;
+struct argp_option;
 
 int run_set_patchable(struct arguments *);
+
+struct argp_option *get_command_option_set_patchable(void);
 
 #endif

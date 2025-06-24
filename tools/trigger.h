@@ -23,7 +23,11 @@
 #define TRIGGER_H
 
 struct arguments;
+struct argp_option;
 
 int run_trigger(struct arguments *);
+
+struct argp_option *
+get_command_option_trigger(void);
 
 #endif /* TRIGGER_H */

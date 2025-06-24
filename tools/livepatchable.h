@@ -23,7 +23,11 @@
 #define LIVEPATCHABLE_H
 
 struct arguments;
+struct argp_option;
 
 int run_livepatchable(struct arguments *);
+
+struct argp_option *
+get_command_option_livepatchable(void);
 
 #endif /* LIVEPATCHABLE.H */

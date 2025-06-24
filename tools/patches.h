@@ -29,6 +29,7 @@
 
 struct arguments;
 struct ulp_process;
+struct argp_option;
 
 struct ulp_process_iterator
 {
@@ -67,5 +68,7 @@ const char *buildid_to_string(const unsigned char[BUILDID_LEN]);
 size_t extract_ulp_comment_to_mem(const char *livepatch, char **out);
 
 int run_patches(struct arguments *);
+
+struct argp_option *get_command_option_patches(void);
 
 #endif

@@ -25,6 +25,7 @@
 #include <libelf.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <argp.h>
 
 #include "arguments.h"
 #include "config.h"
@@ -69,4 +70,16 @@ run_livepatchable(struct arguments *arguments)
   close(fd);
 
   return ret;
+}
+
+struct argp_option *
+get_command_option_livepatchable(void)
+{
+  static struct argp_option options[] = {
+    { 0, 0, 0, 0, "Options:", 0 },
+    { "verbose", 'v', 0, 0, "Produce verbose output", 0 },
+    { "quiet", 'q', 0, 0, "Don't produce any output", 0 },
+    { 0 }
+  };
+  return options;
 }

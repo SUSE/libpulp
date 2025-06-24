@@ -27,6 +27,7 @@
 
 #include <stddef.h>
 #include <unistd.h>
+#include <argp.h>
 
 /** Enable or disable threading in process discovery.  */
 extern bool enable_threading;
@@ -116,6 +117,7 @@ run_set_patchable(struct arguments *arguments)
   ulp_verbose = arguments->verbose;
   enable_threading = !arguments->disable_threads;
   const char *process_wildcard = arguments->process_wildcard;
+  const char *user_wildcard = arguments->user_wildcard;
   int retries = arguments->retries;
   bool enable;
   struct ulp_process *p;
@@ -131,10 +133,28 @@ run_set_patchable(struct arguments *arguments)
     return 1;
   }
 
-  FOR_EACH_ULP_PROCESS_MATCHING_WILDCARD(p, process_wildcard)
+  FOR_EACH_ULP_PROCESS_FROM_USER_WILDCARD(p, process_wildcard, user_wildcard)
   {
     enable_or_disable_patching(p, enable, retries);
   }
 
   return 0;
+}
+
+struct argp_option *
+get_command_option_set_patchable(void)
+{
+  static struct argp_option options[] = {
+    { 0, 0, 0, 0, "Options:", 0 },
+    { "verbose", 'v', 0, 0, "Produce verbose output", 0 },
+    { "quiet", 'q', 0, 0, "Don't produce any output", 0 },
+    { "process", 'p', "process", 0, "Target process name, wildcard, or PID", 0 },
+    { "user", 'u', "user", 0, "User name, wildcard, or UID", 0 },
+    { "disable-threading", ULP_OP_DISABLE_THREADING, 0, 0,
+    "Do not launch additional threads", 0 },
+    { "retries", 'r', "N", 0, "Retry N times if process busy", 0 },
+    { 0 }
+  };
+
+  return options;
 }

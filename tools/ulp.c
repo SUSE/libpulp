@@ -100,7 +100,7 @@ const char *argp_program_version = PACKAGE_STRING;
 static const char args_doc[] = "COMMAND [ARG1 ARG2 ...]";
 
 /* clang-format off */
-static const char doc[] =
+static char doc[] =
 "ulp: Userspace Live Patch tool.\n"
 "\n"
 " This tool executes a COMMAND passed in the argument list.\n"
@@ -118,69 +118,11 @@ static const char doc[] =
 "   post                      Post process patch container (.so file) in ARG1.\n"
 "   messages                  Print livepatch information contained in libpulp.\n"
 "   livepatchable             Check if .so library in ARG1 is livepatchable.\n"
-"   set_patchable             Enable/disable livepatching in process given by -p.\n";
+"   set_patchable             Enable/disable livepatching in process.\n";
 
 /* clang-format on */
 
-/* switches that don't have a shorthand.  */
-#define ULP_OP_REVERT_ALL 256
-#define ULP_OP_REVERT 257
-#define ULP_OP_COLOR 258
-#define ULP_OP_TIMEOUT 259
-#define ULP_OP_DISABLE_THREADING 260
-#define ULP_OP_RECURSIVE 261
-#define ULP_OP_DISABLE_SUMMARIZATION 262
-#define ULP_OP_ONLY_LIVEPATCHED 263
-#define ULP_OP_DISABLE_SECCOMP 264
-
-static struct argp_option options[] = {
-  { 0, 0, 0, 0, "Options:", 0 },
-  { "verbose", 'v', 0, 0, "Produce verbose output", 0 },
-  { "quiet", 'q', 0, 0, "Don't produce any output", 0 },
-  { 0, 0, 0, 0, "patches, check & trigger commands only:", 0 },
-  { "process", 'p', "process", 0, "Target process name, wildcard, or PID", 0 },
-  { "user", 'u', "user", 0, "User name, wildcard, or UID", 0 },
-  { "disable-threading", ULP_OP_DISABLE_THREADING, 0, 0,
-    "Do not launch additional threads", 0 },
-  { 0, 0, 0, 0, "dump & patches command only:", 0 },
-  { "buildid", 'b', 0, 0, "Print the build id", 0 },
-  { "only-livepatched", ULP_OP_ONLY_LIVEPATCHED, 0, 0, "Print only processes that were livepatched", 0 },
-  { 0, 0, 0, 0, "trigger command only:", 0 },
-  { "revert-all", ULP_OP_REVERT_ALL, "LIB", 0,
-    "Revert all patches from LIB. If LIB=target, then all patches from the "
-    "target library within the passed livepatch will be reverted.",
-    0 },
-  { "timeout", ULP_OP_TIMEOUT, "t", 0,
-    "Set trigger timeout to t seconds (default 200s)", 0 },
-  { "disable-summarization", ULP_OP_DISABLE_SUMMARIZATION, 0, 0,
-    "Disable trigger ouput summarization", 0 },
-  { "recursive", ULP_OP_RECURSIVE, 0, 0, "Search for patches recursively", 0 },
-  { "root", 'R', "PREFIX", 0,
-    "Append prefix to livepatch path when passing it to target process", 0 },
-  { "disable-seccomp", ULP_OP_DISABLE_SECCOMP, 0, 0,
-    "disable seccomp filters on target process (use for testing purposes)", 0 },
-#if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
-  { "check-stack", 'c', 0, 0, "Check the call stack before live patching", 0 },
-#endif
-  { 0, 0, 0, 0, "trigger & set_patchable commands only:", 0 },
-  { "retries", 'r', "N", 0, "Retry N times if process busy", 0 },
-  { 0, 0, 0, 0, "trigger & dump commands only:", 0 },
-  { "revert", ULP_OP_REVERT, 0, 0,
-    "revert livepatch / dump reverse patch info.", 0 },
-  { 0, 0, 0, 0, "packer commands only:", 0 },
-  { "output", 'o', "FILE", 0, "Write output to FILE", 0 },
-  { 0, 0, 0, 0, "packer command only:", 0 },
-  { "livepatch", 'l', "LIVEPATCH", 0,
-    "Use this livepatch file\nDefaults to the one described in ARG1", 0 },
-  { "target", 't', "LIBRARY", 0,
-    "Use this target library\nDefaults to the one described in ARG1", 0 },
-  { "color", ULP_OP_COLOR, "yes/no/auto", 0, "Enable/disable colored messages", 0 },
-  { 0, 0, 0, 0, "extract command only:", 0 },
-  { "with-debuginfo", 'd', "DEBUGINFO", 0,
-    "Use debuginfo information for symbolextraction", 0 },
-  { 0 }
-};
-
+static struct argp_option options[] = {};
 static struct argp argp = { options, parser, args_doc, doc, NULL, NULL, NULL };
 
 /* End of variables used by argp.  */
@@ -216,6 +158,21 @@ command_from_string(const char *str)
   }
 
   return ULP_NONE;
+}
+
+static command_t
+get_command_from_args(int argc, char **argv)
+{
+  command_t ret = ULP_NONE;
+  int i;
+  for (i = 0; i < argc; i++) {
+    ret = command_from_string(argv[i]);
+    if (ret != ULP_NONE) {
+      return ret;
+    }
+  }
+
+  return ret;
 }
 
 /* This function is called when all arguments have been parsed.  */
@@ -462,6 +419,71 @@ change_color(const char *ansi_escape)
   }
 }
 
+static struct argp_option *
+get_command_option(command_t cmd)
+{
+  static struct argp_option def = {};
+
+  switch (cmd) {
+    case ULP_NONE:
+      return &def;
+      break;
+
+    case ULP_PATCHES:
+      strcpy(doc, "Command: patches.\n");
+      return get_command_option_patches();
+      break;
+
+    case ULP_CHECK:
+      strcpy(doc, "Command: check.\n");
+      return get_command_option_check();
+      break;
+
+    case ULP_DUMP:
+      strcpy(doc, "Command: dump.\n");
+      return get_command_option_dump();
+      break;
+
+    case ULP_PACKER:
+      strcpy(doc, "Command: packer.\n");
+      return get_command_option_packer();
+      break;
+
+    case ULP_TRIGGER:
+      strcpy(doc, "Command: trigger.\n");
+      return get_command_option_trigger();
+      break;
+
+    case ULP_POST:
+      strcpy(doc, "Command: post.\n");
+      return get_command_option_post();
+      break;
+
+    case ULP_MESSAGES:
+      strcpy(doc, "Command: messages.\n");
+      return get_command_option_messages();
+      break;
+
+    case ULP_LIVEPATCHABLE:
+      strcpy(doc, "Command: livepatchable.\n");
+      return get_command_option_livepatchable();
+      break;
+
+    case ULP_EXTRACT:
+      strcpy(doc, "Command: extract.\n");
+      return get_command_option_extract();
+      break;
+
+    case ULP_SET_PATCHABLE:
+      strcpy(doc, "Command: set_patchable.\n");
+      return get_command_option_set_patchable();
+      break;
+  }
+
+  return &def;
+}
+
+
 static bool
 requires_ptrace(command_t command)
 {
@@ -507,6 +529,12 @@ main(int argc, char **argv, char *envp[] __attribute__((unused)))
 
   /* Initialize retries correctly.  */
   arguments.retries = 1;
+
+  /* Check for the command input.  */
+  command_t cmd = get_command_from_args(argc, argv);
+
+  /* Install an option parser according to command.  */
+  argp.options = get_command_option(cmd);
 
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
 

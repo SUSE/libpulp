@@ -30,6 +30,7 @@
 
 struct arguments;
 struct ulp_so_info;
+struct argp_option;
 
 void unload_elf(Elf **elf, int *fd);
 
@@ -57,5 +58,7 @@ int get_elf_buildid(Elf *elf, char *buf, unsigned *len);
 void *get_symbol_addr(Elf *elf, Elf_Scn *s, const char *search);
 
 int run_packer(struct arguments *);
+
+struct argp_option *get_command_option_packer(void);
 
 #endif /* PACKER_H */

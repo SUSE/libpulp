@@ -23,7 +23,10 @@
 #define CHECK_H
 
 struct arguments;
+struct argp_option;
 
 int run_check(struct arguments *);
+
+struct argp_option *get_command_option_check(void);
 
 #endif
