@@ -9,6 +9,8 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+struct argp_option;
+
 /** Struct containing useful information for Userspace Livepatching retrieved
  *  from the target .so file.
  */
@@ -69,5 +71,7 @@ struct symbol *get_symbol_with_name(struct ulp_so_info *info, const char *sym);
 int run_extract(struct arguments *arguments);
 
 struct ulp_so_info *ulp_so_info_open(const char *path);
+
+struct argp_option *get_command_option_extract(void);
 
 #endif /* _EXTRACT_H_.  */

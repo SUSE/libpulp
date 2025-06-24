@@ -30,4 +30,6 @@ struct Elf_Scn *find_section_by_name(struct Elf *, const char *name);
 
 int run_post(struct arguments *);
 
+struct argp_option *get_command_option_post(void);
+
 #endif /* POST_H */

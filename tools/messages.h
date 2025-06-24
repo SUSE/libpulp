@@ -23,7 +23,10 @@
 #define MESSAGES_H
 
 struct arguments;
+struct argp_option;
 
 int run_messages(struct arguments *);
+
+struct argp_option *get_command_option_messages(void);
 
 #endif /* MESSAGES.H */

@@ -23,7 +23,10 @@
 #define DUMP_H
 
 struct arguments;
+struct argp_option;
 
 int run_dump(struct arguments *);
+
+struct argp_option *get_command_option_dump(void);
 
 #endif /* DUMP_H */

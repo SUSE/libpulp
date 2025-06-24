@@ -33,6 +33,7 @@
 #include <sys/stat.h>
 #include <sys/user.h>
 #include <unistd.h>
+#include <argp.h>
 
 #include "arguments.h"
 #include "config.h"
@@ -616,7 +617,7 @@ static bool check_sys_admin(void)
       goto sys_adm_clear;
     }
   }
-  
+
 sys_adm_clear:
   FREE_AND_NULLIFY(line);
   fclose(file);
@@ -665,4 +666,41 @@ run_trigger(struct arguments *arguments)
                                library, check_stack, revert);
 
   return ret;
+}
+
+struct argp_option *
+get_command_option_trigger(void)
+{
+  static struct argp_option options[] = {
+    { 0, 0, 0, 0, "Options:", 0 },
+    { "verbose", 'v', 0, 0, "Produce verbose output", 0 },
+    { "quiet", 'q', 0, 0, "Don't produce any output", 0 },
+    { "process", 'p', "process", 0, "Target process name, wildcard, or PID", 0 },
+    { "user", 'u', "user", 0, "User name, wildcard, or UID", 0 },
+    { "disable-threading", ULP_OP_DISABLE_THREADING, 0, 0,
+      "Do not launch additional threads", 0 },
+    { "revert-all", ULP_OP_REVERT_ALL, "LIB", 0,
+      "Revert all patches from LIB. If LIB=target, then all patches from the "
+      "target library within the passed livepatch will be reverted.",
+      0 },
+    { "timeout", ULP_OP_TIMEOUT, "t", 0,
+      "Set trigger timeout to t seconds (default 200s)", 0 },
+    { "disable-summarization", ULP_OP_DISABLE_SUMMARIZATION, 0, 0,
+      "Disable trigger ouput summarization", 0 },
+    { "recursive", ULP_OP_RECURSIVE, 0, 0, "Search for patches recursively", 0 },
+    { "root", 'R', "PREFIX", 0,
+      "Append prefix to livepatch path when passing it to target process", 0 },
+    { "disable-seccomp", ULP_OP_DISABLE_SECCOMP, 0, 0,
+      "disable seccomp filters on target process (use for testing purposes)", 0 },
+  #if defined ENABLE_STACK_CHECK && ENABLE_STACK_CHECK
+    { "check-stack", 'c', 0, 0, "Check the call stack before live patching", 0 },
+  #endif
+    { "retries", 'r', "N", 0, "Retry N times if process busy", 0 },
+    { "revert", ULP_OP_REVERT, 0, 0,
+      "revert livepatch.", 0 },
+    { "color", ULP_OP_COLOR, "yes/no/auto", 0, "Enable/disable colored messages", 0 },
+    { 0 }
+  };
+
+  return options;
 }

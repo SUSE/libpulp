@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <argp.h>
 
 #include "arguments.h"
 #include "config.h"
@@ -1252,4 +1253,23 @@ main_error:
     WARN("metadata file generation failed.");
   }
   return ret;
+}
+
+struct argp_option *
+get_command_option_packer(void)
+{
+  static struct argp_option options[] = {
+    { 0, 0, 0, 0, "Options:", 0 },
+    { "verbose", 'v', 0, 0, "Produce verbose output", 0 },
+    { "quiet", 'q', 0, 0, "Don't produce any output", 0 },
+    { 0, 0, 0, 0, "packer commands only:", 0 },
+    { "output", 'o', "FILE", 0, "Write output to FILE", 0 },
+    { "livepatch", 'l', "LIVEPATCH", 0,
+      "Use this livepatch file\nDefaults to the one described in ARG1", 0 },
+    { "target", 't', "LIBRARY", 0,
+      "Use this target library\nDefaults to the one described in ARG1", 0 },
+    { 0 }
+  };
+
+  return options;
 }

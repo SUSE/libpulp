@@ -28,6 +28,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <argp.h>
 
 #include <libelf.h>
 
@@ -147,4 +148,17 @@ run_post(struct arguments *arguments)
   close(fd);
 
   return 0;
+}
+
+struct argp_option *
+get_command_option_post(void)
+{
+  static struct argp_option options[] = {
+    { 0, 0, 0, 0, "Options:", 0 },
+    { "verbose", 'v', 0, 0, "Produce verbose output", 0 },
+    { "quiet", 'q', 0, 0, "Don't produce any output", 0 },
+    { 0 }
+  };
+
+  return options;
 }

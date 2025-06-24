@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/user.h>
+#include <argp.h>
 
 #include "arguments.h"
 #include "check.h"
@@ -140,4 +141,18 @@ ulp_process_clean:
   free(livepatch);
   release_ulp_process(target);
   return ret;
+}
+
+struct argp_option *
+get_command_option_check(void)
+{
+  static struct argp_option options[] = {
+    { 0, 0, 0, 0, "Options:", 0 },
+    { "verbose", 'v', 0, 0, "Produce verbose output", 0 },
+    { "quiet", 'q', 0, 0, "Don't produce any output", 0 },
+    { "process", 'p', "process", 0, "Target process name, wildcard, or PID", 0 },
+    { 0 }
+  };
+
+  return options;
 }

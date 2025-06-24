@@ -25,6 +25,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <argp.h>
 
 #include "arguments.h"
 #include "config.h"
@@ -733,4 +734,20 @@ run_extract(struct arguments *arguments)
   release_so_info(info);
   release_so_info(debuginfo);
   return 0;
+}
+
+struct argp_option *
+get_command_option_extract(void)
+{
+  static struct argp_option options[] = {
+  { 0, 0, 0, 0, "Options:", 0 },
+  { "verbose", 'v', 0, 0, "Produce verbose output", 0 },
+  { "quiet", 'q', 0, 0, "Don't produce any output", 0 },
+  { "output", 'o', "FILE", 0, "Write output to FILE", 0 },
+  { "with-debuginfo", 'd', "DEBUGINFO", 0,
+    "Use debuginfo information for symbolextraction", 0 },
+  { 0 }
+  };
+
+  return options;
 }

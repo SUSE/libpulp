@@ -21,6 +21,7 @@
 
 #include <stdio.h>
 #include <sys/types.h>
+#include <argp.h>
 
 #include "arguments.h"
 #include "dump.h"
@@ -120,4 +121,20 @@ run_dump(struct arguments *arguments)
   dump_ulp_comments(arguments->args[0]);
   free(livepatch);
   return 0;
+}
+
+struct argp_option *
+get_command_option_dump(void)
+{
+  static struct argp_option options[] = {
+    { 0, 0, 0, 0, "Options:", 0 },
+    { "verbose", 'v', 0, 0, "Produce verbose output", 0 },
+    { "quiet", 'q', 0, 0, "Don't produce any output", 0 },
+    { "buildid", 'b', 0, 0, "Print the build id", 0 },
+    { "revert", ULP_OP_REVERT, 0, 0,
+      "dump reverse patch info.", 0 },
+    { 0 }
+  };
+
+  return options;
 }

@@ -666,3 +666,24 @@ run_patches(struct arguments *arguments)
 
   return any_error == 0 ? 0 : 1;
 }
+
+struct argp_option *
+get_command_option_patches(void)
+{
+  static struct argp_option options[] = {
+    { 0, 0, 0, 0, "Options:", 0 },
+    { "verbose", 'v', 0, 0, "Produce verbose output", 0 },
+    { "quiet", 'q', 0, 0, "Don't produce any output", 0 },
+    { "process", 'p', "process", 0, "Target process name, wildcard, or PID", 0 },
+    { "user", 'u', "user", 0, "User name, wildcard, or UID", 0 },
+    { "disable-threading", ULP_OP_DISABLE_THREADING, 0, 0,
+      "Do not launch additional threads", 0 },
+    { "buildid", 'b', 0, 0, "Print the build id", 0 },
+    { "only-livepatched", ULP_OP_ONLY_LIVEPATCHED, 0, 0, "Print only processes that were livepatched", 0 },
+    { "color", ULP_OP_COLOR, "yes/no/auto", 0, "Enable/disable colored messages", 0 },
+    { 0, 0, 0, 0, "extract command only:", 0 },
+    { 0 }
+  };
+
+  return options;
+}
