@@ -27,32 +27,27 @@ import signal
 
 # Make sure we can call libc.so.6 and it doesn't crash.
 
-# Distros can have libc in many many places, there seems to be no
-# standard way.  So we try them all.
-libc_potential_paths = (
-  '/usr/lib64/',
-  '/lib64/',
-  '/usr/lib/',
-  '/lib/',
-)
+path_libc = subprocess.check_output(
+  ["gcc", "-print-file-name=libc.so.6"]
+).strip()
 
-# Global variables with the path of libdl and libc.
-path_libc = None
-path_libdl = None
+path_libc = subprocess.check_output(
+  ["realpath", path_libc]
+).strip()
 
-# Old versions of glibc has 'libdl.so.2' not integrated into libc.so.6.
-# Try to find where it is.
-for path in libc_potential_paths:
-  libdl = path + 'libdl.so.2'
-  libc = path + 'libc.so.6'
+if not os.path.exists(path_libc):
+  raise FileNotFoundError(f"{libc_path} not found")
 
-  if path_libdl is None and os.path.isfile(libdl):
-    # libdl found.
-    path_libdl = libdl
+path_libdl = subprocess.check_output(
+  ["gcc", "-print-file-name=libdl.so.2"]
+).strip()
 
-  if path_libc is None and os.path.isfile(libc):
-    # libc found.
-    path_libc = libc
+path_libdl = subprocess.check_output(
+  ["realpath", path_libdl]
+).strip()
+
+if not os.path.exists(path_libdl):
+  raise FileNotFoundError(f"{libdl_path} not found")
 
 # Older versions of glibc has a bug where calling libc.so.6 with libdl.so.2
 # preloaded causes it to crash.  Check if we are in such case.
