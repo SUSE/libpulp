@@ -126,6 +126,45 @@ struct rtld_global__2_35
   __rtld_lock_define_recursive (EXTERN, _dl_load_tls_lock)
 };
 
+/**
+ * Incomplete declaration of rtld_global, taken out from glibc's
+ * sysdeps/generic/ldsodefs.h. We just need the first part of it to reach the
+ * '_dl_load_lock'.
+ *
+ * Extracted from glibc 2.42.
+ *
+ */
+struct rtld_global__2_42
+{
+  struct
+  {
+    struct link_map *_ns_loaded;
+    unsigned int _ns_nloaded;
+    struct r_scope_elem *_ns_main_searchlist;
+    unsigned int _ns_global_scope_alloc;
+    unsigned int _ns_global_scope_pending_adds;
+    struct link_map *libc_map;
+    struct
+    {
+      __rtld_lock_define_recursive (, lock)
+      struct
+      {
+        uint32_t hashval;
+        const char *name;
+        const ElfW(Sym) *sym;
+        const struct link_map *map;
+      } *entries;
+      size_t size;
+      size_t n_elements;
+      void (*free) (void *);
+    } _ns_unique_sym_table;
+  } _dl_ns[DL_NNS];
+  size_t _dl_nns;
+  __rtld_lock_define_recursive (EXTERN, _dl_load_lock)
+  __rtld_lock_define_recursive (EXTERN, _dl_load_write_lock)
+  __rtld_lock_define_recursive (EXTERN, _dl_load_tls_lock)
+};
+
 /* clang-format on */
 
 #undef DL_NNS
