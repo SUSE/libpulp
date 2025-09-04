@@ -83,8 +83,10 @@ void libpulp_errx_func(const char *file, const char *func, int line, int eval,
 
 /** @brief Macro which passes the current file, function and line number for
  * logging.  */
+#ifndef libpulp_errx
 #define libpulp_errx(...) \
   libpulp_errx_func(__FILE__, __func__, __LINE__, __VA_ARGS__)
+#endif
 
 /** @brief Libpulp's version of `exit`
  *
@@ -111,7 +113,7 @@ void libpulp_crash_assert_func(const char *file, const char *func, int line,
                                unsigned long expression);
 
 #define libpulp_crash_assert(expr) \
-  libpulp_crash_assert_func(__FILE__, __func__, __LINE__, (unsigned long)expr)
+  libpulp_crash_assert_func(__FILE__, __func__, __LINE__, (unsigned long)(expr))
 
 /** Poison any function that makes the process to abort.  */
 #ifndef DISABLE_ERR_POISON

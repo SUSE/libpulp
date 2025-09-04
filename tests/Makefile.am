@@ -596,6 +596,7 @@ manyprocesses_LDADD = libmanyprocesses.la
 manyprocesses_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 
 dlsym_SOURCES = dlsym.c
+dlsym_CFLAGS = -I$(srcdir)/../include
 dlsym_LDADD = -lpthread -ldl -lrt
 dlsym_DEPENDENCIES = $(POST_PROCESS) $(METADATA)
 

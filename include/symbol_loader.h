@@ -1,7 +1,7 @@
 /*
  *  libpulp - User-space Livepatching Library
  *
- *  Copyright (C) 2021 SUSE Software Solutions GmbH
+ *  Copyright (C) 2025 SUSE Software Solutions GmbH
  *
  *  This file is part of libpulp.
  *
@@ -19,5 +19,14 @@
  *  along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-int __ulp_asunsafe_trylock(void);
-int __ulp_asunsafe_unlock(void);
+#include <pthread.h>
+
+void *get_loaded_symbol_addr_size(const char *, const char *, void *, size_t *);
+
+#define get_loaded_symbol_addr(x, y, z) get_loaded_symbol_addr_size(x, y, z, NULL)
+
+void *get_loaded_library_base_addr(const char *);
+
+int get_loaded_library_tls_index(const char *);
+
+void get_ld_global_locks(pthread_mutex_t **l_lock, pthread_mutex_t **w_lock);

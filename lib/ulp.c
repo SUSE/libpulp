@@ -39,6 +39,7 @@
 #include "error.h"
 #include "insn_queue_lib.h"
 #include "interpose.h"
+#include "symbol_loader.h"
 #include "msg_queue.h"
 #include "ulp.h"
 
