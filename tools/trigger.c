@@ -54,7 +54,8 @@ static bool
 skippable_error(ulp_error_t err)
 {
   return err == EBUILDID || err == ENOTARGETLIB || err == EUSRBLOCKED ||
-         err == EWILDNOMATCH || err == EAPPLIED || err == ENOPATCH;
+         err == EWILDNOMATCH || err == EAPPLIED || err == ENOPATCH ||
+         err == ESRCH;
 }
 
 enum

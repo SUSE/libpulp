@@ -1494,6 +1494,12 @@ hijack_threads(struct ulp_process *process)
   snprintf(taskname, PATH_MAX, "/proc/%d/task", pid);
   taskdir = opendir(taskname);
   if (taskdir == NULL) {
+    /* In the case the error is ENOENT, that means the process ended between
+       the process discovery and here, the process hijacking.  */
+    if (errno == ENOENT) {
+      return ESRCH;
+    }
+
     WARN("error opening %s: %s.", taskname, strerror(errno));
     return errno;
   }
