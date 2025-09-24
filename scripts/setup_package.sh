@@ -21,8 +21,8 @@
 
 PROGNAME=`basename "$0"`
 
-SLE_VERSION_REGEX="[0-9]{6}"
-VERSION_REGEX="([0-9\.a-zA-Z]+-$SLE_VERSION_REGEX\.[0-9\.]+[0-9])"
+SLE_VERSION_REGEX="[0-9]{6}|slfo[\.0-9]+"
+VERSION_REGEX="([0-9\.a-zA-Z]+-([0-9]{6}\.|slfo[\.0-9]+_)?[0-9\.]+[0-9]+)"
 PLATFORM=
 PRODUCT=
 URL=
@@ -48,13 +48,54 @@ popd ()
   command popd "$@" > /dev/null
 }
 
+is_sle15()
+{
+  if [[ $PLATFORM == SLE-15* ]]; then
+    return 0
+  fi
+
+  return 1
+}
+
+is_slfo()
+{
+  if [[ $PLATFORM == SLFO* ]]; then
+    return 0
+  fi
+
+  return 1
+}
+
+is_alp()
+{
+  if [ $PLATFORM == "ALP" ]; then
+    return 0
+  fi
+
+  return 1
+}
+
 set_url_platform()
 {
   PLATFORM=$1
   PRODUCT=$2
   local element=$3
 
-  URL="https://download.suse.de/download/ibs/SUSE:/SLE-$PLATFORM:/$PRODUCT/standard"
+  if is_slfo; then
+    # SLFO uses other links.
+    local ver=$(echo $PLATFORM | grep -Eo "([0-9]+\.|[0-9]+)+")
+
+    # SLFO-1.1 for some weird reason has ':' appended to it in url.  Hack it.
+    if [ $ver == "1.1" ]; then
+      URL="https://download.suse.de/download/ibs/SUSE:/SLFO:/$ver:/Build/standard"
+    elif [ $ver == "1.2" ]; then
+      URL="https://download.suse.de/download/ibs/SUSE:/SLFO:/$ver/standard"
+    fi
+  elif is_alp; then
+    URL="https://download.suse.de/download/ibs/SUSE:/ALP:/Source:/Standard:/Core:/1.0:/Build/standard"
+  else
+    URL="https://download.suse.de/download/ibs/SUSE:/$PLATFORM:/$PRODUCT/standard"
+  fi
 
   if [ "$element" == "src" ]; then
     URL="$URL/src"
@@ -81,7 +122,7 @@ web_get()
 get_version_from_package_name()
 {
   local package=$1
-  local version=$(echo "$1" | grep -Eo $VERSION_REGEX)
+  local version=$(echo "$1" | grep -Po "\-\K$VERSION_REGEX")
 
   echo $version
 }
@@ -100,21 +141,23 @@ get_sle_version_from_package_name()
   # Declare a hash table mapping version number to a label used in
   # download.suse.de
 
-  declare -A sle_hash=( ["150000"]="15"
-                        ["150100"]="15-SP1"
-                        ["150200"]="15-SP2"
-                        ["150300"]="15-SP3"
-                        ["150400"]="15-SP4"
-                        ["150500"]="15-SP5"
-                        ["150600"]="15-SP6")
-
+  declare -A sle_hash=( ["150000"]="SLE-15"
+                        ["150100"]="SLE-15-SP1"
+                        ["150200"]="SLE-15-SP2"
+                        ["150300"]="SLE-15-SP3"
+                        ["150400"]="SLE-15-SP4"
+                        ["150500"]="SLE-15-SP5"
+                        ["150600"]="SLE-15-SP6"
+                        ["150700"]="SLE-15-SP7"
+                        ["slfo.1.1"]="SLFO:1.1"
+                        ["slfo.1.2"]="SLFO:1.2"
+                      )
 
   local version=$(echo "$1" | grep -Eo "($SLE_VERSION_REGEX)")
-
   local sle_version=${sle_hash[$version]}
 
   if [ "x$sle_version" = "x" ]; then
-    "Unsupported SLE package version $version"
+    echo "Unsupported SLE package version $version" >> /dev/stderr
     exit 1
   fi
 
@@ -455,7 +498,7 @@ dump_interesting_info_from_elfs_in_lib()
 
 sanitize_platform()
 {
-  local platforms="15-SP3 15-SP4 15-SP5 15-SP6"
+  local platforms="SLE-15-SP3 SLE-15-SP4 SLE-15-SP5 SLE-15-SP6 SLE-15-SP7 ALP SLFO:1.1 SLFO:1.2"
 
   for platform in ${platforms}; do
     if [ "$PLATFORM" = "$platform" ]; then
@@ -465,6 +508,7 @@ sanitize_platform()
   done
 
   echo "Unsupported platform $PLATFORM"
+  echo "Supported platforms: $platforms"
   exit 1
 }
 
@@ -494,7 +538,7 @@ print_help_message()
   echo ""
   echo "Usage: $PROGNAME <switches>"
   echo "where <switches>"
-  echo "  --platform=PLATFORM            SLE version (ex 15-SP4)."
+  echo "  --platform=PLATFORM            SLE version (ex SLE-15-SP4)."
   echo "  --package=PACKAGE              Package name to download (ex glibc)."
   echo "  --no-src-download              Do not download the src package."
   echo "  --no-ipa-clones-download       Do not download the ipa-clones tarballs."
@@ -559,9 +603,6 @@ parse_program_argv()
   # Do some sanity checking
   sanitize_platform
   sanitize_package
-
-  # Set platform globally
-  set_url_platform "$PLATFORM" "GA"
 }
 
 main()
@@ -572,14 +613,28 @@ main()
   rm -rf $PLATFORM
 
   local all_names=""
-  local products="GA Update"
 
-  for product in GA Update; do
+  # In case the platform is plain SLE-15, there are multiple 'products' we
+  # must look to.
+  local products="_"
+  if is_sle15; then
+    products="GA Update"
+  fi
+
+  for product in $products; do
     # Set platform globally
     set_url_platform "$PLATFORM" $product
 
     download_package_list "/tmp/suse_package_list.html"
     local names=$(extract_lib_package_names "/tmp/suse_package_list.html" $PACKAGE)
+
+    echo "names: $names \n\n"
+    # Check if "names" string is empty.  If so, that means the package in
+    # question is not in this repository.
+    if [ "x$names" == "x" ]; then
+      echo "Package not found in $PLATFORM:$product. Are you sure it exists?"
+      exit 1
+    fi
 
     # Clean the directory
     rm -rf $PLATFORM
