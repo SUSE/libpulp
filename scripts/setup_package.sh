@@ -21,10 +21,11 @@
 
 PROGNAME=`basename "$0"`
 
-SLE_VERSION_REGEX="[0-9]{6}"
-VERSION_REGEX="([0-9\.a-zA-Z]+-$SLE_VERSION_REGEX\.[0-9\.]+[0-9])"
+SLE_VERSION_REGEX="[0-9]{6}|slfo[\.0-9]+"
+VERSION_REGEX="([0-9\.a-zA-Z]+-([0-9]{6}\.|slfo[\.0-9]+_)?[0-9\.]+[0-9]+)"
 PLATFORM=
 PRODUCT=
+ARCH=
 URL=
 PACKAGE=
 NO_CLEANUP=0
@@ -38,6 +39,9 @@ NO_IPA_CLONES_DOWNLOAD=0
 # If this flag is enabled, then download of debuginfo packages will be blocked.
 NO_DEBUGINFO_DOWNLOAD=0
 
+# If this flag is enabled, then extracted files are not cleaned.
+NO_CLEANUP_EXTRACTED_FILES=0
+
 # Pushd and popd are not silent. Silence them.
 pushd ()
 {
@@ -48,18 +52,59 @@ popd ()
   command popd "$@" > /dev/null
 }
 
+is_sle15()
+{
+  if [[ $PLATFORM == SLE-15* ]]; then
+    return 0
+  fi
+
+  return 1
+}
+
+is_slfo()
+{
+  if [[ $PLATFORM == SLFO* ]]; then
+    return 0
+  fi
+
+  return 1
+}
+
+is_alp()
+{
+  if [ $PLATFORM == "ALP" ]; then
+    return 0
+  fi
+
+  return 1
+}
+
 set_url_platform()
 {
   PLATFORM=$1
   PRODUCT=$2
-  local element=$3
+  ARCH=$3
+  local element=$4
 
-  URL="https://download.suse.de/download/ibs/SUSE:/SLE-$PLATFORM:/$PRODUCT/standard"
+  if is_slfo; then
+    # SLFO uses other links.
+    local ver=$(echo $PLATFORM | grep -Eo "([0-9]+\.|[0-9]+)+")
+    # SLFO-1.1 for some weird reason has ':' appended to it in url.  Hack it.
+    if [ $ver == "1.1" ]; then
+      URL="https://download.suse.de/download/ibs/SUSE:/SLFO:/$ver:/Build/standard"
+    elif [ $ver == "1.2" ]; then
+      URL="https://download.suse.de/download/ibs/SUSE:/SLFO:/$ver/standard"
+    fi
+  elif is_alp; then
+    URL="https://download.suse.de/download/ibs/SUSE:/ALP:/Source:/Standard:/Core:/1.0:/Build/standard"
+  else
+    URL="https://download.suse.de/download/ibs/SUSE:/$PLATFORM:/$PRODUCT/standard"
+  fi
 
   if [ "$element" == "src" ]; then
     URL="$URL/src"
   elif [ "$element" != "ipa-clones" ]; then
-    URL="$URL/x86_64"
+    URL="$URL/$ARCH"
   fi
 }
 
@@ -81,7 +126,7 @@ web_get()
 get_version_from_package_name()
 {
   local package=$1
-  local version=$(echo "$1" | grep -Eo $VERSION_REGEX)
+  local version=$(echo "$1" | grep -Po "\-\K$VERSION_REGEX")
 
   echo $version
 }
@@ -100,21 +145,23 @@ get_sle_version_from_package_name()
   # Declare a hash table mapping version number to a label used in
   # download.suse.de
 
-  declare -A sle_hash=( ["150000"]="15"
-                        ["150100"]="15-SP1"
-                        ["150200"]="15-SP2"
-                        ["150300"]="15-SP3"
-                        ["150400"]="15-SP4"
-                        ["150500"]="15-SP5"
-                        ["150600"]="15-SP6")
-
+  declare -A sle_hash=( ["150000"]="SLE-15"
+                        ["150100"]="SLE-15-SP1"
+                        ["150200"]="SLE-15-SP2"
+                        ["150300"]="SLE-15-SP3"
+                        ["150400"]="SLE-15-SP4"
+                        ["150500"]="SLE-15-SP5"
+                        ["150600"]="SLE-15-SP6"
+                        ["150700"]="SLE-15-SP7"
+                        ["slfo.1.1"]="SLFO:1.1"
+                        ["slfo.1.2"]="SLFO:1.2"
+                      )
 
   local version=$(echo "$1" | grep -Eo "($SLE_VERSION_REGEX)")
-
   local sle_version=${sle_hash[$version]}
 
   if [ "x$sle_version" = "x" ]; then
-    "Unsupported SLE package version $version"
+    echo "Unsupported SLE package version $version" >> /dev/stderr
     exit 1
   fi
 
@@ -126,7 +173,7 @@ extract_lib_package_names()
   local file=$1
   local lib_name=$2
 
-  local interesting_lines=$(grep -Eo "$lib_name-$VERSION_REGEX\.x86_64.rpm\"" $1)
+  local interesting_lines=$(grep -Eo "$lib_name-$VERSION_REGEX\.$ARCH.rpm\"" $1)
   local final=""
 
   for lib in ${interesting_lines}; do
@@ -201,7 +248,7 @@ get_list_of_ipa_clones()
       package_name="openssl-3"
     fi
 
-    ipa_clones_list="$ipa_clones_list $package_name-livepatch-$version.x86_64.tar.xz"
+    ipa_clones_list="$ipa_clones_list $package_name-livepatch-$version.$ARCH.tar.xz"
   done
 
   echo $ipa_clones_list
@@ -244,7 +291,7 @@ get_list_of_debuginfo_packages()
     local package_name=$(get_name_from_package_name $package)
     local version=$(get_version_from_package_name $package)
 
-    src_package_list="$src_package_list $package_name-debuginfo-$version.x86_64.rpm"
+    src_package_list="$src_package_list $package_name-debuginfo-$version.$ARCH.rpm"
   done
 
   echo $src_package_list
@@ -257,7 +304,7 @@ download_debuginfo_packages()
 
   echo $packages
 
-  set_url_platform $PLATFORM $PRODUCT "debuginfo"
+  set_url_platform $PLATFORM $PRODUCT $ARCH "debuginfo"
   parallel_download_packages "$packages"
 }
 
@@ -266,7 +313,7 @@ download_src_packages()
   local packages=$(get_list_of_src_packages "$*")
   local old_url=$URL
 
-  set_url_platform $PLATFORM $PRODUCT "src"
+  set_url_platform $PLATFORM $PRODUCT $ARCH "src"
   parallel_download_packages "$packages"
 }
 
@@ -278,7 +325,7 @@ download_ipa_clones()
 
   local sle_ver=$(get_sle_version_from_package_name $1)
 
-  set_url_platform $PLATFORM $PRODUCT "ipa-clones"
+  set_url_platform $PLATFORM $PRODUCT $ARCH "ipa-clones"
   parallel_download_packages "$ipa_clones_list"
 }
 
@@ -291,16 +338,16 @@ extract_libs_from_package()
   local src_package=$(get_list_of_src_packages $package)
   local debuginfo_package=$(get_list_of_debuginfo_packages $package)
 
-  mkdir -p $PLATFORM/$name/$version
+  mkdir -p $ARCH/$PLATFORM/$name/$version
 
-  cp $package $PLATFORM/$name/$version/$package
+  cp $package $ARCH/$PLATFORM/$name/$version/$package
   if [ $? -ne 0 ]; then
     echo "error: $package not downloaded."
     exit 1
   fi
 
   if [ $NO_SRC_DOWNLOAD -eq 0 ]; then
-    cp $src_package $PLATFORM/$name/$version/$src_package
+    cp $src_package $ARCH/$PLATFORM/$name/$version/$src_package
     if [ $? -ne 0 ]; then
       echo "error: $src_package not downloaded."
       exit 1
@@ -308,7 +355,7 @@ extract_libs_from_package()
   fi
 
   if [ $NO_IPA_CLONES_DOWNLOAD -eq 0 ]; then
-    cp $ipa_clones $PLATFORM/$name/$version/$ipa_clones
+    cp $ipa_clones $ARCH/$PLATFORM/$name/$version/$ipa_clones
     if [ $? -ne 0 ]; then
       echo "error: $ipa_clones not downloaded."
       read -r -p "Continue without it? [y/N] " response
@@ -319,14 +366,14 @@ extract_libs_from_package()
   fi
 
   if [ $NO_DEBUGINFO_DOWNLOAD -eq 0 ]; then
-    cp $debuginfo_package $PLATFORM/$name/$version/$debuginfo_package
+    cp $debuginfo_package $ARCH/$PLATFORM/$name/$version/$debuginfo_package
     if [ $? -ne 0 ]; then
       echo "error: $debuginfo not downloaded."
       exit 1
     fi
   fi
 
-  cd $PLATFORM/$name/$version
+  cd $ARCH/$PLATFORM/$name/$version
     mkdir -p binaries
     cd binaries
       if [ -f ../$package ]; then
@@ -361,7 +408,7 @@ extract_libs_from_package()
 
     # delete anything we don't need.
     rm -f *.rpm *.tar.xz
-  cd ../../../
+  cd ../../../../
 }
 
 # List of .debug files in folder.  Stored here for cache reasons.
@@ -401,6 +448,13 @@ dump_interesting_info_from_elfs()
 
   # Iterate on every so in the folder.
   for so in $list_of_sos; do
+    # Check if .so is livepatchable.  We may have non-livepatchable
+    # libraries here.
+    ulp livepatchable $so 2> /dev/null
+    if [ $? -ne 0 ]; then
+      continue # Library is not livepatchable, skip it.
+    fi
+
     if [ $NO_DEBUGINFO_DOWNLOAD -eq 0 ]; then
       # Get the debuginfo that matches this library.
       local debug=$(match_so_to_debuginfo $so)
@@ -419,15 +473,23 @@ dump_interesting_info_from_elfs()
     fi
   done
 
-  # Delete all .so we don't need.
-  for so in $list_of_sos; do
-    rm -f $so
-  done
+  if [ $NO_CLEANUP_EXTRACTED_FILES -eq 0 ]; then
+    # Delete all .so we don't need.
+    for so in $list_of_sos; do
+      rm -f $so
+    done
 
-  # Delete all .debug we we don't need.
-  for debug in $_LIST_OF_DEBUG; do
-    rm -f $debug
-  done
+    # Delete all .debug we we don't need.
+    for debug in $_LIST_OF_DEBUG; do
+      rm -f $debug
+    done
+
+    # Delete .txt files (licenses, etc)
+    find . -type f -name "*.txt" -delete
+
+    # Delete any broken symlinks that may have been left after we deleted stuff.
+    find . -xtype l -exec rm {} \;
+  fi
 
   # Delete empty directories left.
   find . -type d -empty -delete
@@ -455,7 +517,7 @@ dump_interesting_info_from_elfs_in_lib()
 
 sanitize_platform()
 {
-  local platforms="15-SP3 15-SP4 15-SP5 15-SP6"
+  local platforms="SLE-15-SP3 SLE-15-SP4 SLE-15-SP5 SLE-15-SP6 SLE-15-SP7 ALP SLFO:1.1 SLFO:1.2"
 
   for platform in ${platforms}; do
     if [ "$PLATFORM" = "$platform" ]; then
@@ -465,6 +527,7 @@ sanitize_platform()
   done
 
   echo "Unsupported platform $PLATFORM"
+  echo "Supported platforms: $platforms"
   exit 1
 }
 
@@ -484,6 +547,28 @@ sanitize_package()
   done
 
   echo "Unsupported package $PACKAGE"
+  echo "Supported packages: $packages"
+  exit 1
+}
+
+sanitize_arch()
+{
+  local archs="x86_64 ppc64le"
+
+  if [ "x$ARCH" == "x" ]; then
+    echo "You must pass a --arch=<ARCH> parameter!"
+    exit 1
+  fi
+
+  for arch in ${archs}; do
+    if [ "$ARCH" == "$arch" ]; then
+      # Supported arch found
+      return 0
+    fi
+  done
+
+  echo "Unsupported architecture $ARCH."
+  echo "Supported architectures: $archs"
   exit 1
 }
 
@@ -494,11 +579,13 @@ print_help_message()
   echo ""
   echo "Usage: $PROGNAME <switches>"
   echo "where <switches>"
-  echo "  --platform=PLATFORM            SLE version (ex 15-SP4)."
+  echo "  --platform=PLATFORM            SLE version (ex SLE-15-SP4)."
   echo "  --package=PACKAGE              Package name to download (ex glibc)."
+  echo "  --arch=ARCH                    System architecture (ex x86_64)"
   echo "  --no-src-download              Do not download the src package."
   echo "  --no-ipa-clones-download       Do not download the ipa-clones tarballs."
   echo "  --no-cleanup                   Do not cleanup downloaded .rpm files."
+  echo "  --no-cleanup-extracted         Do not cleanup extracted files."
   echo ""
   echo "supported <library> so far are 'glibc' and 'libopenssl1_1'"
 }
@@ -523,6 +610,10 @@ parse_program_argv()
         PACKAGE="${i#*=}"
         shift
         ;;
+      --arch=*)
+        ARCH="${i#*=}"
+        shift
+        ;;
       --no-cleanup)
         NO_CLEANUP=1
         shift
@@ -537,6 +628,10 @@ parse_program_argv()
         ;;
       --no-debuginfo-download)
         NO_DEBUGINFO_DOWNLOAD=1
+        shift
+        ;;
+      --no-cleanup-extracted)
+        NO_CLEANUP_EXTRACTED_FILES=1
         shift
         ;;
       --help)
@@ -559,9 +654,7 @@ parse_program_argv()
   # Do some sanity checking
   sanitize_platform
   sanitize_package
-
-  # Set platform globally
-  set_url_platform "$PLATFORM" "GA"
+  sanitize_arch
 }
 
 main()
@@ -572,14 +665,27 @@ main()
   rm -rf $PLATFORM
 
   local all_names=""
-  local products="GA Update"
 
-  for product in GA Update; do
+  # In case the platform is plain SLE-15, there are multiple 'products' we
+  # must look to.
+  local products="_"
+  if is_sle15; then
+    products="GA Update"
+  fi
+
+  for product in $products; do
     # Set platform globally
-    set_url_platform "$PLATFORM" $product
+    set_url_platform "$PLATFORM" $product $ARCH
 
     download_package_list "/tmp/suse_package_list.html"
     local names=$(extract_lib_package_names "/tmp/suse_package_list.html" $PACKAGE)
+
+    # Check if "names" string is empty.  If so, that means the package in
+    # question is not in this repository.
+    if [ "x$names" == "x" ]; then
+      echo "Package not found in $PLATFORM:$product. Are you sure it exists?"
+      exit 1
+    fi
 
     # Clean the directory
     rm -rf $PLATFORM
@@ -603,7 +709,7 @@ main()
     extract_libs_from_package "$package"
   done
 
-  dump_interesting_info_from_elfs_in_lib $PLATFORM/$PACKAGE
+  dump_interesting_info_from_elfs_in_lib $ARCH/$PLATFORM/$PACKAGE
 
   # Delete all packages to cleanup.
   if [ $NO_CLEANUP -ne 1 ]; then
