@@ -42,6 +42,9 @@ NO_DEBUGINFO_DOWNLOAD=0
 # If this flag is enabled, then extracted files are not cleaned.
 NO_CLEANUP_EXTRACTED_FILES=0
 
+# If this flag is enabled, then the script will setup older, unsupported libraries.
+SETUP_UNSUPPORTED_LIBRARIES=0
+
 # Pushd and popd are not silent. Silence them.
 pushd ()
 {
@@ -586,6 +589,7 @@ print_help_message()
   echo "  --no-ipa-clones-download       Do not download the ipa-clones tarballs."
   echo "  --no-cleanup                   Do not cleanup downloaded .rpm files."
   echo "  --no-cleanup-extracted         Do not cleanup extracted files."
+  echo "  --setup-unsupported-libraries  Setup libraries past the 13-months support range."
   echo ""
   echo "supported <library> so far are 'glibc' and 'libopenssl1_1'"
 }
@@ -632,6 +636,10 @@ parse_program_argv()
         ;;
       --no-cleanup-extracted)
         NO_CLEANUP_EXTRACTED_FILES=1
+        shift
+        ;;
+      --setup-unuspported-libraries)
+        SETUP_UNSUPPORTED_LIBRARIES=1
         shift
         ;;
       --help)
@@ -706,6 +714,15 @@ main()
   done
 
   for package in $all_names; do
+    local target=$(LANG=C date --date="today - 13 months")
+
+    # Check if package time is in the supported range.
+    if [[ $SETUP_UNSUPPORTED_LIBRARIES -eq 0 && \
+          "$(LANG=C date -r $package)" < "$target" ]]; then
+      echo "Dropping $package because it is older than 13 months."
+      continue;
+    fi
+
     extract_libs_from_package "$package"
   done
 
