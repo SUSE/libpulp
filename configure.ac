@@ -17,7 +17,7 @@
 #   You should have received a copy of the GNU General Public License
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
-AC_INIT([libpulp],[0.3.16],[noreply@suse.com])
+AC_INIT([libpulp],[0.3.17],[noreply@suse.com])
 
 # Keep most generated files under the config directory.
 AC_CONFIG_AUX_DIR([config])
