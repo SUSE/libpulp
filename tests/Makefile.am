@@ -478,7 +478,8 @@ check_PROGRAMS = \
   insn_queue \
   chroot \
   visibility \
-  notes
+  notes \
+  dlopen
 
 numserv_SOURCES = numserv.c
 numserv_LDADD = libdozens.la libhundreds.la
@@ -648,6 +649,11 @@ notes_DEPENDENCIES = notes.ld $(POST_PROCESS) $(METADATA)
 
 EXTRA_DIST += notes.ld
 
+dlopen_SOURCES = dlopen.c
+dlopen_CFLAGS = $(AM_CFLAGS)
+dlsym_LDADD = -lpthread -ldl -lrt
+dlsym_DEPENDENCIES = libhundreds.la
+
 TESTS = \
   numserv.py \
   numserv_bsymbolic.py \
@@ -707,7 +713,8 @@ TESTS = \
   textrel.py \
   seccomp_disable.py \
   run_libc.py \
-  glibc_private.py
+  glibc_private.py \
+  dlopen.py
 
 XFAIL_TESTS = \
   blocked.py \

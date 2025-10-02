@@ -76,8 +76,6 @@ static void *(*real_aligned_alloc)(size_t, size_t) = NULL;
 static int (*real_posix_memalign)(void **, size_t, size_t) = NULL;
 
 /* Dynamic loader functions. */
-static void *(*real_dlopen)(const char *, int) = NULL;
-static void *(*real_dlmopen)(Lmid_t, const char *, int) = NULL;
 static int (*real_dlclose)(void *) = NULL;
 static int (*real_dladdr)(const void *, Dl_info *) = NULL;
 static int (*real_dladdr1)(const void *, Dl_info *, void **, int) = NULL;
@@ -268,24 +266,12 @@ __ulp_asunsafe_begin(void)
 
   bool ok = true;
 
-  real_dlopen = dlsym(RTLD_NEXT, "dlopen");
-  real_dlmopen = dlsym(RTLD_NEXT, "dlmopen");
   real_dlclose = dlsym(RTLD_NEXT, "dlclose");
   real_dladdr = dlsym(RTLD_NEXT, "dladdr");
   real_dladdr1 = dlsym(RTLD_NEXT, "dladdr1");
   real_dlinfo = dlsym(RTLD_NEXT, "dlinfo");
 
   /* Check if we got the symbols we need from libdl.  */
-  if (!real_dlopen) {
-    set_libpulp_error_state_with_reason(ENOLIBDL, "unable to find function `dlopen`.");
-    ok = false;
-  }
-
-  if (!real_dlmopen) {
-    set_libpulp_error_state_with_reason(ENOLIBDL, "unable to find function `dlmopen`.");
-    ok = false;
-  }
-
   if (!real_dlclose) {
     set_libpulp_error_state_with_reason(ENOLIBDL, "unable to find function `dlclose`.");
     ok = false;
@@ -562,38 +548,6 @@ posix_memalign(void **memptr, size_t alignment, size_t size)
 
   __sync_fetch_and_add(&flag, 1);
   result = real_posix_memalign(memptr, alignment, size);
-  __sync_fetch_and_sub(&flag, 1);
-
-  return result;
-}
-
-void *
-dlopen(const char *filename, int flags)
-{
-  void *result;
-
-  if (real_dlopen == NULL) {
-    __ulp_asunsafe_begin();
-  }
-
-  __sync_fetch_and_add(&flag, 1);
-  result = real_dlopen(filename, flags);
-  __sync_fetch_and_sub(&flag, 1);
-
-  return result;
-}
-
-void *
-dlmopen(Lmid_t nsid, const char *file, int mode)
-{
-  void *result;
-
-  if (real_dlmopen == NULL) {
-    __ulp_asunsafe_begin();
-  }
-
-  __sync_fetch_and_add(&flag, 1);
-  result = real_dlmopen(nsid, file, mode);
   __sync_fetch_and_sub(&flag, 1);
 
   return result;
