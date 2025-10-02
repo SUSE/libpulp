@@ -651,8 +651,8 @@ EXTRA_DIST += notes.ld
 
 dlopen_SOURCES = dlopen.c
 dlopen_CFLAGS = $(AM_CFLAGS)
-dlsym_LDADD = -lpthread -ldl -lrt
-dlsym_DEPENDENCIES = libhundreds.la
+dlopen_LDADD = -lpthread -ldl -lrt
+dlopen_DEPENDENCIES = libhundreds.la
 
 TESTS = \
   numserv.py \
