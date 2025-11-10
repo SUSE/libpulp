@@ -32,7 +32,9 @@
 
 struct msg_queue __ulp_msg_queue;
 
-static char msg[MSGQ_BUFFER_MAX];
+/* Define an buffer in which snprintf will expand tokens in strings.  */
+#define SPRINTF_BUFFER_SIZE         8192
+static char msg[SPRINTF_BUFFER_SIZE];
 
 static void
 msgq_strpush(const char *msg, size_t msg_size)
@@ -107,7 +109,7 @@ msgq_push(const char *format, ...)
    * return the size of the string, therefore, the size of the object will
    * be +1 because of the null character in the end of the string.  */
   va_start(arglist, format);
-  msg_size = vsnprintf(msg, MSGQ_BUFFER_MAX, format, arglist) + 1;
+  msg_size = vsnprintf(msg, SPRINTF_BUFFER_SIZE, format, arglist) + 1;
   va_end(arglist);
 
   msgq_strpush(msg, msg_size);
@@ -125,7 +127,7 @@ msgq_vpush(const char *format, va_list arglist)
   /* Expand the format string with the arguments provided. vsnprintf will
    * return the size of the string, therefore, the size of the object will
    * be +1 because of the null character in the end of the string.  */
-  msg_size = vsnprintf(msg, MSGQ_BUFFER_MAX, format, arglist) + 1;
+  msg_size = vsnprintf(msg, SPRINTF_BUFFER_SIZE, format, arglist) + 1;
 
   msgq_strpush(msg, msg_size);
 }
