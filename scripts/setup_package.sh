@@ -142,35 +142,6 @@ get_name_from_package_name()
   echo ${tokens[0]}
 }
 
-get_sle_version_from_package_name()
-{
-  local package=$1
-  # Declare a hash table mapping version number to a label used in
-  # download.suse.de
-
-  declare -A sle_hash=( ["150000"]="SLE-15"
-                        ["150100"]="SLE-15-SP1"
-                        ["150200"]="SLE-15-SP2"
-                        ["150300"]="SLE-15-SP3"
-                        ["150400"]="SLE-15-SP4"
-                        ["150500"]="SLE-15-SP5"
-                        ["150600"]="SLE-15-SP6"
-                        ["150700"]="SLE-15-SP7"
-                        ["slfo.1.1"]="SLFO:1.1"
-                        ["slfo.1.2"]="SLFO:1.2"
-                      )
-
-  local version=$(echo "$1" | grep -Eo "($SLE_VERSION_REGEX)")
-  local sle_version=${sle_hash[$version]}
-
-  if [ "x$sle_version" = "x" ]; then
-    echo "Unsupported SLE package version $version" >> /dev/stderr
-    exit 1
-  fi
-
-  echo $sle_version
-}
-
 extract_lib_package_names()
 {
   local file=$1
@@ -181,7 +152,11 @@ extract_lib_package_names()
 
   for lib in ${interesting_lines}; do
     lib=${lib%?} # Remove last " from string.
-    final="$final $lib"
+
+    # Do not add livepatch packages to the list.
+    if [[ "$lib" != *"livepatch"* ]]; then
+      final="$final $lib"
+    fi
   done
 
   echo $final
@@ -326,8 +301,6 @@ download_ipa_clones()
   local ipa_clones_list=$(get_list_of_ipa_clones "$*")
   local old_url=$URL
 
-  local sle_ver=$(get_sle_version_from_package_name $1)
-
   set_url_platform $PLATFORM $PRODUCT $ARCH "ipa-clones"
   parallel_download_packages "$ipa_clones_list"
 }
@@ -463,7 +436,7 @@ dump_interesting_info_from_elfs()
       local debug=$(match_so_to_debuginfo $so)
 
       if [ "$debug" == "" ]; then
-        exit 1
+        continue
       fi
 
       # Run the ulp extract command on both the library and debuginfo.
@@ -491,7 +464,7 @@ dump_interesting_info_from_elfs()
     find . -type f -name "*.txt" -delete
 
     # Delete any broken symlinks that may have been left after we deleted stuff.
-    find . -xtype l -exec rm {} \;
+    find . -xtype l -delete
   fi
 
   # Delete empty directories left.
@@ -714,11 +687,11 @@ main()
   done
 
   for package in $all_names; do
-    local target=$(LANG=C date --date="today - 13 months")
+    local target=$(LANG=C date --date="today - 13 months" +%s)
 
     # Check if package time is in the supported range.
     if [[ $SETUP_UNSUPPORTED_LIBRARIES -eq 0 && \
-          "$(LANG=C date -r $package)" < "$target" ]]; then
+          "$(LANG=C date -r $package +%s)" < "$target" ]]; then
       echo "Dropping $package because it is older than 13 months."
       continue;
     fi
