@@ -26,6 +26,7 @@ VERSION_REGEX="([0-9\.a-zA-Z]+-([0-9]{6}\.|slfo[\.0-9]+_)?[0-9\.]+[0-9]+)"
 PLATFORM=
 PRODUCT=
 ARCH=
+BASEURL=
 URL=
 PACKAGE=
 NO_CLEANUP=0
@@ -53,6 +54,30 @@ pushd ()
 popd ()
 {
   command popd "$@" > /dev/null
+}
+
+# Semaphores for parallel processing
+# initialize a semaphore with a given number of tokens
+open_sem(){
+  mkfifo pipe-$$
+  exec 3<>pipe-$$
+  rm pipe-$$
+  local i=$1
+  for((;i>0;i--)); do
+      printf %s 000 >&3
+  done
+}
+
+# run the given command asynchronously and pop/push tokens
+run_with_lock(){
+  local x
+  # this read waits until there is something to read
+  read -u 3 -n 3 x && ((0==x)) || exit $x
+  (
+   ( "$@"; )
+  # push the return code of the command to the semaphore
+  printf '%.3d' $? >&3
+  )&
 }
 
 is_sle15()
@@ -103,6 +128,7 @@ set_url_platform()
   else
     URL="https://download.suse.de/download/ibs/SUSE:/$PLATFORM:/$PRODUCT/standard"
   fi
+  BASEURL="$URL"
 
   if [ "$element" == "src" ]; then
     URL="$URL/src"
@@ -126,18 +152,50 @@ web_get()
   fi
 }
 
+update_meta()
+{
+    test -d meta || mkdir -p meta
+    pushd meta
+    echo "meta from $BASEURL"
+    dname="$PLATFORM.$PRODUCT"
+    wget -4 --no-check-certificate -r --no-parent -l 1 -N --show-progress -P "$dname/" "$BASEURL/repodata/"
+    if [ $? -eq 4 ]; then
+      echo Unable to download "$BASEURL/repodata"
+      exit 1
+    fi
+    repodir=$(find "$dname" -name repodata -type d)
+    if [ -z "$repodir" ]; then
+      echo "nothing downloaded??"
+    elif [ ! -f "$repodir/repomd.xml" ]; then
+      echo "not a repomd"
+    elif [ -f "$dname/solv" -a "$dname/solv" -nt "$repodir/repomd.xml" ]; then
+      echo "solv is uptodate"
+    else
+      echo "updating solv file"
+      repo2solv -o "$dname/solv" "$repodir"
+      dumpsolv "$dname/solv" | awk '/^solvable:name:/{name=$2} /^solvable:arch:/{arch=$2} /^solvable:evr:/{print name,$2,arch}' > "$dname/packs"
+    fi
+    popd
+}
+
+get_filename_from_nevra()
+{
+  local n=${1/;/-}
+  n=${n/;/.}
+  echo "${n}.rpm"
+}
+
 get_version_from_package_name()
 {
   local package=$1
-  local version=$(echo "$1" | grep -Po "\-\K$VERSION_REGEX")
-
-  echo $version
+  IFS=';' tokens=( $package )
+  echo ${tokens[1]}
 }
 
 get_name_from_package_name()
 {
   local package=$1
-  IFS='-' tokens=( $package )
+  IFS=';' tokens=( $package )
 
   echo ${tokens[0]}
 }
@@ -147,17 +205,10 @@ extract_lib_package_names()
   local file=$1
   local lib_name=$2
 
-  local interesting_lines=$(grep -Eo "$lib_name-$VERSION_REGEX\.$ARCH.rpm\"" $1)
   local final=""
-
-  for lib in ${interesting_lines}; do
-    lib=${lib%?} # Remove last " from string.
-
-    # Do not add livepatch packages to the list.
-    if [[ "$lib" != *"livepatch"* ]]; then
-      final="$final $lib"
-    fi
-  done
+  while read -r pname evr arch; do
+  final="$final ${pname};${evr};${arch}"
+  done <<< "$(grep -E "$lib_name [^ ]+ $ARCH" $1)"
 
   echo $final
 }
@@ -222,8 +273,13 @@ get_list_of_ipa_clones()
     fi
 
     # libopenssl-3 ipa-clones artifacts are named openssl-3
-    if [ "$package_name" = "libopenssl3" ]; then
+    if [ "$package_name" = "libopenssl3" -o "$package_name" = "libopenssl3-x86-64-v3"  ]; then
       package_name="openssl-3"
+    fi
+
+    # glibc-locale-base ipa-clones artifacts are named glibc
+    if [ "$package_name" = "glibc-locale-base" -o "$package_name" = "glibc-gconv-modules-extra" ]; then
+      package_name="glibc"
     fi
 
     ipa_clones_list="$ipa_clones_list $package_name-livepatch-$version.$ARCH.tar.xz"
@@ -248,13 +304,19 @@ get_list_of_src_packages()
     fi
 
     # libopenssl-3 src comes from openssl-3
-    if [ "$package_name" = "libopenssl3" ]; then
+    if [ "$package_name" = "libopenssl3" -o "$package_name" = "libopenssl3-x86-64-v3" ]; then
       package_name="openssl-3"
+    fi
+
+    # glibc-locale-base ipa-clones artifacts are named glibc
+    if [ "$package_name" = "glibc-locale-base" -o "$package_name" = "glibc-gconv-modules-extra" ]; then
+      package_name="glibc"
     fi
 
     src_package_list="$src_package_list $package_name-$version.src.rpm"
   done
 
+  echo "AAAA $src_package_list" > /dev/stderr
   echo $src_package_list
 
 }
@@ -268,6 +330,11 @@ get_list_of_debuginfo_packages()
   for package in $packages; do
     local package_name=$(get_name_from_package_name $package)
     local version=$(get_version_from_package_name $package)
+
+    # glibc-locale-base comes from glibc
+    if [ "$package_name" = "glibc-locale-base" ]; then
+      package_name="glibc"
+    fi
 
     src_package_list="$src_package_list $package_name-debuginfo-$version.$ARCH.rpm"
   done
@@ -308,6 +375,7 @@ download_ipa_clones()
 extract_libs_from_package()
 {
   local package=$1
+  local filename=$(get_filename_from_nevra $package)
   local version=$(get_version_from_package_name $package)
   local name=$(get_name_from_package_name $package)
   local ipa_clones=$(get_list_of_ipa_clones $package)
@@ -316,16 +384,16 @@ extract_libs_from_package()
 
   mkdir -p $ARCH/$PLATFORM/$name/$version
 
-  cp $package $ARCH/$PLATFORM/$name/$version/$package
+  cp $filename $ARCH/$PLATFORM/$name/$version/$filename
   if [ $? -ne 0 ]; then
-    echo "error: $package not downloaded."
+    echo "388 error: $filename not downloaded."
     exit 1
   fi
 
   if [ $NO_SRC_DOWNLOAD -eq 0 ]; then
     cp $src_package $ARCH/$PLATFORM/$name/$version/$src_package
     if [ $? -ne 0 ]; then
-      echo "error: $src_package not downloaded."
+      echo "395 error: $src_package not downloaded."
       exit 1
     fi
   fi
@@ -344,7 +412,7 @@ extract_libs_from_package()
   if [ $NO_DEBUGINFO_DOWNLOAD -eq 0 ]; then
     cp $debuginfo_package $ARCH/$PLATFORM/$name/$version/$debuginfo_package
     if [ $? -ne 0 ]; then
-      echo "error: $debuginfo not downloaded."
+      echo "414 error: $debuginfo not downloaded."
       exit 1
     fi
   fi
@@ -352,8 +420,8 @@ extract_libs_from_package()
   cd $ARCH/$PLATFORM/$name/$version
     mkdir -p binaries
     cd binaries
-      if [ -f ../$package ]; then
-        rpm2cpio ../$package | cpio -idm --quiet
+      if [ -f ../$filename ]; then
+        rpm2cpio ../$filename | cpio -idm --quiet
       fi
     cd ..
 
@@ -414,6 +482,35 @@ match_so_to_debuginfo()
   echo $list_of_debug
 }
 
+ulp_extract_task ()
+{
+  local so=$1
+
+  # Check if .so is livepatchable.  We may have non-livepatchable
+  # libraries here.
+  ulp livepatchable $so 2> /dev/null
+  if [ $? -ne 0 ]; then
+    continue # Library is not livepatchable, skip it.
+  fi
+
+  if [ $NO_DEBUGINFO_DOWNLOAD -eq 0 ]; then
+    # Get the debuginfo that matches this library.
+    local debug=$(match_so_to_debuginfo $so)
+
+    if [ "$debug" == "" ]; then
+      continue
+    fi
+
+    # Run the ulp extract command on both the library and debuginfo.
+    echo ulp extract $so -d $debug -o $so.json
+    ulp extract $so -d $debug -o $so.json
+  else
+    # Run the ulp extract command only on the library.
+    echo ulp extract $so -o $so.json
+    ulp extract $so -o $so.json
+  fi
+}
+
 dump_interesting_info_from_elfs()
 {
   pushd $1
@@ -422,32 +519,16 @@ dump_interesting_info_from_elfs()
   # Populate cache of list of .debug
   _LIST_OF_DEBUG=$(find . -name "*.debug")
 
+  # Initialize semaphore with the current number of CPUs.
+  open_sem $(getconf _NPROCESSORS_ONLN)
+
   # Iterate on every so in the folder.
   for so in $list_of_sos; do
-    # Check if .so is livepatchable.  We may have non-livepatchable
-    # libraries here.
-    ulp livepatchable $so 2> /dev/null
-    if [ $? -ne 0 ]; then
-      continue # Library is not livepatchable, skip it.
-    fi
-
-    if [ $NO_DEBUGINFO_DOWNLOAD -eq 0 ]; then
-      # Get the debuginfo that matches this library.
-      local debug=$(match_so_to_debuginfo $so)
-
-      if [ "$debug" == "" ]; then
-        continue
-      fi
-
-      # Run the ulp extract command on both the library and debuginfo.
-      echo ulp extract $so -d $debug -o $so.json
-      ulp extract $so -d $debug -o $so.json
-    else
-      # Run the ulp extract command only on the library.
-      echo ulp extract $so -o $so.json
-      ulp extract $so -o $so.json
-    fi
+    run_with_lock ulp_extract_task $so
   done
+
+  # Barrier for the above parallel for.
+  wait
 
   if [ $NO_CLEANUP_EXTRACTED_FILES -eq 0 ]; then
     # Delete all .so we don't need.
@@ -509,7 +590,7 @@ sanitize_platform()
 
 sanitize_package()
 {
-  local packages="glibc libopenssl1_1 libopenssl3"
+  local packages="libopenssl1_1 libopenssl3 libopenssl3-x86-64-v3 glibc glibc-gconv-modules-extra glibc-locale-base"
   if [ "x$PACKAGE" = "x" ]; then
     echo "You must pass a --package=<PACKAGE> parameter!"
     exit 1
@@ -655,11 +736,30 @@ main()
   fi
 
   for product in $products; do
+
     # Set platform globally
     set_url_platform "$PLATFORM" $product $ARCH
 
-    download_package_list "/tmp/suse_package_list.html"
-    local names=$(extract_lib_package_names "/tmp/suse_package_list.html" $PACKAGE)
+    update_meta
+    local nevras=$(extract_lib_package_names "meta/$PLATFORM.$PRODUCT/packs" $PACKAGE)
+
+    # Check if the nevras is empty. In that case the user might have to request the
+    # packages from an earlier codestream (like SLE-15-SP3 for example).
+    if [ "$nevras" == ";;" ]; then
+      echo "Package $PACKAGE not found in $PLATFORM. Maybe you need to request from"
+      echo "an earlier codestream, or it simply doesn't exist."
+      exit 1
+    fi
+
+    local names=""
+    for i in $nevras; do
+      # first ';' into '-', second ';' into '.'
+      local n=${i/;/-}
+      n=${n/;/.}
+      local pname=${i%%;*}
+      local filename=$(get_filename_from_nevra "$i")
+      names="$names $filename"
+    done
 
     # Check if "names" string is empty.  If so, that means the package in
     # question is not in this repository.
@@ -674,19 +774,22 @@ main()
     parallel_download_packages "$names"
 
     if [ $NO_SRC_DOWNLOAD -eq 0 ]; then
-      download_src_packages "$names"
+      download_src_packages "$nevras"
     fi
     if [ $NO_IPA_CLONES_DOWNLOAD -eq 0 ]; then
-      download_ipa_clones "$names"
+      download_ipa_clones "$nevras"
     fi
     if [ $NO_DEBUGINFO_DOWNLOAD -eq 0 ]; then
-      download_debuginfo_packages "$names"
+      download_debuginfo_packages "$nevras"
     fi
 
     all_names="$all_names $names"
+    all_nevras="$all_nevras $nevras"
   done
 
-  for package in $all_names; do
+  #for package in $all_names; do
+  for nevra in $all_nevras; do
+    local package=$(get_filename_from_nevra "$nevra")
     local target=$(LANG=C date --date="today - 13 months" +%s)
 
     # Check if package time is in the supported range.
@@ -696,7 +799,7 @@ main()
       continue;
     fi
 
-    extract_libs_from_package "$package"
+    extract_libs_from_package "$nevra"
   done
 
   dump_interesting_info_from_elfs_in_lib $ARCH/$PLATFORM/$PACKAGE
