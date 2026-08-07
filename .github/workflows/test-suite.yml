@@ -41,6 +41,8 @@ jobs:
         git gcc gcc-c++ clang libtool make dash valgrind gzip
         findutils libjson-c-devel libseccomp-devel gawk
     - uses: actions/checkout@v2
+    - name: Fix_python3
+      run: if [ ! -f /usr/bin/python3 ]; then ln -s $(find /usr/bin/ -name "python3*" | head -n 1) /usr/bin/python3; fi
     - name: bootstrap
       run: ./bootstrap
     - name: configure
