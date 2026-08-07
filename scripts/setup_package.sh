@@ -20,6 +20,8 @@
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
 PROGNAME=`basename "$0"`
+SUPPORTED_PACKAGES="libopenssl1_1 libopenssl3 libopenssl3-x86-64-v3 glibc glibc-gconv-modules-extra glibc-locale-base"
+
 
 SLE_VERSION_REGEX="[0-9]{6}|slfo[\.0-9]+"
 VERSION_REGEX="([0-9\.a-zA-Z]+-([0-9]{6}\.|slfo[\.0-9]+_)?[0-9\.]+[0-9]+)"
@@ -46,6 +48,12 @@ NO_CLEANUP_EXTRACTED_FILES=0
 # If this flag is enabled, then the script will setup older, unsupported libraries.
 SETUP_UNSUPPORTED_LIBRARIES=0
 
+# If the flag is enabled, then the script will not run ulp extract in parallel.
+ULP_EXTRACT_SERIAL=0
+
+# If this flag is enabled, then errors regarding IPA-clones are ignored.
+IGNORE_IPA_CLONES_ERRORS=0
+
 # Pushd and popd are not silent. Silence them.
 pushd ()
 {
@@ -58,14 +66,31 @@ popd ()
 
 # Semaphores for parallel processing
 # initialize a semaphore with a given number of tokens
+STARTED=0
+ENDED=0
 open_sem(){
-  mkfifo pipe-$$
-  exec 3<>pipe-$$
-  rm pipe-$$
+  local num=$$
+
+  STARTED=0
+  ENDED=0
+
+  mkfifo pipe-$num
+  exec 3<>pipe-$num
+  rm pipe-$num
   local i=$1
   for((;i>0;i--)); do
       printf %s 000 >&3
   done
+}
+
+close_sem(){
+  exec 3<&-
+
+  if [ $STARTED -ne $ENDED ]; then
+    echo -e "\e[31mFATAL: STARTED does not match ENDED. Error in FIFO.\e[0m"
+    echo -e "Run this script in serial mode."
+    exit 1
+  fi
 }
 
 # run the given command asynchronously and pop/push tokens
@@ -74,9 +99,10 @@ run_with_lock(){
   # this read waits until there is something to read
   read -u 3 -n 3 x && ((0==x)) || exit $x
   (
-   ( "$@"; )
+   ( "$@"; STARTED=`expr $STARTED + 1`)
   # push the return code of the command to the semaphore
   printf '%.3d' $? >&3
+  ENDED=`expr $ENDED + 1`
   )&
 }
 
@@ -316,7 +342,6 @@ get_list_of_src_packages()
     src_package_list="$src_package_list $package_name-$version.src.rpm"
   done
 
-  echo "AAAA $src_package_list" > /dev/stderr
   echo $src_package_list
 
 }
@@ -402,9 +427,11 @@ extract_libs_from_package()
     cp $ipa_clones $ARCH/$PLATFORM/$name/$version/$ipa_clones
     if [ $? -ne 0 ]; then
       echo "error: $ipa_clones not downloaded."
-      read -r -p "Continue without it? [y/N] " response
-      if [[ ! "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
-        exit 1
+      if [ $IGNORE_IPA_CLONES_ERRORS -eq 0 ]; then
+        read -r -p "Continue without it? [y/N] " response
+        if [[ ! "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+          exit 1
+        fi
       fi
     fi
   fi
@@ -519,16 +546,21 @@ dump_interesting_info_from_elfs()
   # Populate cache of list of .debug
   _LIST_OF_DEBUG=$(find . -name "*.debug")
 
-  # Initialize semaphore with the current number of CPUs.
-  open_sem $(getconf _NPROCESSORS_ONLN)
-
   # Iterate on every so in the folder.
-  for so in $list_of_sos; do
-    run_with_lock ulp_extract_task $so
-  done
+  if [ $ULP_EXTRACT_SERIAL -eq 1 ]; then
+    # Run the extraction sequentially, as the user requested.
+    for so in $list_of_sos; do
+      ulp_extract_task $so
+    done
+  else
+    # Run in parallel.
+    for so in $list_of_sos; do
+      run_with_lock ulp_extract_task $so
+    done
 
-  # Barrier for the above parallel for.
-  wait
+    # Barrier for the above parallel for.
+    wait
+  fi
 
   if [ $NO_CLEANUP_EXTRACTED_FILES -eq 0 ]; then
     # Delete all .so we don't need.
@@ -564,10 +596,17 @@ dump_interesting_info_from_elfs_in_lib()
   # Enter in platform folder
   pushd $platform
 
+  # Initialize semaphore with the current number of CPUs.
+  open_sem $(getconf _NPROCESSORS_ONLN)
+
   # Iterate on every version
   for dir in $(ls); do
     dump_interesting_info_from_elfs $dir
   done
+
+  # Close semaphore.
+  close_sem
+
   popd
 
 }
@@ -590,13 +629,12 @@ sanitize_platform()
 
 sanitize_package()
 {
-  local packages="libopenssl1_1 libopenssl3 libopenssl3-x86-64-v3 glibc glibc-gconv-modules-extra glibc-locale-base"
   if [ "x$PACKAGE" = "x" ]; then
     echo "You must pass a --package=<PACKAGE> parameter!"
     exit 1
   fi
 
-  for package in ${packages}; do
+  for package in ${SUPPORTED_PACKAGES}; do
     if [ "$PACKAGE" = "$package" ]; then
       # Supported package found.
       return 0
@@ -604,7 +642,7 @@ sanitize_package()
   done
 
   echo "Unsupported package $PACKAGE"
-  echo "Supported packages: $packages"
+  echo "Supported packages: $SUPPORTED_PACKAGES"
   exit 1
 }
 
@@ -644,8 +682,11 @@ print_help_message()
   echo "  --no-cleanup                   Do not cleanup downloaded .rpm files."
   echo "  --no-cleanup-extracted         Do not cleanup extracted files."
   echo "  --setup-unsupported-libraries  Setup libraries past the 13-months support range."
+  echo "  --serial-extract               No not run \`ulp extract\` in parallel."
+  echo "  --ignore-ipa-clones-errors     Ignore errors regarding IPA-clones not present"
   echo ""
-  echo "supported <library> so far are 'glibc' and 'libopenssl1_1'"
+  echo "supported <library> so far are:"
+  echo "$SUPPORTED_PACKAGES."
 }
 
 
@@ -692,8 +733,16 @@ parse_program_argv()
         NO_CLEANUP_EXTRACTED_FILES=1
         shift
         ;;
-      --setup-unuspported-libraries)
+      --setup-unsupported-libraries)
         SETUP_UNSUPPORTED_LIBRARIES=1
+        shift
+        ;;
+      --serial-extract)
+        ULP_EXTRACT_SERIAL=1
+        shift
+        ;;
+      --ignore-ipa-clones-errors)
+        IGNORE_IPA_CLONES_ERRORS=1
         shift
         ;;
       --help)
