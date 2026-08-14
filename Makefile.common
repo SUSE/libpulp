@@ -63,7 +63,7 @@ CONVENIENCE_LDFLAGS = -rpath $(libdir) $(AM_LDFLAGS)
 # does not create .so targets).
 %.dsc: %.in $(check_LTLIBRARIES)
 	sed -e "s|__ABS_BUILDDIR__|$(abs_builddir)|" $< > $*.tmp
-	$(top_srcdir)/tests/offsets.py $*.tmp $@
+	$(PYTHON) -B $(top_srcdir)/tests/offsets.py $*.tmp $@
 	rm -f $*.tmp
 
 # This rule build the .ulp file, which at some point were used to hold
