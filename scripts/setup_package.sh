@@ -42,8 +42,15 @@ NO_IPA_CLONES_DOWNLOAD=0
 # If this flag is enabled, then download of debuginfo packages will be blocked.
 NO_DEBUGINFO_DOWNLOAD=0
 
+# If this flag is enabled, then binary files are not downloaded.
+NO_BINARY_DOWNLOAD=0
+
 # If this flag is enabled, then extracted files are not cleaned.
 NO_CLEANUP_EXTRACTED_FILES=0
+
+# If this flag in enabled, dumping of the files will be skipped and no json
+# files will be created.
+NO_INFORMATION_EXTRACTION=0
 
 # If this flag is enabled, then the script will setup older, unsupported libraries.
 SETUP_UNSUPPORTED_LIBRARIES=0
@@ -53,6 +60,10 @@ ULP_EXTRACT_SERIAL=0
 
 # If this flag is enabled, then errors regarding IPA-clones are ignored.
 IGNORE_IPA_CLONES_ERRORS=0
+
+# If this flag is enabled, then .rpm files will be classified according to their
+# version.
+CLASSIFY_RPM_PACKAGES=0
 
 # Pushd and popd are not silent. Silence them.
 pushd ()
@@ -367,6 +378,38 @@ get_list_of_debuginfo_packages()
   echo $src_package_list
 }
 
+# Get list of binary packages, for example libopenssl-3 requires
+# openssl-3 to build even tho we don't need it for livepatching.
+get_list_of_binary_packages()
+{
+  local packages="$*"
+  local bin_package_list=""
+
+  for package in $packages; do
+    local package_name=$(get_name_from_package_name $package)
+    local version=$(get_version_from_package_name $package)
+
+    # libopenssl1_1 binaries comes from openssl.
+    if [ "$package_name" = "libopenssl1_1" ]; then
+      package_name="openssl-1_1"
+    fi
+
+    # libopenssl-3 binaries comes from openssl-3
+    if [ "$package_name" = "libopenssl3" -o "$package_name" = "libopenssl3-x86-64-v3" ]; then
+      package_name="openssl-3"
+    fi
+
+    # glibc binaries comes from glibc-utils
+    if [ "$package_name" = "glibc-locale-base" -o "$package_name" = "glibc-gconv-modules-extra" ]; then
+      package_name="glibc-utils"
+    fi
+
+    bin_package_list="$bin_package_list $package_name-$version.$ARCH.rpm"
+  done
+
+  echo $bin_package_list
+}
+
 download_debuginfo_packages()
 {
   local packages=$(get_list_of_debuginfo_packages "$*")
@@ -395,6 +438,40 @@ download_ipa_clones()
 
   set_url_platform $PLATFORM $PRODUCT $ARCH "ipa-clones"
   parallel_download_packages "$ipa_clones_list"
+}
+
+download_binary_packages()
+{
+  local packages=$(get_list_of_binary_packages "$*")
+  local old_url=$URL
+
+  set_url_platform $PLATFORM $PRODUCT $ARCH "bin"
+  parallel_download_packages "$packages"
+}
+
+classify_rpm_task()
+{
+  local rpm=$1
+
+  # We have to do things a little bit differently.
+  local version=$(rpm -q --qf '%{version}-%{release}' -p $rpm)
+
+  mkdir -p "rpm/$ARCH/$PLATFORM/$name/$version/"
+  cp $rpm "rpm/$ARCH/$PLATFORM/$name/$version/"
+}
+
+classify_rpms()
+{
+  # Initialize semaphore with the current number of CPUs.
+  open_sem $(getconf _NPROCESSORS_ONLN)
+
+  # Run in parallel per file.
+  for rpm in *.rpm; do
+    classify_rpm_task $rpm
+  done
+
+  # Close semaphore.
+  close_sem
 }
 
 extract_libs_from_package()
@@ -681,9 +758,12 @@ print_help_message()
   echo "  --no-ipa-clones-download       Do not download the ipa-clones tarballs."
   echo "  --no-cleanup                   Do not cleanup downloaded .rpm files."
   echo "  --no-cleanup-extracted         Do not cleanup extracted files."
+  echo "  --no-information-extraction    Do not extract and create .json files."
   echo "  --setup-unsupported-libraries  Setup libraries past the 13-months support range."
   echo "  --serial-extract               No not run \`ulp extract\` in parallel."
   echo "  --ignore-ipa-clones-errors     Ignore errors regarding IPA-clones not present"
+  echo "  --classify-rpm-packages        Classify .rpm according to their versions to a"
+  echo "                                 separate folder"
   echo ""
   echo "supported <library> so far are:"
   echo "$SUPPORTED_PACKAGES."
@@ -729,8 +809,16 @@ parse_program_argv()
         NO_DEBUGINFO_DOWNLOAD=1
         shift
         ;;
+      --no-binary-download)
+        NO_BINARY_DOWNLOAD=1
+        shift
+        ;;
       --no-cleanup-extracted)
         NO_CLEANUP_EXTRACTED_FILES=1
+        shift
+        ;;
+      --no-information-extraction)
+        NO_INFORMATION_EXTRACTION=1
         shift
         ;;
       --setup-unsupported-libraries)
@@ -743,6 +831,10 @@ parse_program_argv()
         ;;
       --ignore-ipa-clones-errors)
         IGNORE_IPA_CLONES_ERRORS=1
+        shift
+        ;;
+      --classify-rpm-packages)
+        CLASSIFY_RPM_PACKAGES=1
         shift
         ;;
       --help)
@@ -831,27 +923,35 @@ main()
     if [ $NO_DEBUGINFO_DOWNLOAD -eq 0 ]; then
       download_debuginfo_packages "$nevras"
     fi
+    if [ $NO_BINARY_DOWNLOAD -eq 0 ]; then
+      download_binary_packages "$nevras"
+    fi
 
     all_names="$all_names $names"
     all_nevras="$all_nevras $nevras"
   done
 
-  #for package in $all_names; do
-  for nevra in $all_nevras; do
-    local package=$(get_filename_from_nevra "$nevra")
-    local target=$(LANG=C date --date="today - 13 months" +%s)
+  if [ $CLASSIFY_RPM_PACKAGES -eq 1 ]; then
+    classify_rpms
+  fi
 
-    # Check if package time is in the supported range.
-    if [[ $SETUP_UNSUPPORTED_LIBRARIES -eq 0 && \
-          "$(LANG=C date -r $package +%s)" < "$target" ]]; then
-      echo "Dropping $package because it is older than 13 months."
-      continue;
-    fi
+  if [ $NO_INFORMATION_EXTRACTION -eq 0 ]; then
+    for nevra in $all_nevras; do
+      local package=$(get_filename_from_nevra "$nevra")
+      local target=$(LANG=C date --date="today - 13 months" +%s)
 
-    extract_libs_from_package "$nevra"
-  done
+      # Check if package time is in the supported range.
+      if [[ $SETUP_UNSUPPORTED_LIBRARIES -eq 0 && \
+            "$(LANG=C date -r $package +%s)" < "$target" ]]; then
+        echo "Dropping $package because it is older than 13 months."
+        continue;
+      fi
 
-  dump_interesting_info_from_elfs_in_lib $ARCH/$PLATFORM/$PACKAGE
+      extract_libs_from_package "$nevra"
+    done
+
+    dump_interesting_info_from_elfs_in_lib $ARCH/$PLATFORM/$PACKAGE
+  fi
 
   # Delete all packages to cleanup.
   if [ $NO_CLEANUP -ne 1 ]; then
