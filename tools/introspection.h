@@ -110,6 +110,7 @@ struct ulp_dynobj
   Elf64_Addr check;
   Elf64_Addr state;
   Elf64_Addr global;
+  Elf64_Addr msg_queue_old;
   Elf64_Addr msg_queue;
   Elf64_Addr revert_all;
   Elf64_Addr metadata_buffer;
