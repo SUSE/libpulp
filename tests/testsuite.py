@@ -55,6 +55,18 @@ def is_library_livepatchable(library):
     return True
   return False
 
+def get_default_env():
+    asan_path = ''
+    try:
+      asan_path = os.environ['ASAN_PATH']
+    except KeyError:
+      pass
+    suppression_path = os.path.dirname(os.path.abspath(__file__)) + '/sed.supp'
+    return {'LD_PRELOAD': asan_path + ':' + libpulp_path,
+           'ASAN_OPTIONS': 'color=never',
+           'LSAN_OPTIONS': 'suppressions=' + suppression_path
+    }
+
 # Wrapper around pexpect.spawn that automatically sets userspace livepatching
 # requirements, such as LD_PRELOAD'ing libpulp.so, as well as extends its
 # functionality with live patching operations.
@@ -103,8 +115,6 @@ class spawn(pexpect.spawn):
     if testname[0] != '/':
       testname = './' + testname
 
-    testname = '/usr/bin/sh -c ' + '\''+ testname + '\''
-
     # if TEST_THROUGH_VALGRIND environment variable is defined, append valgrind
     # call on testname. We actually call valgrind on the `sh` call, and it
     # still catch memory issues while avoiding libpulp problems regarding
@@ -117,7 +127,7 @@ class spawn(pexpect.spawn):
 
     # If env has not been provided, default to LD_PRELOAD'ing libpulp.so.
     if env == Ellipsis:
-      env = {'LD_PRELOAD': libpulp_path}
+      env = get_default_env()
 
     # Spawn the testcase with pexpect and enable logging.
     super().__init__(testname, timeout=timeout, env=env, encoding=encoding,

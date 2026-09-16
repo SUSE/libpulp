@@ -32,8 +32,8 @@ libpulp_la_SOURCES = \
 libpulp_la_LDFLAGS = \
   -ldl \
   -Wl,--version-script=$(srcdir)/libpulp.versions \
-  -Wl,--hash-style=sysv \ # Ubuntu seems to default to gnu, so be clear we ...
-  $(AM_LDFLAGS) # ... want old style hash sections, else DT_HASH is empty.
+  -Wl,--hash-style=sysv \
+  $(AM_LDFLAGS)
 
 # Workaround a bug in Autoconf 2.69
 if CPU_X86_64
@@ -62,6 +62,12 @@ libpulp_la_LIBADD = $(top_builddir)/common/libcommon.la
 
 AM_CFLAGS += -I$(top_srcdir)/include -I$(top_srcdir)/include/arch/$(target_cpu)
 AM_CCASFLAGS += -I$(top_srcdir)/include -I$(top_srcdir)/include/arch/$(target_cpu)
+
+if ENABLE_ADDRSAN
+# Add address sanitizer
+AM_CFLAGS += -fsanitize=address,undefined
+AM_LDFLAGS += -fsanitize=address,undefined
+endif
 
 # Add -fno-strict-alias to the insn_queue code.
 insn_queue.lo : CFLAGS += -fno-strict-aliasing

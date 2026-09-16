@@ -206,6 +206,9 @@ struct ulp_applied_patch
 
   /** Timestamp of when patch was loaded.  */
   time_t timestamp;
+
+  /** The .so handler.  */
+  void *so_handler;
 };
 
 struct ulp_applied_unit

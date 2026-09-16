@@ -65,13 +65,13 @@ worker(void *arg __attribute__((unused)))
     data = malloc(300 * sizeof(char));
     data = realloc(data, 400 * sizeof(char));
     free(data);
-    data = aligned_alloc(256, 500 * sizeof(char));
+    data = aligned_alloc(256, 512 * sizeof(char));
     free(data);
     data = valloc(600 * sizeof(char));
     free(data);
     data = pvalloc(700 * sizeof(char));
     free(data);
-    if (!posix_memalign((void **)&data, 512, 800 * sizeof(char)))
+    if (!posix_memalign((void **)&data, 512, 1024 * sizeof(char)))
       free(data);
 
     handle = dlopen(NULL, RTLD_LAZY | RTLD_NOLOAD);
