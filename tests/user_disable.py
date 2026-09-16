@@ -36,8 +36,8 @@ if username is None:
 
 # If we can not get username, then skip this part of the test.
 if username is not None:
-  env = { 'LD_PRELOAD': '../lib/.libs/libpulp.so',
-          'LIBPULP_DISABLE_ON_USERS': username }
+  env = testsuite.get_default_env()
+  env['LIBPULP_DISABLE_ON_USERS'] = username
 
   child = testsuite.spawn('numserv', env=env)
 
@@ -58,8 +58,8 @@ if username is not None:
 
 #--Test uid--
 
-env = { 'LD_PRELOAD': '../lib/.libs/libpulp.so',
-        'LIBPULP_DISABLE_ON_USERS': str(os.getuid()) }
+env = testsuite.get_default_env()
+env['LIBPULP_DISABLE_ON_USERS'] = str(os.getuid())
 
 child = testsuite.spawn('numserv', env=env)
 

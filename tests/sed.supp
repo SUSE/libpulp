@@ -1,0 +1,2 @@
+# Suppress leaks in sed.  We are not interested in them.
+leak:/usr/bin/sed

@@ -23,8 +23,8 @@ import re
 
 import testsuite
 
-env = { 'LD_PRELOAD': '../lib/.libs/libpulp.so',
-        'LIBPULP_DISABLE_ON_PATH': '*/numserv' }
+env = testsuite.get_default_env()
+env['LIBPULP_DISABLE_ON_PATH'] = '*/numserv'
 
 child = testsuite.spawn('numserv', env=env)
 

@@ -61,7 +61,7 @@ if path_libdl is not None:
     exit(77)
 
 # Proceed with the test.
-env = {'LD_PRELOAD': testsuite.libpulp_path}
+env = testsuite.get_default_env()
 
 output = subprocess.check_output(path_libc, timeout=5, stderr=subprocess.STDOUT, env=env)
 gnu = re.search('GNU C Library', output.decode())

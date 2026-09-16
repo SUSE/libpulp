@@ -26,7 +26,7 @@
 #include <libblocked.h>
 
 /* Iterate for a while to let the trigger tool apply a live patch. */
-#define LOOPS 1000000000
+#define LOOPS 2000000000
 
 int
 main(void)

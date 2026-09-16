@@ -62,6 +62,63 @@ begin(void)
   msgq_push("libpulp loaded...\n");
 }
 
+/** @brief Release resources allocated by libpulp.
+ *
+ * Once the execution of the process ends, release all resources took by
+ * libpulp.
+ */
+__attribute__((destructor)) void
+end(void)
+{
+  struct ulp_applied_patch *patch = __ulp_state.patches;
+
+  /* First, revert all livepatches.  */
+  while (patch) {
+    struct ulp_applied_patch *next_patch = patch->next;
+
+    dlclose(patch->so_handler); // Close the livepatch .so handler.
+    if (ulp_can_revert_patch(patch->patch_id) == 0) {
+      ulp_revert_patch(patch->patch_id);
+    }
+
+    patch = next_patch;
+  }
+
+  __ulp_state.patches = NULL;
+
+  /* Now release the detours.  */
+  struct ulp_detour_root *root = __ulp_root;
+
+  while (root) {
+    struct ulp_detour_root *root_next = root->next;
+    struct ulp_detour *detour = root->detours;
+
+    while (detour != NULL) {
+      struct ulp_detour *detour_next = detour->next;
+
+      /* Zero object.  */
+      memset(detour, 0, sizeof(*detour));
+
+      /* Release detour.  */
+      FREE_AND_NULLIFY(detour);
+
+      detour = detour_next;
+    }
+
+    /* Lets zero out the root object.  */
+    memset(root, 0, sizeof(*root));
+
+    /* Release detour_root.  */
+    FREE_AND_NULLIFY(root);
+
+    /* Go to next.  */
+    root = root_next;
+  }
+
+  /* Set the root object as NULL.  */
+  __ulp_root = NULL;
+}
+
 /** @brief Write into memory bypassing memory protections
  *
  * The process may be launched with mprotect through seccomp, which
@@ -240,18 +297,6 @@ __ulp_get_global_universe_value()
   return __ulp_global_universe;
 }
 
-/* TODO: unloading needs further testing */
-int
-unload_handlers(struct ulp_metadata *ulp)
-{
-  int status = 1;
-  if (ulp->so_handler && dlclose(ulp->so_handler)) {
-    WARN("Error unloading patch so handler: %s", ulp->so_filename);
-    status = 0;
-  }
-  return status;
-}
-
 /** @brief Load symbol with name 'fname' from so in 'handler'.
  *
  * Given a dlopen 'handle', get the symbol which matches the 'fname'.
@@ -290,7 +335,6 @@ load_so_handlers(struct ulp_metadata *ulp)
 
   if (!ulp->so_handler) {
     WARN("Unable to load patch dl handler.");
-    unload_handlers(ulp);
     return 0;
   }
 
@@ -305,6 +349,7 @@ int
 unload_metadata(struct ulp_metadata *ulp)
 {
   free_metadata(ulp);
+  FREE_AND_NULLIFY(ulp);
   __ulp_metadata_ref = NULL;
   return 0;
 }
@@ -472,7 +517,7 @@ metadata_clean:
  * @return 0 if success, anything else if error.
  */
 int
-load_patch()
+load_patch(void)
 {
   struct ulp_metadata *ulp = NULL;
   struct ulp_applied_patch *patch_entry;
@@ -706,7 +751,7 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
 
   map_ptr = &map_data;
   memset(map_ptr, 0, sizeof(struct link_map));
-  retcode = dlinfo(ulp->so_handler, RTLD_DI_LINKMAP, &map_ptr);
+  retcode = dlinfo(patch_so, RTLD_DI_LINKMAP, &map_ptr);
   if (retcode == -1) {
     WARN("Error in call to dlinfo: %s", dlerror());
     return EUNKNOWN;
@@ -725,7 +770,7 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
       /* In case the user did not specify the patch offset, try to find the
          symbol's address by its name.  */
       patch_address =
-          (uintptr_t)load_so_symbol(ref->reference_name, ulp->so_handler);
+          (uintptr_t)load_so_symbol(ref->reference_name, patch_so);
 
       if (patch_address == 0) {
         return ENONEWFUNC;
@@ -801,6 +846,9 @@ ulp_state_update(struct ulp_metadata *ulp)
 
   basename_target = get_basename(obj->name);
 
+  /* Copy the .so handler to the new created applied_patch object.  */
+  a_patch->so_handler = ulp->so_handler;
+
   /* only shared objs have units, this loop never runs for main obj */
   while (unit != NULL) {
     a_unit = calloc(1, sizeof(struct ulp_applied_unit));
@@ -816,7 +864,7 @@ ulp_state_update(struct ulp_metadata *ulp)
       return 0;
     }
 
-    a_unit->target_addr = load_so_symbol(unit->new_fname, ulp->so_handler);
+    a_unit->target_addr = load_so_symbol(unit->new_fname, a_patch->so_handler);
     if (!a_unit->target_addr) {
       return 0;
     }
@@ -1206,6 +1254,7 @@ ulp_state_remove(unsigned char *id)
   }
 
   FREE_AND_NULLIFY(patch_to_remove->lib_name);
+  FREE_AND_NULLIFY(patch_to_remove->container_name)
   FREE_AND_NULLIFY(patch_to_remove);
 
   return 1;

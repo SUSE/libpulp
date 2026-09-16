@@ -23,8 +23,8 @@ import re
 import testsuite
 import os
 
-env = { 'LD_PRELOAD': '../lib/.libs/libpulp.so',
-        'LIBPULP_DISABLE_ON_GROUPS': str(os.getgid()) }
+env = testsuite.get_default_env()
+env['LIBPULP_DISABLE_ON_GROUPS'] = str(os.getgid())
 
 child = testsuite.spawn('numserv', env=env)
 

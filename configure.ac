@@ -57,7 +57,8 @@ AC_ARG_ENABLE(sanitizers,
 AS_HELP_STRING([--enable-sanitizers],
 [compile ulp tools with address and undefined-behaviour sanitizer [default=no]]),
 [enable_sanitizers=yes]
-[AC_SUBST([UBSAN_OPTIONS], ["print_stack_trace=1 detect_stack_use_after_return=1"])],
+[AC_SUBST([UBSAN_OPTIONS], ["print_stack_trace=1 detect_stack_use_after_return=1"])
+ AC_SUBST([ASAN_PATH], [`$CC -print-file-name=libasan.so`])],
 [enable_sanitizers=no; break])
 
 AM_CONDITIONAL([ENABLE_ADDRSAN], [test "x$enable_sanitizers" == "xyes"])
@@ -75,7 +76,7 @@ AM_CONDITIONAL([ENABLE_THREADSAN], [test "x$enable_thread_sanitizer" == "xyes"])
 # We need to disable optimizations if libsanitizer is enabled, else we
 # lose interesting informations about the leaks/errors.
 AS_IF([test "x$enable_sanitizers" == "xyes" -o "x$enable_thread_sanitizer" == "xyes"],
-      [CFLAGS="-O0 -g"], [])
+      [CFLAGS="$CFLAGS -O0 -g"], [])
 
 # Enable valgrind on testing. Catches memory errors in libpulp.so.
 AC_ARG_ENABLE(valgrind,

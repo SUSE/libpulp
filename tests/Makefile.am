@@ -763,6 +763,10 @@ if ENABLE_VALGRIND
 check: export TESTS_THROUGH_VALGRIND=1
 endif
 
+if ENABLE_ADDRSAN
+check: export ASAN_PATH=@ASAN_PATH@
+endif
+
 if ENABLE_AFL
 check-afl: $(METADATA) $(check_LTLIBRARIES)
 	ULP_IN_AFL_TEST=1 \
