@@ -28,7 +28,8 @@ libpulp_la_SOURCES = \
   minielf.c \
   gdb_interface.c \
   symbol_loader.c \
-  ulp_metadata.c
+  ulp_metadata.c \
+  ulp_applied_patch.c
 
 libpulp_la_LDFLAGS = \
   -ldl \

@@ -31,6 +31,7 @@
 #include <sys/types.h>
 
 #include "ulp_metadata.h"
+#include "ulp_applied_patch.h"
 
 #define OUT_PATCH_NAME "metadata.ulp"
 #define OUT_REVERSE_NAME "reverse.ulp"
@@ -84,51 +85,6 @@ struct ulp_dependency
   unsigned char dep_id[32];
   char patch_id_check;
   struct ulp_dependency *next;
-};
-
-/* TODO: check/remove these OLD structures */
-
-struct ulp_applied_patch
-{
-  /** ID of patch.  */
-  unsigned char patch_id[32];
-
-  /** Name of target library.  */
-  const char *lib_name;
-
-  /** Name of the patch container file (.so).  */
-  const char *container_name;
-
-  struct ulp_applied_unit *units;
-  struct ulp_applied_patch *next;
-
-  /** Patch dependency.  Not used but kept for backwards compatibility.  */
-  struct ulp_dependency *deps;
-
-  /** Timestamp of when patch was loaded.  */
-  time_t timestamp;
-
-  /** The .so handler.  */
-  void *so_handler;
-};
-
-struct ulp_applied_unit
-{
-  /** The address of the new function, from the livepatch container.  */
-  void *patched_addr;
-
-  /** The address of the old function, from the library itself.  */
-  void *target_addr;
-
-  /** The content overwritten by the patch.  */
-  char overwritten_bytes[14];
-
-  /** FIXME: Unused, but kept as backwards compatibility with older versions of
-      libpulp.   */
-  char jmp_type;
-
-  /** Next in the chain.  */
-  struct ulp_applied_unit *next;
 };
 
 /** Libpulp version type.  The tripplet is incoded here, with a maximum value
