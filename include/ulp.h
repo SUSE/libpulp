@@ -83,19 +83,7 @@ void __ulp_print();
 /* functions */
 void *memwrite(void *dest, const void *src, size_t n);
 
-void free_metadata(struct ulp_metadata *ulp);
-
-int unload_handlers(struct ulp_metadata *ulp);
-
 void *load_so_symbol(char *fname, void *handle);
-
-int load_so_handlers(struct ulp_metadata *ulp);
-
-int unload_metadata(struct ulp_metadata *ulp);
-
-struct ulp_metadata *load_metadata(int *err);
-
-int parse_metadata(struct ulp_metadata *ulp);
 
 void *load_so(char *obj);
 

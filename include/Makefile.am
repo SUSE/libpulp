@@ -29,7 +29,8 @@ noinst_HEADERS = \
 	insn_queue.h \
 	insn_queue_lib.h \
 	minielf.h \
-	symbol_loader.h
+	symbol_loader.h \
+	ulp_metadata.h
 
 # Workaround a bug in Autoconf 2.69
 if CPU_X86_64
