@@ -413,3 +413,41 @@ get_ld_global_locks(pthread_mutex_t **dl_load_lock, pthread_mutex_t **dl_load_wr
     }
   }
 }
+
+
+/** @brief Load symbol with name 'fname' from so in 'handler'.
+ *
+ * Given a dlopen 'handle', get the symbol which matches the 'fname'.
+ *
+ * @return Address to symbol.
+ */
+void *
+load_so_symbol(char *fname, void *handle)
+{
+  void *func;
+  char *error;
+
+  func = dlsym(handle, fname);
+  error = dlerror();
+  if (error) {
+    WARN("Unable to load function %s: %s.", fname, error);
+    return NULL;
+  }
+
+  return func;
+}
+
+/** @brief call dlopen and check for errors.  */
+void *
+load_so(char *obj)
+{
+  void *patch_obj;
+
+  patch_obj = dlopen(obj, RTLD_NOW);
+  if (!patch_obj) {
+    WARN("Unable to load shared object %s: %s.", obj, dlerror());
+    return NULL;
+  }
+
+  return patch_obj;
+}

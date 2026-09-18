@@ -27,7 +27,8 @@ libpulp_la_SOURCES = \
   error.c \
   minielf.c \
   gdb_interface.c \
-  symbol_loader.c
+  symbol_loader.c \
+  ulp_metadata.c
 
 libpulp_la_LDFLAGS = \
   -ldl \
