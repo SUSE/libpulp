@@ -29,7 +29,8 @@ libpulp_la_SOURCES = \
   gdb_interface.c \
   symbol_loader.c \
   ulp_metadata.c \
-  ulp_applied_patch.c
+  ulp_applied_patch.c \
+  ulp_detour.c
 
 libpulp_la_LDFLAGS = \
   -ldl \

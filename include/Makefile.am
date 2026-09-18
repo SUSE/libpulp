@@ -31,7 +31,8 @@ noinst_HEADERS = \
 	minielf.h \
 	symbol_loader.h \
 	ulp_metadata.h \
-	ulp_applied_patch.h
+	ulp_applied_patch.h \
+	ulp_detour.h
 
 # Workaround a bug in Autoconf 2.69
 if CPU_X86_64
