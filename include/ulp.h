@@ -89,13 +89,9 @@ void *load_so(char *obj);
 
 int load_patch(void);
 
-int ulp_can_revert_patch(const unsigned char *id);
-
 int is_object_consistent(struct ulp_object *obj);
 
 int ulp_apply_all_units(struct ulp_metadata *ulp);
-
-struct ulp_applied_patch *ulp_state_update(struct ulp_metadata *ulp);
 
 int check_patch_sanity(struct ulp_metadata *ulp);
 
@@ -111,11 +107,7 @@ void ulp_patch_addr_absolute(void *old_faddr, void *new_faddr);
 
 int ulp_patch_addr(void *old_faddr, void *new_faddr, int enable);
 
-struct ulp_applied_patch *ulp_get_applied_patch(const unsigned char *id);
-
 int ulp_revert_patch(unsigned char *id);
-
-int ulp_state_remove(unsigned char *id);
 
 int ulp_revert_all_units(unsigned char *patch_id);
 
