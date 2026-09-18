@@ -288,3 +288,38 @@ ulp_can_revert_patch(const unsigned char *id)
 
   return 0;
 }
+
+/* these are here for debugging reasons :) */
+void
+dump_ulp_patching_state(void)
+{
+  struct ulp_applied_patch *a_patch;
+  struct ulp_applied_unit *a_unit;
+  struct ulp_dependency *dep;
+  int i;
+
+  fprintf(stderr, "----- ULP state dump -----\n");
+  fprintf(stderr, "__ulp_state address: %lx\n", (unsigned long)&__ulp_state);
+
+  for (a_patch = __ulp_state.patches; a_patch != NULL;
+       a_patch = a_patch->next) {
+    fprintf(stderr, "* libname: %s\n", a_patch->lib_name);
+    fprintf(stderr, "* container: %s\n", a_patch->container_name);
+    fprintf(stderr, "* PATCH 0x");
+    for (i = 0; i < 32; i++) {
+      fprintf(stderr, "%x.", a_patch->patch_id[i]);
+    }
+    fprintf(stderr, "\n");
+    for (dep = a_patch->deps; dep != NULL; dep = dep->next) {
+      fprintf(stderr, "* DEPENDs 0x");
+      for (i = 0; i < 32; i++) {
+        fprintf(stderr, "%x.", dep->dep_id[i]);
+      }
+      fprintf(stderr, "\n");
+    }
+
+    for (a_unit = a_patch->units; a_unit != NULL; a_unit = a_unit->next)
+      fprintf(stderr, "** %p %p\n", a_unit->patched_addr, a_unit->target_addr);
+  }
+  fprintf(stderr, "----- End of dump ------\n");
+}

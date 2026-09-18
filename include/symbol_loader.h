@@ -30,3 +30,7 @@ void *get_loaded_library_base_addr(const char *);
 int get_loaded_library_tls_index(const char *);
 
 void get_ld_global_locks(pthread_mutex_t **l_lock, pthread_mutex_t **w_lock);
+
+void *load_so_symbol(char *fname, void *handle);
+
+void *load_so(char *obj);
