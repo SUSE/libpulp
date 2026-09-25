@@ -157,7 +157,7 @@ set_url_platform()
     # SLFO-1.1 for some weird reason has ':' appended to it in url.  Hack it.
     if [ $ver == "1.1" ]; then
       URL="https://download.suse.de/download/ibs/SUSE:/SLFO:/$ver:/Build/standard"
-    elif [ $ver == "1.2" ]; then
+    else
       URL="https://download.suse.de/download/ibs/SUSE:/SLFO:/$ver/standard"
     fi
   elif is_alp; then
@@ -690,7 +690,7 @@ dump_interesting_info_from_elfs_in_lib()
 
 sanitize_platform()
 {
-  local platforms="SLE-15-SP3 SLE-15-SP4 SLE-15-SP5 SLE-15-SP6 SLE-15-SP7 ALP SLFO:1.1 SLFO:1.2"
+  local platforms="SLE-15-SP3 SLE-15-SP4 SLE-15-SP5 SLE-15-SP6 SLE-15-SP7 ALP SLFO:1.1 SLFO:1.2 SLFO:1.3"
 
   for platform in ${platforms}; do
     if [ "$PLATFORM" = "$platform" ]; then
@@ -769,6 +769,29 @@ print_help_message()
   echo "$SUPPORTED_PACKAGES."
 }
 
+check_required_programs()
+{
+  local err=0
+
+  if ! repo2solv -h 2> /dev/null > /dev/null; then
+    echo "ERROR: repo2solv not found. Install libsolv-tools-base."
+    err=1
+  fi
+
+  if ! rpm2cpio --help 2> /dev/null > /dev/null; then
+    echo "ERROR: rpm2cpio not found. Install rpm."
+    err=1
+  fi
+
+  if ! rpm --help 2> /dev/null > /dev/null; then
+    echo "ERROR: rpm not found. Install rpm."
+    err=1
+  fi
+
+  if [ $err -eq 1 ]; then
+    exit 1
+  fi
+}
 
 parse_program_argv()
 {
@@ -960,4 +983,5 @@ main()
   echo "Done."
 }
 
+check_required_programs
 main $*
