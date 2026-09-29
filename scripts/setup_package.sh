@@ -45,6 +45,9 @@ NO_DEBUGINFO_DOWNLOAD=0
 # If this flag is enabled, then binary files are not downloaded.
 NO_BINARY_DOWNLOAD=0
 
+# If this flag is enabled, then -devel packages are not downloaded.
+NO_DEVEL_DOWNLOAD=0
+
 # If this flag is enabled, then extracted files are not cleaned.
 NO_CLEANUP_EXTRACTED_FILES=0
 
@@ -410,6 +413,37 @@ get_list_of_binary_packages()
   echo $bin_package_list
 }
 
+# Get list of devel packages.
+get_list_of_devel_packages()
+{
+  local packages="$*"
+  local devel_package_list=""
+
+  for package in $packages; do
+    local package_name=$(get_name_from_package_name $package)
+    local version=$(get_version_from_package_name $package)
+
+    # libopenssl1_1 binaries comes from openssl.
+    if [ "$package_name" = "libopenssl1_1" ]; then
+      package_name="libopenssl-1_1-devel"
+    fi
+
+    # libopenssl-3 binaries comes from openssl-3
+    if [ "$package_name" = "libopenssl3" -o "$package_name" = "libopenssl3-x86-64-v3" ]; then
+      package_name="libopenssl-3-devel"
+    fi
+
+    # glibc binaries comes from glibc-utils
+    if [ "$package_name" = "glibc" -o "$package_name" = "glibc-locale-base" -o "$package_name" = "glibc-gconv-modules-extra" ]; then
+      package_name="glibc-devel"
+    fi
+
+    devel_package_list="$devel_package_list $package_name-$version.$ARCH.rpm"
+  done
+
+  echo $devel_package_list
+}
+
 download_debuginfo_packages()
 {
   local packages=$(get_list_of_debuginfo_packages "$*")
@@ -446,6 +480,15 @@ download_binary_packages()
   local old_url=$URL
 
   set_url_platform $PLATFORM $PRODUCT $ARCH "bin"
+  parallel_download_packages "$packages"
+}
+
+download_devel_packages()
+{
+  local packages=$(get_list_of_devel_packages "$*")
+  local old_url=$URL
+
+  set_url_platform $PLATFORM $PRODUCT $ARCH "devel"
   parallel_download_packages "$packages"
 }
 
@@ -756,6 +799,8 @@ print_help_message()
   echo "  --arch=ARCH                    System architecture (ex x86_64)"
   echo "  --no-src-download              Do not download the src package."
   echo "  --no-ipa-clones-download       Do not download the ipa-clones tarballs."
+  echo "  --no-binary-download           Do not download the binary packages."
+  echo "  --no-devel-download            Do not download the devel packages."
   echo "  --no-cleanup                   Do not cleanup downloaded .rpm files."
   echo "  --no-cleanup-extracted         Do not cleanup extracted files."
   echo "  --no-information-extraction    Do not extract and create .json files."
@@ -834,6 +879,10 @@ parse_program_argv()
         ;;
       --no-binary-download)
         NO_BINARY_DOWNLOAD=1
+        shift
+        ;;
+      --no-devel-download)
+        NO_DEVEL_DOWNLOAD=1
         shift
         ;;
       --no-cleanup-extracted)
@@ -948,6 +997,9 @@ main()
     fi
     if [ $NO_BINARY_DOWNLOAD -eq 0 ]; then
       download_binary_packages "$nevras"
+    fi
+    if [ $NO_DEVEL_DOWNLOAD -eq 0 ]; then
+      download_devel_packages "$nevras"
     fi
 
     all_names="$all_names $names"
