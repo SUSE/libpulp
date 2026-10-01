@@ -823,8 +823,8 @@ check_required_programs()
     err=1
   fi
 
-  if ! rpm2cpio --help 2> /dev/null > /dev/null; then
-    echo "ERROR: rpm2cpio not found. Install rpm."
+  if ! type -P dumpsolv 2> /dev/null > /dev/null; then
+    echo "ERROR: dumpsolv not found. Install libsolv-tools."
     err=1
   fi
 
