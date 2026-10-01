@@ -32,9 +32,9 @@
 #include <limits.h>
 
 #include "config.h"
-#include "error.h"
+#include "lib/error.h"
 #include "msg_queue.h"
-#include "ulp.h"
+#include "lib/ulp.h"
 
 #include "arch/powerpc64le/arch_common.h"
 

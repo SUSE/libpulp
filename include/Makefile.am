@@ -18,21 +18,21 @@
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
 noinst_HEADERS = \
-	ulp.h \
 	ulp_common.h \
-	interpose.h \
 	msg_queue.h \
-	error.h \
 	error_common.h \
 	terminal_colors.h \
-	ld_rtld.h \
 	insn_queue.h \
-	insn_queue_lib.h \
-	minielf.h \
-	symbol_loader.h \
 	ulp_metadata.h \
 	ulp_applied_patch.h \
-	ulp_detour.h
+	lib/ulp.h \
+	lib/interpose.h \
+	lib/error.h \
+	lib/ld_rtld.h \
+	lib/insn_queue_lib.h \
+	lib/minielf.h \
+	lib/symbol_loader.h \
+	lib/ulp_detour.h
 
 # Workaround a bug in Autoconf 2.69
 if CPU_X86_64

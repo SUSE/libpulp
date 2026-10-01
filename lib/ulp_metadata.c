@@ -6,7 +6,7 @@
 
 #include "ulp_metadata.h"
 #include "ulp_common.h"
-#include "error.h"
+#include "lib/error.h"
 
 
 extern char __ulp_metadata_buffer[];

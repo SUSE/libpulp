@@ -30,7 +30,7 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 
-#include "error.h"
+#include "lib/error.h"
 #include "ulp_common.h"
 
 /** Global instruction queue object.  */

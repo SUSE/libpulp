@@ -38,17 +38,17 @@
 #include <unistd.h>
 #include <sys/param.h>
 
-#include "interpose.h"
-#include "symbol_loader.h"
+#include "lib/interpose.h"
+#include "lib/symbol_loader.h"
 #include "config.h"
-#include "ld_rtld.h"
+#include "lib/ld_rtld.h"
 #include "msg_queue.h"
-#include "ulp.h"
+#include "lib/ulp.h"
 #include "ulp_common.h"
 #include "arch_common.h"
 
 /* This header should be included last, as it poisons some symbols.  */
-#include "error.h"
+#include "lib/error.h"
 
 /* Declare internal glibc functions which are exposed. We have to use them
    while __ulp_asunsafe_begin have not run yet.  */
