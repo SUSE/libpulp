@@ -181,9 +181,9 @@ web_get()
 {
   echo downloading "$1"
   if [ -z "$2" ]; then
-    wget -4 --show-progress --no-check-certificate "$1"
+    wget --no-hsts -4 --show-progress --no-check-certificate "$1"
   else
-    wget -4 --show-progress --no-check-certificate -O "$2" "$1"
+    wget --no-hsts -4 --show-progress --no-check-certificate -O "$2" "$1"
   fi
 
   if [ $? -eq 4 ]; then
@@ -198,7 +198,7 @@ update_meta()
     pushd meta
     echo "meta from $BASEURL"
     dname="$PLATFORM.$PRODUCT"
-    wget -4 --no-check-certificate -r --no-parent -l 1 -N --show-progress -P "$dname/" "$BASEURL/repodata/"
+    wget --no-hsts -4 --no-check-certificate -r --no-parent -l 1 -N --show-progress -P "$dname/" "$BASEURL/repodata/"
     if [ $? -eq 4 ]; then
       echo Unable to download "$BASEURL/repodata"
       exit 1
@@ -281,7 +281,7 @@ parallel_download_packages()
     # If package already exists, do not bother downloading them again
     if [ ! -f "$package" ]; then
       echo "downloading from $url"
-      wget -4 -q --show-progress --no-check-certificate "$url" &
+      wget --no-hsts -4 -q --show-progress --no-check-certificate "$url" &
       pid=$!
       pids="$pid $pids"
     else
