@@ -20,9 +20,9 @@
  */
 
 #define _GNU_SOURCE
-#include "ulp_detour.h"
+#include "lib/ulp_detour.h"
 #include "ulp_common.h"
-#include "symbol_loader.h"
+#include "lib/symbol_loader.h"
 #include "arch_common.h"
 
 #include <stdio.h>
@@ -31,7 +31,7 @@
 #include <link.h>
 #include <dlfcn.h>
 
-#include "error.h"
+#include "lib/error.h"
 
 struct ulp_detour_root *__ulp_root = NULL;
 unsigned int __ulp_root_index_counter = 0;

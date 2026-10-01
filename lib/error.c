@@ -31,7 +31,7 @@ __libpulp_unique_exit_point()
   exit(1);
 }
 
-#include "error.h"
+#include "lib/error.h"
 #include "msg_queue.h"
 #include <stdarg.h>
 #include <stdio.h>

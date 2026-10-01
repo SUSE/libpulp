@@ -40,11 +40,11 @@
 #include <sys/param.h>
 #include <stdarg.h>
 
-#include "symbol_loader.h"
-#include "ld_rtld.h"
+#include "lib/symbol_loader.h"
+#include "lib/ld_rtld.h"
 #ifndef WARN
 #include "ulp_common.h"
-#include "error.h"
+#include "lib/error.h"
 #endif
 
 extern const char *__progname;

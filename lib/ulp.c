@@ -29,13 +29,13 @@
 
 #include "arch_common.h"
 #include "config.h"
-#include "error.h"
-#include "insn_queue_lib.h"
-#include "interpose.h"
-#include "symbol_loader.h"
+#include "lib/error.h"
+#include "lib/insn_queue_lib.h"
+#include "lib/interpose.h"
+#include "lib/symbol_loader.h"
 #include "msg_queue.h"
-#include "ulp.h"
-#include "ulp_detour.h"
+#include "lib/ulp.h"
+#include "lib/ulp_detour.h"
 
 /* ulp data structures */
 extern struct ulp_patching_state __ulp_state;

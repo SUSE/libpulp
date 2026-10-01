@@ -25,9 +25,9 @@
 #include <string.h>
 
 #include "config.h"
-#include "error.h"
+#include "lib/error.h"
 #include "msg_queue.h"
-#include "ulp.h"
+#include "lib/ulp.h"
 #include "arch/x86_64/arch_common.h"
 
 /** Intel endbr64 instruction optcode.  */

@@ -23,14 +23,14 @@
 
 #include "ulp_common.h"
 #include "ulp_applied_patch.h"
-#include "ulp.h"
+#include "lib/ulp.h"
 #include "msg_queue.h"
-#include "symbol_loader.h"
+#include "lib/symbol_loader.h"
 
 #include <stdlib.h>
 #include <string.h>
 
-#include "error.h"
+#include "lib/error.h"
 
 struct ulp_patching_state __ulp_state = { 0, NULL };
 
