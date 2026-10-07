@@ -30,18 +30,20 @@
 /* Create an externally visible msg_queue object that will be read with ptrace.
  * It will be read by ulp_messages (tools/messages.c) using ptrace. */
 
-struct msg_queue __ulp_msg_queue;
+struct msg_queue __ulp_msg_queue_new = { .size = MSGQ_BUFFER_MAX };
 
-static char msg[MSGQ_BUFFER_MAX];
+/* Define an buffer in which snprintf will expand tokens in strings.  */
+#define SPRINTF_BUFFER_SIZE         8192
+static char msg[SPRINTF_BUFFER_SIZE];
 
 static void
 msgq_strpush(const char *msg, size_t msg_size)
 {
   /* Write the msg_queue values in variables for briefness.  */
-  int top = __ulp_msg_queue.top;
-  int bottom = __ulp_msg_queue.bottom;
-  int distance = __ulp_msg_queue.distance;
-  char *buffer = __ulp_msg_queue.buffer;
+  int top = __ulp_msg_queue_new.top;
+  int bottom = __ulp_msg_queue_new.bottom;
+  int distance = __ulp_msg_queue_new.distance;
+  char *buffer = __ulp_msg_queue_new.buffer;
 
   /* In case the message is empty or it is too large for the buffer, don't
    * bother even trying to insert it.  */
@@ -88,9 +90,9 @@ msgq_strpush(const char *msg, size_t msg_size)
   distance += msg_size;
   top = (top + msg_size) % MSGQ_BUFFER_MAX;
 
-  __ulp_msg_queue.top = top;
-  __ulp_msg_queue.bottom = bottom;
-  __ulp_msg_queue.distance = distance;
+  __ulp_msg_queue_new.top = top;
+  __ulp_msg_queue_new.bottom = bottom;
+  __ulp_msg_queue_new.distance = distance;
 }
 
 /* Push a message into the message queue.
@@ -107,7 +109,7 @@ msgq_push(const char *format, ...)
    * return the size of the string, therefore, the size of the object will
    * be +1 because of the null character in the end of the string.  */
   va_start(arglist, format);
-  msg_size = vsnprintf(msg, MSGQ_BUFFER_MAX, format, arglist) + 1;
+  msg_size = vsnprintf(msg, SPRINTF_BUFFER_SIZE, format, arglist) + 1;
   va_end(arglist);
 
   msgq_strpush(msg, msg_size);
@@ -125,7 +127,7 @@ msgq_vpush(const char *format, va_list arglist)
   /* Expand the format string with the arguments provided. vsnprintf will
    * return the size of the string, therefore, the size of the object will
    * be +1 because of the null character in the end of the string.  */
-  msg_size = vsnprintf(msg, MSGQ_BUFFER_MAX, format, arglist) + 1;
+  msg_size = vsnprintf(msg, SPRINTF_BUFFER_SIZE, format, arglist) + 1;
 
   msgq_strpush(msg, msg_size);
 }

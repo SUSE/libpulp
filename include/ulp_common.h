@@ -33,9 +33,9 @@
 #define OUT_PATCH_NAME "metadata.ulp"
 #define OUT_REVERSE_NAME "reverse.ulp"
 
-/* Use a 512kb buffer for metadata.  This should be enough for most case
+/* Use a 64kb buffer for metadata.  This should be enough for most case
  * scenarios.  */
-#define ULP_METADATA_BUF_LEN (512 * 1024)
+#define ULP_METADATA_BUF_LEN (64 * 1024)
 #define ULP_PATH_LEN 256
 
 #define ARRAY_LENGTH(v) (sizeof(v) / sizeof(*(v)))

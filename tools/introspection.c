@@ -913,8 +913,12 @@ get_libpulp_extern_symbols(struct ulp_dynobj *obj, int pid)
         bitfield |= (1 << 3);
       }
       else if (!strcmp(remote_name, "_msg_queue")) {
+        obj->msg_queue_old = ehdr_addr + sym.st_value;
+        bitfield |= (1 << 4); // Use the same bitfield as the msg_queue.
+      }
+      else if (!strcmp(remote_name, "_msg_queue_new")) {
         obj->msg_queue = ehdr_addr + sym.st_value;
-        bitfield |= (1 << 4);
+        bitfield |= (1 << 4); // Use the same bitfield as the msg_queue.
       }
       else if (!strcmp(remote_name, "_revert_all")) {
         obj->revert_all = ehdr_addr + sym.st_value;

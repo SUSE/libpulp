@@ -714,7 +714,8 @@ TESTS = \
   seccomp_disable.py \
   run_libc.py \
   glibc_private.py \
-  dlopen.py
+  dlopen.py \
+  size.sh
 
 XFAIL_TESTS = \
   blocked.py \

@@ -24,8 +24,11 @@
 
 #include <stdarg.h>
 
-/** Define a 2Mb buffer for holding the messages.  */
-#define MSGQ_BUFFER_MAX (2 * 1024 * 1024)
+/** Define a 256Kb buffer for holding the messages in the old queue.  */
+#define MSGQ_BUFFER_MAX (256 * 1024)
+
+/** Define a 2Mb buffer for holding the messages in the old queue.  */
+#define MSGQ_OLD_BUFFER_MAX (2 * 1024 * 1024)
 
 /** This is the circular message queue datastructure.
  *
@@ -60,10 +63,32 @@
  * resulting in the circular queue behaviour. When reading this queue, the user
  * should start reading from the bottom position.
  */
+
+/** Define the same structure that is used by old versions of libpulp (<0.3.18)  */
 struct msg_queue
 {
+  /** Size of the queue.  Must match the size of MSGQ_BUFFER_MAX.  */
+  int size;
+
+  /** Position pointing to free memory that can be written to.  */
+  int top;
+
+  /** Position pointing to the oldest message still in buffer.  */
+  int bottom;
+
+  /** Distance betweem top and bottom. Should not be greater than
+   * MSGQ_BUFFER_MAX.  */
+  int distance;
+
   /** Buffer holding the messages.  */
   char buffer[MSGQ_BUFFER_MAX];
+};
+
+/** Define the same structure that is used by old versions of libpulp (<0.3.18)  */
+struct msg_queue_old
+{
+  /** Buffer holding the messages.  */
+  char buffer[MSGQ_OLD_BUFFER_MAX];
 
   /** Position pointing to free memory that can be written to.  */
   int top;
@@ -76,7 +101,7 @@ struct msg_queue
   int distance;
 };
 
-extern struct msg_queue __ulp_msg_queue;
+extern struct msg_queue __ulp_msg_queue_new;
 
 void msgq_push(const char *format, ...);
 void msgq_vpush(const char *format, va_list);
