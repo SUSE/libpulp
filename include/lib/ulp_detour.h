@@ -80,3 +80,5 @@ struct ulp_detour_root *push_new_root(void);
 int ulp_revert_all_units(unsigned char *patch_id);
 
 int ulp_apply_all_units(struct ulp_metadata *);
+
+void release_ulp_detour_root(void);

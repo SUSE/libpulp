@@ -24,6 +24,7 @@
 #include "ulp_common.h"
 #include "lib/symbol_loader.h"
 #include "arch_common.h"
+#include "lib/ulp.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,13 +37,10 @@
 struct ulp_detour_root *__ulp_root = NULL;
 unsigned int __ulp_root_index_counter = 0;
 
-/* Functions from other modules.  See what to do with them.  */
-void ulp_patch_addr_absolute(void *old_faddr, void *new_faddr);
-int ulp_patch_addr(void *old_faddr, void *new_faddr, int enable);
-void *memwrite(void *dest, const void *src, size_t n);
-
-
 extern unsigned long __ulp_global_universe;
+
+/* Arch-specifc patch function, not exported in any header.  */
+int ulp_patch_addr(void *old_faddr, void *new_faddr, int enable);
 
 /** @brief Get next root index and update the global counter.
  *
@@ -319,6 +317,45 @@ ulp_apply_all_units(struct ulp_metadata *ulp)
   }
 
   return 0;
+}
+
+/** Release all detours allocated.  This should be called when libpulp has
+ *  finished its work and everything needs to be deallocated in order for
+ *  it to not trigger memory sanitizers.
+ */
+void release_ulp_detour_root(void)
+{
+  /* Now release the detours.  */
+  struct ulp_detour_root *root = __ulp_root;
+
+  while (root) {
+    struct ulp_detour_root *root_next = root->next;
+    struct ulp_detour *detour = root->detours;
+
+    while (detour != NULL) {
+      struct ulp_detour *detour_next = detour->next;
+
+      /* Zero object.  */
+      memset(detour, 0, sizeof(*detour));
+
+      /* Release detour.  */
+      FREE_AND_NULLIFY(detour);
+
+      detour = detour_next;
+    }
+
+    /* Lets zero out the root object.  */
+    memset(root, 0, sizeof(*root));
+
+    /* Release detour_root.  */
+    FREE_AND_NULLIFY(root);
+
+    /* Go to next.  */
+    root = root_next;
+  }
+
+  /* Set the root object as NULL.  */
+  __ulp_root = NULL;
 }
 
 void
