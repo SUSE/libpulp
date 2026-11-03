@@ -81,37 +81,8 @@ end(void)
 
   __ulp_state.patches = NULL;
 
-  /* Now release the detours.  */
-  struct ulp_detour_root *root = __ulp_root;
-
-  while (root) {
-    struct ulp_detour_root *root_next = root->next;
-    struct ulp_detour *detour = root->detours;
-
-    while (detour != NULL) {
-      struct ulp_detour *detour_next = detour->next;
-
-      /* Zero object.  */
-      memset(detour, 0, sizeof(*detour));
-
-      /* Release detour.  */
-      FREE_AND_NULLIFY(detour);
-
-      detour = detour_next;
-    }
-
-    /* Lets zero out the root object.  */
-    memset(root, 0, sizeof(*root));
-
-    /* Release detour_root.  */
-    FREE_AND_NULLIFY(root);
-
-    /* Go to next.  */
-    root = root_next;
-  }
-
-  /* Set the root object as NULL.  */
-  __ulp_root = NULL;
+  /* now release the detour_root.  */
+  release_ulp_detour_root();
 }
 
 /** @brief Write into memory bypassing memory protections
@@ -241,48 +212,6 @@ __ulp_get_global_universe_value()
   return __ulp_global_universe;
 }
 
-/*
- * Read one line from FD into BUF, which must be pre-allocated and large
- * enough to hold LEN characteres. The offset into FD is advanced by the
- * amount of bytes read.
- *
- * @return  -1 on error, 0 on End-of-file, or the amount of bytes read.
- */
-int
-read_line(int fd, char *buf, size_t len)
-{
-  char *ptr;
-  int retcode;
-  size_t offset;
-
-  /* Read one byte at a time, until a newline is found. */
-  offset = 0;
-  while (offset < len) {
-    ptr = buf + offset;
-
-    /* Read one byte. */
-    retcode = read(fd, ptr, 1);
-
-    /* Error with read syscall. */
-    if (retcode == -1) {
-      if (errno == EINTR || errno == EAGAIN)
-        continue;
-      else
-        return -1;
-    }
-
-    /* Stop at EOF or EOL. */
-    if (retcode == 0 || *ptr == '\n') {
-      return offset;
-    }
-
-    offset++; /* Reading one byte at a time. */
-  }
-
-  /* EOL not found. */
-  return -1;
-}
-
 /** @brief Load patch from metadata buffer and apply its content.
  *
  * When a livepatch is issued, this function will parse the patch from the
@@ -348,61 +277,6 @@ load_patch(void)
 load_patch_success:
   unload_metadata(ulp);
   return ret;
-}
-
-/* @brief Retrieves the memory protection bits of the page containing ADDR.
- *
- * @param addr    Address of the page.
- * @return        If errors ocurred, return -1.
- */
-int
-memory_protection_get(uintptr_t addr)
-{
-  char line[LINE_MAX];
-  char *str;
-  char *end;
-  int fd;
-  int result;
-  int retcode;
-  uintptr_t addr1;
-  uintptr_t addr2;
-
-  fd = open("/proc/self/maps", O_RDONLY);
-  if (fd == -1)
-    return -1;
-
-  /* Iterate over /proc/self/maps lines. */
-  result = -1;
-  for (;;) {
-
-    /* Read one line. */
-    retcode = read_line(fd, line, LINE_MAX);
-    if (retcode <= 0)
-      break;
-
-    /* Parse the address range in the current line. */
-    str = line;
-    addr1 = strtoul(str, &end, 16);
-    str = end + 1; /* Skip the dash used in the range output. */
-    addr2 = strtoul(str, &end, 16);
-
-    /* Skip line if target address not within range. */
-    if (addr < addr1 || addr >= addr2)
-      continue;
-
-    /* Otherwise, parse the memory protection bits. */
-    result = 0;
-    if (*(end + 1) == 'r')
-      result |= PROT_READ;
-    if (*(end + 2) == 'w')
-      result |= PROT_WRITE;
-    if (*(end + 3) == 'x')
-      result |= PROT_EXEC;
-    break;
-  }
-
-  close(fd);
-  return result;
 }
 
 /** @brief Get patched address of function with universe index = idx.

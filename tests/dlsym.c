@@ -1,6 +1,6 @@
 #define _GNU_SOURCE
 #include "../include/config.h"
-#include "../include/ld_rtld.h"
+#include "../include/lib/ld_rtld.h"
 #include <dlfcn.h>
 #include <gnu/lib-names.h>
 #include <gnu/libc-version.h>
