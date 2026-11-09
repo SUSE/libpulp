@@ -370,11 +370,6 @@ get_list_of_debuginfo_packages()
     local package_name=$(get_name_from_package_name $package)
     local version=$(get_version_from_package_name $package)
 
-    # glibc-locale-base comes from glibc
-    if [ "$package_name" = "glibc-locale-base" ]; then
-      package_name="glibc"
-    fi
-
     src_package_list="$src_package_list $package_name-debuginfo-$version.$ARCH.rpm"
   done
 
@@ -637,7 +632,7 @@ ulp_extract_task ()
   # libraries here.
   ulp livepatchable $so 2> /dev/null
   if [ $? -ne 0 ]; then
-    continue # Library is not livepatchable, skip it.
+    return 0 # Library is not livepatchable, skip it.
   fi
 
   if [ $NO_DEBUGINFO_DOWNLOAD -eq 0 ]; then
@@ -645,7 +640,7 @@ ulp_extract_task ()
     local debug=$(match_so_to_debuginfo $so)
 
     if [ "$debug" == "" ]; then
-      continue
+      return 0
     fi
 
     # Run the ulp extract command on both the library and debuginfo.
