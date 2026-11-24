@@ -20,7 +20,7 @@
 #   along with libpulp.  If not, see <http://www.gnu.org/licenses/>.
 
 PROGNAME=`basename "$0"`
-SUPPORTED_PACKAGES="libopenssl1_1 libopenssl3 libopenssl3-x86-64-v3 glibc glibc-gconv-modules-extra glibc-locale-base"
+SUPPORTED_PACKAGES="libopenssl1_1 libopenssl3 libopenssl3-x86-64-v3 glibc glibc-gconv-modules-extra glibc-locale-base glibc-locale"
 
 
 SLE_VERSION_REGEX="[0-9]{6}|slfo[\.0-9]+"
@@ -31,6 +31,9 @@ ARCH=
 BASEURL=
 URL=
 PACKAGE=
+# Files requested by parallel_download_packages in this run, either downloaded
+# or already present.  Only these are classified by --classify-rpm-packages.
+DOWNLOADED_FILES=""
 NO_CLEANUP=0
 
 # If this flag is enabled, then download of src packages will be blocked.
@@ -248,7 +251,7 @@ extract_lib_package_names()
   local final=""
   while read -r pname evr arch; do
   final="$final ${pname};${evr};${arch}"
-  done <<< "$(grep -E "$lib_name [^ ]+ $ARCH" $1)"
+  done <<< "$(grep -E "^$lib_name [^ ]+ $ARCH\$" $1)"
 
   echo $final
 }
@@ -278,6 +281,7 @@ parallel_download_packages()
 
   for package in $packages; do
     local url="$URL/$package"
+    DOWNLOADED_FILES="$DOWNLOADED_FILES $package"
     # If package already exists, do not bother downloading them again
     if [ ! -f "$package" ]; then
       echo "downloading from $url"
@@ -318,7 +322,7 @@ get_list_of_ipa_clones()
     fi
 
     # glibc-locale-base ipa-clones artifacts are named glibc
-    if [ "$package_name" = "glibc-locale-base" -o "$package_name" = "glibc-gconv-modules-extra" ]; then
+    if [ "$package_name" = "glibc-locale-base" -o "$package_name" = "glibc-locale" -o "$package_name" = "glibc-gconv-modules-extra" ]; then
       package_name="glibc"
     fi
 
@@ -349,7 +353,7 @@ get_list_of_src_packages()
     fi
 
     # glibc-locale-base ipa-clones artifacts are named glibc
-    if [ "$package_name" = "glibc-locale-base" -o "$package_name" = "glibc-gconv-modules-extra" ]; then
+    if [ "$package_name" = "glibc-locale-base" -o "$package_name" = "glibc-locale" -o "$package_name" = "glibc-gconv-modules-extra" ]; then
       package_name="glibc"
     fi
 
@@ -398,7 +402,7 @@ get_list_of_binary_packages()
     fi
 
     # glibc binaries comes from glibc-utils
-    if [ "$package_name" = "glibc-locale-base" -o "$package_name" = "glibc-gconv-modules-extra" ]; then
+    if [ "$package_name" = "glibc-locale-base" -o "$package_name" = "glibc-locale" -o "$package_name" = "glibc-gconv-modules-extra" ]; then
       package_name="glibc-utils"
     fi
 
@@ -429,7 +433,7 @@ get_list_of_devel_packages()
     fi
 
     # glibc binaries comes from glibc-utils
-    if [ "$package_name" = "glibc" -o "$package_name" = "glibc-locale-base" -o "$package_name" = "glibc-gconv-modules-extra" ]; then
+    if [ "$package_name" = "glibc" -o "$package_name" = "glibc-locale-base" -o "$package_name" = "glibc-locale" -o "$package_name" = "glibc-gconv-modules-extra" ]; then
       package_name="glibc-devel"
     fi
 
@@ -503,9 +507,12 @@ classify_rpms()
   # Initialize semaphore with the current number of CPUs.
   open_sem $(getconf _NPROCESSORS_ONLN)
 
-  # Run in parallel per file.
-  for rpm in *.rpm; do
-    classify_rpm_task $rpm
+  # Only classify the .rpm files of this run, not every .rpm in the current
+  # directory, which could belong to another package or platform.
+  for rpm in $DOWNLOADED_FILES; do
+    if [[ "$rpm" == *.rpm && -f "$rpm" ]]; then
+      classify_rpm_task $rpm
+    fi
   done
 
   # Close semaphore.
