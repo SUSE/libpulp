@@ -98,8 +98,22 @@ insnq_interpret(insn_queue_t *queue)
   int num_insns = queue->num_insns;
   char *buffer = queue->buffer;
 
+  if ((unsigned) size > INSN_BUFFER_MAX) {
+    WARN("insnq: invalid instruction buffer size. All insns will be ignored.");
+    return EINSNQ;
+  }
+
   while (num_insns_executed < num_insns) {
     struct ulp_insn *insn = (struct ulp_insn *)&buffer[pc];
+
+    /* Make sure we won't go past the buffer.  */
+    if (pc >= INSN_BUFFER_MAX) {
+      /* Abort if an invalid insn is received.  */
+      WARN("insnq: received instruction surpasses the buffer size. Further"
+           "insns will be ignored.");
+      return EINSNQ;
+    }
+
     if (ulp_insn_valid(insn)) {
       pc += insn_interpret(insn);
       num_insns_executed++;

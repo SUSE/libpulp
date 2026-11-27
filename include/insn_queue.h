@@ -25,11 +25,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/** Define a 2Mb buffer for holding the instructions list.  */
-#define INSN_BUFFER_MAX (2 * 1024 * 1024)
+/** Define a 256Kb buffer for holding the instructions list.  */
+#define INSN_BUFFER_MAX (256 * 1024)
 
 /** Define the current version of the instruction queue.  */
-#define INSNQ_CURR_VERSION 1
+#define INSNQ_CURR_VERSION 2
 
 /** The ULP instruction queue.  This works as follows:
  * 1- Libpulp write instructions that should be executed on the `ulp` tool

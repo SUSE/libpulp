@@ -41,13 +41,21 @@
 #include "ulp_common.h"
 
 static Elf64_Addr
-get_msgq_address(const struct ulp_process *p)
+get_msgq_address(const struct ulp_process *p, bool *old)
 {
   struct ulp_dynobj *dyn;
   Elf64_Addr msgq_addr = 0;
 
   for (dyn = p->dynobj_libpulp; dyn != NULL; dyn = dyn->next) {
+
+    /* Try the old queue first.  */
+    if (dyn->msg_queue_old) {
+      *old = true;
+      msgq_addr = dyn->msg_queue_old;
+    }
+
     if (dyn->msg_queue) {
+      *old = false;
       msgq_addr = dyn->msg_queue;
       break;
     }
@@ -57,34 +65,31 @@ get_msgq_address(const struct ulp_process *p)
 }
 
 static void
-msgq_print(struct msg_queue *msg_queue)
+msgq_print(int size, int bottom, int distance, const char *buffer)
 {
-  int bottom = msg_queue->bottom;
-  int distance = msg_queue->distance;
-
   while (distance > 0) {
-    putchar(msg_queue->buffer[bottom]);
-    bottom = (bottom + 1) % MSGQ_BUFFER_MAX;
+    putchar(buffer[bottom]);
+    bottom = (bottom + 1) % size;
     distance--;
   }
 }
 
 static void
-msgq_debug(struct msg_queue *msg_queue)
+msgq_debug(int size, int bottom, int top, const char *buffer)
 {
   int i;
-  for (i = 0; i < MSGQ_BUFFER_MAX; i++) {
-    if (msg_queue->buffer[i] == '\0')
+  for (i = 0; i < size; i++) {
+    if (buffer[i] == '\0')
       putchar('.');
     else
-      putchar(msg_queue->buffer[i]);
+      putchar(buffer[i]);
   }
   putchar('\n');
 
-  for (i = 0; i < MSGQ_BUFFER_MAX; i++) {
-    if (msg_queue->bottom == i)
+  for (i = 0; i < size; i++) {
+    if (bottom == i)
       putchar('B');
-    else if (msg_queue->top == i)
+    else if (top == i)
       putchar('T');
     else
       putchar(' ');
@@ -93,44 +98,116 @@ msgq_debug(struct msg_queue *msg_queue)
 }
 
 static int
-print_message_buffer(const struct ulp_process *p, bool debug)
+print_message_buffer_new(int pid, Elf64_Addr msgq_addr, bool debug)
 {
   static struct msg_queue msg_queue;
   int ret;
 
-  Elf64_Addr msgq_addr = get_msgq_address(p);
+  memset(&msg_queue, 0, sizeof(msg_queue));
 
-  memset(&msg_queue, 0, sizeof(struct msg_queue));
+  if (attach(pid)) {
+    DEBUG("unable to attach to %d to read string.", pid);
+    return 1;
+  }
+
+  /* Read the first bytes without the buffer to determine the size.  */
+  ret = read_memory(&msg_queue, offsetof(struct msg_queue, buffer), pid,
+                    msgq_addr);
+
+  if (ret > 0) {
+    WARN("could not read libpulp.so message queue in process %d.", pid);
+    return 1;
+  }
+
+  if (msg_queue.size > MSGQ_BUFFER_MAX) {
+    WARN("libpulp.so message queue size is not valid.", pid);
+    msg_queue.size = MSGQ_BUFFER_MAX;
+  }
+
+  /* Read the buffer now.  */
+  ret = read_memory(msg_queue.buffer, msg_queue.size, pid,
+                    msgq_addr + offsetof(struct msg_queue, buffer));
+
+  if (detach(pid)) {
+    DEBUG("unable to detach from %d.", pid);
+    return 1;
+  }
+
+  if (ret > 0) {
+    WARN("could not read libpulp.so message queue in process %d.", pid);
+    return 1;
+  }
+
+  int size = msg_queue.size;
+  int bottom = msg_queue.bottom;
+  int top = msg_queue.top;
+  int distance = msg_queue.distance;
+  const char *buffer = msg_queue.buffer;
+
+  if (debug)
+    msgq_debug(size, bottom, top, buffer);
+  else
+    msgq_print(size, bottom, distance, buffer);
+
+  return ret;
+}
+
+static int
+print_message_buffer_old(int pid, Elf64_Addr msgq_addr, bool debug)
+{
+  static struct msg_queue_old msg_queue;
+  int ret;
+
+  memset(&msg_queue, 0, sizeof(msg_queue));
+
+  if (attach(pid)) {
+    DEBUG("unable to attach to %d to read string.", pid);
+    return 1;
+  }
+
+  ret = read_memory((void *)&msg_queue, sizeof(msg_queue), pid, msgq_addr);
+
+  if (detach(pid)) {
+    DEBUG("unable to detach from %d.", pid);
+    return 1;
+  }
+
+  if (ret > 0) {
+    WARN("could not read libpulp.so message queue in process %d.", pid);
+    return 1;
+  }
+
+  int size = MSGQ_OLD_BUFFER_MAX;
+  int bottom = msg_queue.bottom;
+  int top = msg_queue.top;
+  int distance = msg_queue.distance;
+  const char *buffer = msg_queue.buffer;
+
+  if (debug)
+    msgq_debug(size, bottom, top, buffer);
+  else
+    msgq_print(size, bottom, distance, buffer);
+
+  return ret;
+}
+
+static int
+print_message_buffer(const struct ulp_process *p, bool debug)
+{
+  bool old;
+
+  Elf64_Addr msgq_addr = get_msgq_address(p, &old);
 
   if (!msgq_addr) {
     WARN("could not find libpulp.so message queue in process %d.", p->pid);
     return 1;
   }
 
-  if (attach(p->pid)) {
-    DEBUG("unable to attach to %d to read string.", p->pid);
-    return 1;
+  if (old) {
+    return print_message_buffer_old(p->pid, msgq_addr, debug);
+  } else {
+    return print_message_buffer_new(p->pid, msgq_addr, debug);
   }
-
-  ret = read_memory((void *)&msg_queue, sizeof(struct msg_queue), p->pid,
-                    msgq_addr);
-
-  if (detach(p->pid)) {
-    DEBUG("unable to detach from %d.", p->pid);
-    return 1;
-  }
-
-  if (ret > 0) {
-    WARN("could not read libpulp.so message queue in process %d.", p->pid);
-    return 1;
-  }
-
-  if (debug)
-    msgq_debug(&msg_queue);
-  else
-    msgq_print(&msg_queue);
-
-  return ret;
 }
 
 int

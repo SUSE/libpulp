@@ -91,6 +91,7 @@ test1_parent(int child_pid)
   close(1);
   if (insnq_interpret_from_process_(child_pid,
                                     (Elf64_Addr)&__ulp_insn_queue)) {
+    printf("Test 1 fail\n");
     abort();
   }
   fflush(stdout);
@@ -104,7 +105,10 @@ test1_child(void)
   int n = INSN_BUFFER_MAX / 8;
   const char *string = "abc";
   for (int i = 0; i < n; i++) {
-    insnq_insert_print(string);
+    if (insnq_insert_print(string)) {
+      printf("Error inserting print insn");
+      abort ();
+    }
   }
 
   send('a');
@@ -120,6 +124,7 @@ test2_parent(int child_pid)
   wait_for('c');
   if (insnq_interpret_from_process_(
           child_pid, (Elf64_Addr)&__ulp_insn_queue) != EOLDULP) {
+    printf("Test 2 fail\n");
     abort();
   }
   send('d');
@@ -180,6 +185,7 @@ test3_child(void)
   wait_for('f');
 
   if (memcmp(buf, (void *)write_frame, 8) != 0) {
+    printf("Test 3 fail\n");
     abort();
   }
 }
@@ -204,6 +210,7 @@ test4_child(void)
 
   /* Should detect that we are out of memory in the queue and fail.  */
   if (ret != EINSNQ) {
+    printf("Test 4 fail\n");
     abort();
   }
 
